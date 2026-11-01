@@ -1,5 +1,13 @@
 # NM Studio – Registro versioni
 
+## 5.0.0
+
+- Generazione di dashboard HA `picture-elements` a partire dalle planimetrie salvate: ogni punto con entità HA presente viene rappresentato mediante un `state-icon` nativo nella posizione originale.
+- Più faretti possono condividere una sola entità ed essere mostrati in punti differenti; luci/switch usano l'azione nativa `toggle`, gli altri domini aprono i dettagli nativi `more-info`.
+- Anteprima e audit dei punti senza entità, esportazione JSON, pubblicazione esplicita in una dashboard **nuova** senza sovrascrivere dashboard esistenti.
+- Immagine incorporata nel JSON come data URL per evitare interventi manuali su `/config/www`; compatibilità con il frontend Home Assistant reale ancora da verificare. Non sono previste modifiche a file di configurazione HA.
+- Nessun comando dal configuratore NM Studio; cliccare gli elementi sulla dashboard pubblicata può inviare comandi reali Home Assistant/KNX.
+
 ## 4.9.0
 
 - Corretto il caricamento della planimetria in browser: la Content Security Policy ora consente le immagini locali `data:` e `blob:` necessarie all'editor.
