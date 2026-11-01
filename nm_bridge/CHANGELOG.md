@@ -1,5 +1,11 @@
 # NM Studio – Registro versioni
 
+## 4.1.0
+
+- Primo contratto dati stabile per NM Intelligence (`contract_version: 1`) con capacità dichiarate e rilevamento del motore dalle sole entità Home Assistant.
+- La UI distingue installazione con sola supervisione HA da installazione con Decision Engine simulato, senza richiedere Proxmox o un accesso remoto.
+- Storico remoto e comandi dichiarati non disponibili; nessun cambiamento operativo sul bus o sui servizi Home Assistant.
+
 ## 4.0.1
 
 - Corretto il numero di versione mostrato nell'intestazione: non rimane più fermo alla 3.9.
