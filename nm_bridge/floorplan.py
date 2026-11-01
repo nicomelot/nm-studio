@@ -11,6 +11,9 @@ from pathlib import Path
 PATH = Path(os.getenv("NM_FLOORPLAN_PATH", "/data/nm_floorplans.json"))
 ID = re.compile(r"^[a-zA-Z0-9_-]{1,48}$")
 KINDS = {"light", "dali", "knx", "data", "wifi", "camera", "climate", "rack"}
+ICONS = {"bulb", "spot", "downlight", "led-strip", "pendant", "wall", "switch",
+         "cover", "thermostat", "sensor", "outlet", "wifi", "camera", "rack", "label"}
+ENTITY = re.compile(r"^(?:light|switch|cover|sensor|binary_sensor|climate|fan|media_player)\.[a-z0-9_]{1,240}$")
 MAX_IMAGE = 2 * 1024 * 1024
 
 
@@ -65,7 +68,14 @@ def validate(payload):
                 raise ValueError("Invalid point label or kind")
             if type(x) not in (int, float) or type(y) not in (int, float) or not 0 <= x <= 100 or not 0 <= y <= 100:
                 raise ValueError("Invalid point position")
-            clean_points.append({"id": point["id"], "kind": kind, "label": label.strip(), "x": round(x, 3), "y": round(y, 3)})
+            entity_id, icon = point.get("entity_id", ""), point.get("icon", "label")
+            if not isinstance(entity_id, str) or (entity_id and not ENTITY.fullmatch(entity_id)):
+                raise ValueError("Invalid floorplan Home Assistant entity")
+            if icon not in ICONS:
+                raise ValueError("Invalid floorplan symbol")
+            # Multiple physical points may intentionally reference the same HA entity.
+            clean_points.append({"id": point["id"], "kind": kind, "label": label.strip(), "x": round(x, 3), "y": round(y, 3),
+                                 "entity_id": entity_id, "icon": icon})
         cleaned.append({"id": pid, "name": name.strip(), "background": _image(plan.get("background")), "points": clean_points})
     return {"version": 1, "plans": cleaned}
 
