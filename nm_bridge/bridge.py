@@ -26,7 +26,7 @@ from knx_panel_bridge import inspect as inspect_knx_panel
 from knx_entity_plan import build as build_knx_entity_plan
 from migration_bundle import export_bundle as export_migration, restore_bundle as restore_migration
 from intelligence import summarize as intelligence_summary, decision_entity, normalize_history, history_path
-from module_plan import read as read_module_plan, save as save_module_plan
+from module_plan import read as read_module_plan, save as save_module_plan, suggest_entities as suggest_module_entities
 
 LOG = logging.getLogger("nm_bridge")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -213,6 +213,12 @@ class Handler(BaseHTTPRequestHandler):
                 self.respond(200, "application/json; charset=utf-8", json.dumps(read_module_plan(), ensure_ascii=False).encode())
             except (ValueError, OSError, json.JSONDecodeError):
                 self.respond(500, "application/json", b'{"error":"Module checklist unavailable"}')
+        elif path == "/modules/suggestions":
+            try:
+                data = suggest_module_entities(get_entities())
+                self.respond(200, "application/json; charset=utf-8", json.dumps(data, ensure_ascii=False).encode())
+            except (HTTPError, URLError, ValueError, RuntimeError, OSError, TypeError):
+                self.respond(502, "application/json", b'{"error":"Home Assistant suggestions unavailable"}')
         elif path == "/knx/approved":
             try:
                 self.respond(200, "application/json; charset=utf-8", json.dumps({"devices": read_devices()}, ensure_ascii=False).encode())
