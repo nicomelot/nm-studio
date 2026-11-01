@@ -25,7 +25,7 @@ from deployment_preflight import preflight as deployment_preflight
 from knx_panel_bridge import inspect as inspect_knx_panel
 from knx_entity_plan import build as build_knx_entity_plan
 from migration_bundle import export_bundle as export_migration, restore_bundle as restore_migration
-from intelligence import summarize as intelligence_summary, decision_entity, normalize_history
+from intelligence import summarize as intelligence_summary, decision_entity, normalize_history, history_path
 
 LOG = logging.getLogger("nm_bridge")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -61,7 +61,7 @@ def get_decision_history():
     start = (now - timedelta(days=1)).isoformat()
     query = urlencode({"filter_entity_id": entity, "end_time": now.isoformat(),
                        "significant_changes_only": "0"})
-    url = urlunsplit((origin.scheme, origin.netloc, "/api/history/period/" + start, query, ""))
+    url = urlunsplit((origin.scheme, origin.netloc, history_path(origin.path) + start, query, ""))
     req = Request(url, headers={"Authorization": f"Bearer {token}", "Accept": "application/json"})
     with urlopen(req, timeout=8) as response:
         raw = response.read(2 * 1024 * 1024 + 1)
