@@ -26,6 +26,7 @@ from knx_panel_bridge import inspect as inspect_knx_panel
 from knx_entity_plan import build as build_knx_entity_plan
 from migration_bundle import export_bundle as export_migration, restore_bundle as restore_migration
 from intelligence import summarize as intelligence_summary, decision_entity, normalize_history, history_path
+from module_plan import read as read_module_plan, save as save_module_plan
 
 LOG = logging.getLogger("nm_bridge")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -207,6 +208,11 @@ class Handler(BaseHTTPRequestHandler):
             except (ValueError, OSError, json.JSONDecodeError) as exc:
                 LOG.warning("Layout read failed (%s)", type(exc).__name__)
                 self.respond(500, "application/json", b'{"error":"Layout unavailable"}')
+        elif path == "/modules/plan":
+            try:
+                self.respond(200, "application/json; charset=utf-8", json.dumps(read_module_plan(), ensure_ascii=False).encode())
+            except (ValueError, OSError, json.JSONDecodeError):
+                self.respond(500, "application/json", b'{"error":"Module checklist unavailable"}')
         elif path == "/knx/approved":
             try:
                 self.respond(200, "application/json; charset=utf-8", json.dumps({"devices": read_devices()}, ensure_ascii=False).encode())
@@ -297,7 +303,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?", 1)[0]
-        if self.client_address[0] != INGRESS_PROXY or path not in ("/layout", "/ets/preview", "/knx/approved", "/audit", "/knx/widgets", "/knx/ha-preview", "/dashboard/missing-ha/review", "/dashboard/deployment-preflight", "/knx/panel-create-plan", "/dashboard/publish", "/migration/restore", "/nm-link", "/nm-link/preview", "/nm-link/simulate"):
+        if self.client_address[0] != INGRESS_PROXY or path not in ("/layout", "/modules/plan", "/ets/preview", "/knx/approved", "/audit", "/knx/widgets", "/knx/ha-preview", "/dashboard/missing-ha/review", "/dashboard/deployment-preflight", "/knx/panel-create-plan", "/dashboard/publish", "/migration/restore", "/nm-link", "/nm-link/preview", "/nm-link/simulate"):
             self.send_error(403)
             return
         # Ingress protects access; these checks also reject cross-site form POSTs.
@@ -315,6 +321,8 @@ class Handler(BaseHTTPRequestHandler):
                 layout = validate_layout(json.loads(body))
                 write_layout(layout)
                 data = {"saved": True}
+            elif path == "/modules/plan":
+                data = save_module_plan(json.loads(body))
             elif path == "/knx/approved":
                 data = confirm_devices(json.loads(body))
             elif path == "/knx/widgets":
