@@ -1,7 +1,7 @@
-name: NM Bridge (read-only laboratory)
+name: NM Bridge (installer laboratory)
 slug: nm_bridge
-description: Configurable read-only Home Assistant supervisor laboratory
-version: 4.7.1
+description: NM Studio installer lab with explicitly confirmed KNX entity provisioning
+version: 4.8.0
 arch:
   - amd64
   - aarch64
