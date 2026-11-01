@@ -60,3 +60,11 @@ class ModulePlanTests(unittest.TestCase):
         self.assertEqual(len(matches), 1)
         self.assertEqual(matches[0]["entity_id"], "sensor.pv_missing_unit")
         self.assertTrue(matches[0]["needs_unit_verification"])
+
+    def test_verification_requires_explicit_association(self):
+        plan = module_plan.empty_plan()
+        plan["modules"]["solar"]["verified"] = ["pv_power"]
+        with self.assertRaises(ValueError):
+            module_plan.validate(plan)
+        plan["modules"]["solar"]["assignments"] = {"pv_power": "sensor.pv_power"}
+        self.assertEqual(module_plan.validate(plan)["modules"]["solar"]["verified"], ["pv_power"])
