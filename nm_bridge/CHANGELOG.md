@@ -1,5 +1,11 @@
 # NM Studio – Registro versioni
 
+## 3.7.0
+
+- Primo rilascio incrementale dal repository GitHub ufficiale.
+- Indicatore di versione e canale GitHub visibile nell'interfaccia, per verificare l'aggiornamento da Home Assistant.
+- Nessuna modifica ai dati salvati, ai permessi o ai comportamenti KNX/HA: rilascio di collaudo degli aggiornamenti.
+
 ## 3.6.0
 
 - Backup esportabile delle cinque configurazioni locali (stanze, widget KNX, dispositivi approvati, note ETS, NM Link).
