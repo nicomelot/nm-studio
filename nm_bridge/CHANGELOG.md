@@ -1,5 +1,9 @@
 # NM Studio – Registro versioni
 
+## 4.0.1
+
+- Corretto il numero di versione mostrato nell'intestazione: non rimane più fermo alla 3.9.
+
 ## 4.0.0
 
 - Diagnostica dei sei sensori simulati con età dell'ultimo aggiornamento e distinzione fra dato recente, vecchio e timestamp assente.
