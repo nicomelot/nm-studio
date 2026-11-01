@@ -1,5 +1,13 @@
 # NM Studio – Registro versioni
 
+## 4.6.0
+
+- Ruoli di sensori logici associati alle entità Home Assistant, con conferma manuale distinta dalla semplice selezione.
+- Compatibilità con i piani esistenti; la verifica viene revocata nella UI quando cambia l'entità selezionata.
+- Ricerca dei suggerimenti già all'apertura del wizard e anteprima in sola lettura dei valori delle associazioni salvate.
+- Indicazione prudente «SIM probabile» dai nomi e origine da verificare: non vengono inferiti dati reali da valori simulati.
+- Nessuna creazione di entità, applicazione di YAML, comando su HA o telegramma KNX.
+
 ## 4.5.1
 
 - Suggerimenti HA meno restrittivi: un sensore con nome e dominio compatibili ma unità non dichiarata viene mostrato come candidato da verificare.
