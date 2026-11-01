@@ -1,5 +1,12 @@
 # NM Studio – Registro versioni
 
+## 3.8.0
+
+- Nuova scheda Intelligence in sola lettura, con stato, proposte, motivazioni e scadenza delle decisioni simulate di un motore esterno.
+- Endpoint GET `/intelligence/summary` che usa esclusivamente gli stati dell'istanza Home Assistant già collegata; nessun accesso diretto MQTT.
+- Proposte scadute, schemi non validi o decisioni con esecuzione abilitata non vengono mostrate come attive.
+- Nessun comando KNX, servizio HA, scrittura su MQTT o modifica ai dati salvati.
+
 ## 3.7.0
 
 - Primo rilascio incrementale dal repository GitHub ufficiale.
