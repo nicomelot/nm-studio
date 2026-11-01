@@ -49,3 +49,14 @@ class ModulePlanTests(unittest.TestCase):
         plan["modules"]["solar"]["assignments"] = {"pv_power": "../../secrets"}
         with self.assertRaises(ValueError):
             module_plan.validate(plan)
+
+    def test_missing_unit_is_suggested_but_flagged(self):
+        inventory = [
+            {"entity_id": "sensor.pv_missing_unit", "name": "Produzione FV SIM", "unit": None, "state": "1000"},
+            {"entity_id": "sensor.pv_energy", "name": "Produzione FV", "unit": "kWh", "state": "10"},
+        ]
+        output = module_plan.suggest_entities(inventory)
+        matches = output["suggestions"]["solar"]["pv_power"]
+        self.assertEqual(len(matches), 1)
+        self.assertEqual(matches[0]["entity_id"], "sensor.pv_missing_unit")
+        self.assertTrue(matches[0]["needs_unit_verification"])
