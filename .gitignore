@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+*.zip
+.pytest_cache/
+.venv/
+venv/
+.env
+*.knxproj
+*.json.bak
+nm-studio-backup-*.json

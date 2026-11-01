@@ -1,0 +1,20 @@
+name: NM Bridge (read-only laboratory)
+slug: nm_bridge
+description: Configurable read-only Home Assistant supervisor laboratory
+version: 3.6.0
+arch:
+  - amd64
+  - aarch64
+init: false
+startup: application
+boot: manual
+ingress: true
+ingress_port: 8099
+panel_icon: mdi:lan-connect
+homeassistant_api: true
+homeassistant_role: default
+map:
+  - type: data
+    read_only: false
+options: {}
+schema: {}
