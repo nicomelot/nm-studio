@@ -1,5 +1,11 @@
 # NM Studio – Registro versioni
 
+## 4.5.1
+
+- Suggerimenti HA meno restrittivi: un sensore con nome e dominio compatibili ma unità non dichiarata viene mostrato come candidato da verificare.
+- Unità esplicitamente incompatibili (ad esempio kWh per una misura in W) continuano a essere escluse.
+- Il wizard indica quante entità sono state esaminate e ricorda che le unità mancanti richiedono verifica manuale.
+
 ## 4.5.0
 
 - Ricerca assistita dei candidati Home Assistant per KNX, FV, scambio rete, batteria e climatizzazione.
