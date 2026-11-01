@@ -48,10 +48,20 @@ def _telemetry(states, now):
                 continue
             if not math.isfinite(value) or not low <= value <= high:
                 continue
-            stamp = _timestamp(entry.get("last_updated") or entry.get("last_changed"))
-            fresh = stamp is not None and -5 <= (now - stamp).total_seconds() <= 120
+            # HA last_changed only moves when the value changes. A constant
+            # battery SOC is not evidence of a disconnected MQTT device.
+            updated = _timestamp(entry.get("last_updated"))
+            changed = _timestamp(entry.get("last_changed"))
+            stamp = updated or changed
+            age = (now - stamp).total_seconds() if stamp else None
+            fresh = age is not None and -5 <= age <= 120
+            age_minutes = round(max(0, age) / 60, 1) if age is not None and math.isfinite(age) else None
+            health = "recent" if fresh else "unknown" if stamp is None else "old_update"
             found[key] = {"key": key, "label": label, "value": round(value, 2),
-                          "unit": unit, "fresh": fresh, "simulated": True}
+                          "unit": unit, "fresh": fresh, "simulated": True,
+                          "health": health, "age_minutes": age_minutes,
+                          "last_updated": updated.isoformat() if updated else None,
+                          "last_changed": changed.isoformat() if changed else None}
     return [found[key] for key, *_ in TELEMETRY if key in found]
 
 
@@ -60,11 +70,17 @@ def summarize(states, now=None):
     base = {"read_only": True, "source": "Home Assistant", "found": False,
             "valid": False, "status": "not_found", "summary": "Nessuna decisione di simulazione presente negli stati Home Assistant.",
             "decision_id": None, "generated_at": None, "expires_at": None,
-            "proposals": [], "telemetry": [], "warnings": [],
+            "proposals": [], "telemetry": [], "warnings": [], "explanation_facts": [],
             "execution_enabled": False}
     if not isinstance(states, list):
         return base
     base["telemetry"] = _telemetry(states, now)
+    values = {item["key"]: item for item in base["telemetry"]}
+    pv, load = values.get("pv"), values.get("load")
+    if pv and load and pv["fresh"] and load["fresh"]:
+        base["explanation_facts"].append({"label": "Bilancio simulato FV − consumi", "value": round(pv["value"] - load["value"], 2), "unit": "W"})
+    if values.get("battery"):
+        base["explanation_facts"].append({"label": "Carica batteria simulata", "value": values["battery"]["value"], "unit": "%"})
     candidates = []
     for entry in states:
         if not isinstance(entry, dict) or not str(entry.get("entity_id", "")).startswith("sensor."):
