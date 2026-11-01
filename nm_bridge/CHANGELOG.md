@@ -1,5 +1,12 @@
 # NM Studio – Registro versioni
 
+## 4.5.0
+
+- Ricerca assistita dei candidati Home Assistant per KNX, FV, scambio rete, batteria e climatizzazione.
+- Suggerimenti basati esclusivamente su dominio, nome, unità di misura e disponibilità dello stato: non equivalgono a verifica dell'integrazione o dell'impianto.
+- Selezione manuale da menu a tendina e salvataggio esplicito degli `entity_id` nel piano moduli locale; mantiene compatibilità con i piani 4.4.
+- Nessuna entità creata, nessuna spunta automatica, nessuna chiamata di servizio Home Assistant o comando KNX.
+
 ## 4.4.0
 
 - Catalogo guidato per i moduli KNX/ETS, fotovoltaico e climatizzazione direttamente nell'Avvio guidato.
