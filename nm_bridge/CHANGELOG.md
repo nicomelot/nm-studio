@@ -1,5 +1,12 @@
 # NM Studio – Registro versioni
 
+## 4.7.1
+
+- Le nuove plance HA contengono solo Tile native collegate a entità effettivamente presenti: i widget ancora non associati compaiono nel rapporto di configurazione, non come card fittizie.
+- Comandi apri/chiudi nativi per tapparelle collegate a `cover.*`; supporto Tile per sensori e clima nei widget compatibili.
+- Vietata la pubblicazione di una dashboard con zero entità operative. Restano obbligatorie conferma esplicita e protezione delle dashboard esistenti.
+- La creazione delle entità KNX e l'attivazione dei collegamenti NM Link non sono ancora automatiche: richiedono il prossimo collaudo con istanza HA dotata dell'integrazione pertinente.
+
 ## 4.7.0
 
 - Nuova area installatore «Mappe impianto»: più planimetrie, livelli tecnici KNX, DALI, prese dati, Wi-Fi, video, clima e rack.
