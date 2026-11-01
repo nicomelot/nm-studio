@@ -1,5 +1,15 @@
 # NM Studio – Registro versioni
 
+## 4.9.0
+
+- Corretto il caricamento della planimetria in browser: la Content Security Policy ora consente le immagini locali `data:` e `blob:` necessarie all'editor.
+- L'importazione converte automaticamente PNG/JPEG/SVG in un raster compatibile e prova la compressione JPEG quando il PNG supera il limite di 2 MB.
+- Elenco ricercabile delle entità Home Assistant già presenti, con inserimento rapido di simboli sulla planimetria.
+- Più simboli possono riferirsi alla stessa entità HA, per rappresentare ad esempio quattro faretti comandati dallo stesso circuito KNX.
+- Simboli personalizzabili (faretto, downlight, striscia LED, lampadina, sospensione, applique, tapparella, sensore e altri); le posizioni restano indipendenti dal legame entità.
+- Evidenziazione dei simboli collegati a entità HA attualmente accese/aperte, basata sull'ultimo stato letto. Nessun comando emesso dalla planimetria.
+- I vecchi archivi delle planimetrie sono compatibili: ai punti senza icona o entità si applicano valori predefiniti.
+
 ## 4.8.0
 
 - Prima attivazione reale dal pannello «Genera HA»: dopo revisione ETS, piano di creazione e backup confermato, l'installatore può creare una singola entità KNX tramite le API ufficiali `knx/validate_entity` e `knx/create_entity`.
