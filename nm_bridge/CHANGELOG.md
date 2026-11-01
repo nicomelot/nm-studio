@@ -1,5 +1,13 @@
 # NM Studio – Registro versioni
 
+## 4.7.0
+
+- Nuova area installatore «Mappe impianto»: più planimetrie, livelli tecnici KNX, DALI, prese dati, Wi-Fi, video, clima e rack.
+- Caricamento locale di immagini PNG/JPEG e SVG rasterizzato nel browser prima del salvataggio; backend accetta solo PNG/JPEG verificando firma e dimensione (2 MB per sfondo).
+- Punti posizionabili trascinandoli, etichette, zoom e filtro livelli con coordinate percentuali indipendenti dal disegno.
+- Archivio JSON separato in `/data`, validato e salvato esplicitamente; nessuna associazione live, modifica HA, comando bus o accesso alla rete UniFi.
+- L'archivio delle mappe non è ancora incluso nel vecchio backup di migrazione: migrazione da aggiornare prima del rilascio operativo.
+
 ## 4.6.0
 
 - Ruoli di sensori logici associati alle entità Home Assistant, con conferma manuale distinta dalla semplice selezione.
