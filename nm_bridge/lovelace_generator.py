@@ -1,4 +1,4 @@
-"""Produce an inert Lovelace dashboard draft from saved NM Studio widgets.
+"""Produce native Lovelace cards for verified Home Assistant entities.
 
 Never write Home Assistant storage, register entities, or call services.
 """
@@ -17,7 +17,8 @@ def generate(layout, entities):
     """Return a storage-mode-compatible dashboard configuration and audit report.
 
     Only existing, explicitly linked HA entities receive operational Tile cards.
-    Unlinked or unknown devices become harmless Markdown placeholders.
+    Unlinked or unknown devices remain in the audit report, not on the live
+    dashboard: an inert mock card should never look like a working control.
     """
     widgets = layout.get("widgets", [])
     nodes = layout.get("structure", [])
@@ -49,23 +50,25 @@ def generate(layout, entities):
             ident = w.get("entity_id", "")
             kind = w.get("type", "")
             expected = {"light": {"light", "switch"}, "dimmer": {"light"},
-                        "cover": {"cover"}}.get(kind, set())
+                        "cover": {"cover"}, "sensor": {"sensor", "binary_sensor"},
+                        "climate": {"climate"}, "fan": {"fan"},
+                        "switch": {"switch"}}.get(kind, set())
             compatible = bool(ident and ident.split(".", 1)[0] in expected)
             confirmed = compatible and ident in available
             if confirmed:
-                cards.append({"type": "tile", "entity": ident, "name": w["name"]})
+                card = {"type": "tile", "entity": ident, "name": w["name"]}
+                if ident.startswith("cover."):
+                    card["features"] = [{"type": "cover-open-close"}]
+                elif ident.startswith("climate."):
+                    card["features"] = [{"type": "climate-hvac-modes"}]
+                cards.append(card)
             else:
                 reason = ("Entità non assegnata" if not ident else
                           "Dominio HA incompatibile" if not compatible else "Entità non presente nell'inventario HA")
-                # Markdown is display-only: no tap_action, script, service or bus traffic.
-                cards.append({"type": "markdown", "content": "**" + w["name"] + "**\n\n⚠ " + reason})
                 reports.append({"room": room, "widget": w["name"], "entity_id": ident, "reason": reason})
         if cards:
             view["sections"].append({"type": "grid", "title": room, "cards": cards})
-    if not view["sections"]:
-        view["sections"].append({"type": "grid", "title": "Da configurare", "cards": [
-            {"type": "markdown", "content": "Nessuna entità HA associata. Completa i widget in NM Studio."}]})
-    dashboard = {"title": "NM Studio · Bozza", "views": [view]}
+    dashboard = {"title": "NM Studio", "views": [view]}
     fingerprint = hashlib.sha256(json.dumps(dashboard, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
     return {"version": 1, "read_only": True, "applied": False,
             "dashboard": dashboard, "fingerprint": fingerprint,
