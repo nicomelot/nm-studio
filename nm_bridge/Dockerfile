@@ -22,5 +22,6 @@ COPY knx_panel_bridge.py /app/knx_panel_bridge.py
 COPY knx_entity_plan.py /app/knx_entity_plan.py
 COPY migration_bundle.py /app/migration_bundle.py
 COPY intelligence.py /app/intelligence.py
+COPY module_plan.py /app/module_plan.py
 WORKDIR /app
 CMD ["/command/with-contenv", "python3", "-u", "/app/bridge.py"]
