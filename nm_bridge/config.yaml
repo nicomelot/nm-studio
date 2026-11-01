@@ -1,7 +1,7 @@
 name: NM Bridge (read-only laboratory)
 slug: nm_bridge
 description: Configurable read-only Home Assistant supervisor laboratory
-version: 3.9.0
+version: 4.0.0
 arch:
   - amd64
   - aarch64
