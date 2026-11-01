@@ -3,6 +3,7 @@
 import json
 import os
 import tempfile
+import re
 from pathlib import Path
 
 
@@ -12,10 +13,13 @@ MODULES = {
     "solar": ("Marca e modello inverter", "Integrazione HA configurata", "Produzione FV e misura scambio rete", "Accumulo e SOC, se presenti"),
     "climate": ("Tipo di generatore termico", "Marca e modello sistema", "Integrazione HA configurata", "Stati/modalità e temperature disponibili"),
 }
+ROLES = {"knx": ("control",), "solar": ("pv_power", "grid_power", "battery_soc"),
+         "climate": ("room_temperature", "climate_mode")}
+ENTITY = re.compile(r"^(?:sensor|binary_sensor|light|switch|cover|climate)\.[a-z0-9_]{1,120}$")
 
 
 def empty_plan():
-    return {"version": 1, "modules": {key: {"enabled": False, "checked": [], "notes": ""} for key in MODULES}}
+    return {"version": 1, "modules": {key: {"enabled": False, "checked": [], "notes": "", "assignments": {}} for key in MODULES}}
 
 
 def validate(payload):
@@ -33,8 +37,49 @@ def validate(payload):
             raise ValueError("Invalid checklist")
         if not isinstance(notes, str) or len(notes) > 500:
             raise ValueError("Invalid installer notes")
-        clean["modules"][key] = {"enabled": info["enabled"], "checked": sorted(set(checked)), "notes": notes.strip()}
+        assigned = info.get("assignments", {})
+        if not isinstance(assigned, dict) or any(role not in ROLES[key] or not isinstance(entity, str) or not ENTITY.fullmatch(entity) for role, entity in assigned.items()):
+            raise ValueError("Invalid HA entity assignments")
+        clean["modules"][key] = {"enabled": info["enabled"], "checked": sorted(set(checked)),
+                                 "notes": notes.strip(), "assignments": dict(assigned)}
     return clean
+
+
+ROLE_RULES = {
+    "control": (("light", "switch", "cover"), (), None),
+    "pv_power": (("sensor",), ("fotovolta", "solar", "pv", "produzione"), "W"),
+    "grid_power": (("sensor",), ("rete", "grid", "scambio", "import", "export"), "W"),
+    "battery_soc": (("sensor",), ("batter", "battery", "soc", "carica"), "%"),
+    "room_temperature": (("sensor",), ("temperatur", "temperature", "temp"), "°C"),
+    "climate_mode": (("climate",), (), None),
+}
+
+
+def suggest_entities(entities):
+    """Suggest candidates from names/domains/units only; never approve a mapping."""
+    output = {module: {} for module in ROLES}
+    for module, roles in ROLES.items():
+        for role in roles:
+            domains, keywords, unit = ROLE_RULES[role]
+            candidates = []
+            for item in entities[:2000] if isinstance(entities, list) else []:
+                if not isinstance(item, dict):
+                    continue
+                entity = item.get("entity_id")
+                if not isinstance(entity, str) or not ENTITY.fullmatch(entity) or entity.split(".")[0] not in domains:
+                    continue
+                name = str(item.get("name", ""))[:120]
+                haystack = (name + " " + entity).casefold()
+                if keywords and not any(term in haystack for term in keywords):
+                    continue
+                if unit is not None and item.get("unit") != unit:
+                    continue
+                if str(item.get("state", "")).lower() in ("unknown", "unavailable"):
+                    continue
+                candidates.append({"entity_id": entity, "name": name, "unit": item.get("unit"),
+                                   "evidence": "Dominio, nome e unità compatibili" if unit else "Dominio Home Assistant compatibile"})
+            output[module][role] = candidates[:8]
+    return {"read_only": True, "automatic_approval": False, "suggestions": output}
 
 
 def read():
