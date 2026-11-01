@@ -72,14 +72,22 @@ def suggest_entities(entities):
                 haystack = (name + " " + entity).casefold()
                 if keywords and not any(term in haystack for term in keywords):
                     continue
-                if unit is not None and item.get("unit") != unit:
+                observed_unit = item.get("unit")
+                # An absent HA unit is uncertainty, not proof of incompatibility.
+                # A known incompatible unit (e.g. kWh vs W) is excluded.
+                if unit is not None and observed_unit not in (None, "", unit):
                     continue
                 if str(item.get("state", "")).lower() in ("unknown", "unavailable"):
                     continue
-                candidates.append({"entity_id": entity, "name": name, "unit": item.get("unit"),
-                                   "evidence": "Dominio, nome e unità compatibili" if unit else "Dominio Home Assistant compatibile"})
+                uncertain = unit is not None and observed_unit in (None, "")
+                candidates.append({"entity_id": entity, "name": name, "unit": observed_unit,
+                                   "needs_unit_verification": uncertain,
+                                   "evidence": "Unità non dichiarata in HA: verifica manuale obbligatoria" if uncertain else
+                                   "Dominio, nome e unità compatibili" if unit else "Dominio Home Assistant compatibile"})
+            candidates.sort(key=lambda item: (item["needs_unit_verification"], item["entity_id"]))
             output[module][role] = candidates[:8]
-    return {"read_only": True, "automatic_approval": False, "suggestions": output}
+    return {"read_only": True, "automatic_approval": False, "suggestions": output,
+            "entities_examined": min(len(entities), 2000) if isinstance(entities, list) else 0}
 
 
 def read():
