@@ -1,5 +1,11 @@
 # NM Studio – Registro versioni
 
+## 4.3.0
+
+- Storico Recorder adattivo: prova 24, 6 e 1 ora, riducendo la finestra soltanto se la risposta supera 2 MB.
+- Mantiene il limite di lettura per richiesta, segnala l'intervallo effettivo e non usa credenziali aggiuntive.
+- Lettura opzionale e nessun effetto sull'impianto KNX o sulle automazioni Home Assistant.
+
 ## 4.2.2
 
 - Diagnostica di lettura Recorder: distingue HTTP, risposta oltre 2 MB, JSON non valido e formato inatteso senza esporre token o dati grezzi.
