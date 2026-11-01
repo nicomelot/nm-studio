@@ -49,7 +49,7 @@ def get_ha_states():
 
 
 def get_decision_history():
-    """Read only the discovered simulation sensor's last 24h HA Recorder history."""
+    """Read a bounded HA Recorder window; shrink it when the response is too large."""
     entity = decision_entity(get_ha_states())
     if not entity:
         return {"available": False, "reason": "Motore simulato non rilevato", "items": []}
@@ -58,18 +58,21 @@ def get_decision_history():
         raise RuntimeError("Supervisor token is unavailable")
     now = datetime.now(timezone.utc)
     origin = urlsplit(HA_URL)
-    start = (now - timedelta(days=1)).isoformat()
     query = urlencode({"filter_entity_id": entity, "end_time": now.isoformat(),
                        "significant_changes_only": "0"})
-    url = urlunsplit((origin.scheme, origin.netloc, history_path(origin.path) + start, query, ""))
-    req = Request(url, headers={"Authorization": f"Bearer {token}", "Accept": "application/json"})
-    with urlopen(req, timeout=8) as response:
-        raw = response.read(2 * 1024 * 1024 + 1)
-    if len(raw) > 2 * 1024 * 1024:
-        raise ValueError("HA Recorder response too large")
-    items = normalize_history(json.loads(raw), now)
-    return {"available": True, "source": "Home Assistant Recorder", "hours": 24,
-            "items": items, "note": "Lo storico dipende da Recorder e dagli attributi registrati."}
+    for hours in (24, 6, 1):
+        start = (now - timedelta(hours=hours)).isoformat()
+        url = urlunsplit((origin.scheme, origin.netloc, history_path(origin.path) + start, query, ""))
+        req = Request(url, headers={"Authorization": f"Bearer {token}", "Accept": "application/json"})
+        with urlopen(req, timeout=8) as response:
+            raw = response.read(2 * 1024 * 1024 + 1)
+        if len(raw) > 2 * 1024 * 1024:
+            LOG.info("Recorder response exceeded 2MB; shrinking window from %s hours", hours)
+            continue
+        items = normalize_history(json.loads(raw), now)
+        return {"available": True, "source": "Home Assistant Recorder", "hours": hours,
+                "items": items, "note": "Lo storico dipende da Recorder e dagli attributi registrati."}
+    raise ValueError("HA Recorder response too large")
 
 
 def get_entities():
