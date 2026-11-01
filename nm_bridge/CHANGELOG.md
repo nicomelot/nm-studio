@@ -1,5 +1,10 @@
 # NM Studio – Registro versioni
 
+## 4.2.2
+
+- Diagnostica di lettura Recorder: distingue HTTP, risposta oltre 2 MB, JSON non valido e formato inatteso senza esporre token o dati grezzi.
+- Il dettaglio appare nell'interfaccia Intelligence; nessun cambiamento ai sistemi esterni.
+
 ## 4.2.1
 
 - Corretto il percorso dell'API storico quando Home Assistant è raggiunto attraverso il proxy Supervisor `/core`.
