@@ -29,6 +29,8 @@ from migration_bundle import export_bundle as export_migration, restore_bundle a
 from intelligence import summarize as intelligence_summary, decision_entity, normalize_history, history_path
 from module_plan import read as read_module_plan, save as save_module_plan, suggest_entities as suggest_module_entities
 from floorplan import read as read_floorplans, save as save_floorplans
+from floorplan_lovelace import generate as generate_floorplan_dashboard
+from floorplan_publisher import publish as publish_floorplan_dashboard
 
 LOG = logging.getLogger("nm_bridge")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -220,6 +222,12 @@ class Handler(BaseHTTPRequestHandler):
                 self.respond(200, "application/json; charset=utf-8", json.dumps(read_floorplans(), ensure_ascii=False).encode())
             except (ValueError, OSError, TypeError, json.JSONDecodeError):
                 self.respond(500, "application/json", b'{"error":"Floorplans unavailable"}')
+        elif path == "/floorplans/dashboard-preview":
+            try:
+                data = generate_floorplan_dashboard(read_floorplans(), get_entities())
+                self.respond(200, "application/json; charset=utf-8", json.dumps(data, ensure_ascii=False).encode())
+            except (ValueError, OSError, HTTPError, URLError, RuntimeError, TypeError, json.JSONDecodeError):
+                self.respond(502, "application/json", b'{"error":"Anteprima planimetria HA non disponibile"}')
         elif path == "/modules/suggestions":
             try:
                 data = suggest_module_entities(get_entities())
@@ -316,7 +324,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?", 1)[0]
-        if self.client_address[0] != INGRESS_PROXY or path not in ("/layout", "/modules/plan", "/floorplans", "/ets/preview", "/knx/approved", "/audit", "/knx/widgets", "/knx/ha-preview", "/dashboard/missing-ha/review", "/dashboard/deployment-preflight", "/knx/panel-create-plan", "/knx/panel-create-one", "/dashboard/publish", "/migration/restore", "/nm-link", "/nm-link/preview", "/nm-link/simulate"):
+        if self.client_address[0] != INGRESS_PROXY or path not in ("/layout", "/modules/plan", "/floorplans", "/floorplans/dashboard-publish", "/ets/preview", "/knx/approved", "/audit", "/knx/widgets", "/knx/ha-preview", "/dashboard/missing-ha/review", "/dashboard/deployment-preflight", "/knx/panel-create-plan", "/knx/panel-create-one", "/dashboard/publish", "/migration/restore", "/nm-link", "/nm-link/preview", "/nm-link/simulate"):
             self.send_error(403)
             return
         # Ingress protects access; these checks also reject cross-site form POSTs.
@@ -338,6 +346,8 @@ class Handler(BaseHTTPRequestHandler):
                 data = save_module_plan(json.loads(body))
             elif path == "/floorplans":
                 data = save_floorplans(json.loads(body))
+            elif path == "/floorplans/dashboard-publish":
+                data = publish_floorplan_dashboard(json.loads(body), read_floorplans(), get_entities())
             elif path == "/knx/approved":
                 data = confirm_devices(json.loads(body))
             elif path == "/knx/widgets":
