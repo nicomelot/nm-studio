@@ -132,3 +132,53 @@ def summarize(states, now=None):
             "priority": action.get("priority") if type(action.get("priority")) is int else None,
         })
     return result
+
+
+def decision_entity(states):
+    """Find the same validated simulation entity used by the current view."""
+    if not isinstance(states, list):
+        return None
+    candidates = []
+    for entry in states:
+        if not isinstance(entry, dict):
+            continue
+        entity = entry.get("entity_id")
+        attrs = entry.get("attributes")
+        if not isinstance(entity, str) or not entity.startswith("sensor.") or not isinstance(attrs, dict):
+            continue
+        if not isinstance(attrs.get("decision_id"), str) or attrs.get("simulation") is not True:
+            continue
+        if not isinstance(attrs.get("actions"), list) or not isinstance(attrs.get("status"), str):
+            continue
+        stamp = _timestamp(attrs.get("generated_at"))
+        if stamp:
+            candidates.append((stamp, entity))
+    return max(candidates)[1] if candidates else None
+
+
+def normalize_history(rows, now=None):
+    """Reduce HA Recorder rows to bounded, safe, non-executable summaries."""
+    now = now or datetime.now(timezone.utc)
+    if not isinstance(rows, list):
+        raise ValueError("Unexpected HA Recorder response")
+    result, seen = [], set()
+    for group in rows[:1]:
+        if not isinstance(group, list):
+            continue
+        for entry in group[-300:]:
+            if not isinstance(entry, dict):
+                continue
+            attrs = entry.get("attributes")
+            if not isinstance(attrs, dict):
+                continue
+            decision_id = attrs.get("decision_id")
+            generated = _timestamp(attrs.get("generated_at"))
+            if (not isinstance(decision_id, str) or not 1 <= len(decision_id) <= 80 or
+                    attrs.get("simulation") is not True or not isinstance(attrs.get("actions"), list) or
+                    not isinstance(attrs.get("status"), str) or generated is None or
+                    not 0 <= (now - generated).total_seconds() <= 86400 or decision_id in seen):
+                continue
+            seen.add(decision_id)
+            result.append({"decision_id": decision_id, "generated_at": generated.isoformat(),
+                           "status": attrs["status"][:80], "summary": str(attrs.get("summary", ""))[:320]})
+    return sorted(result, key=lambda item: item["generated_at"], reverse=True)[:30]
