@@ -39,3 +39,21 @@ class FloorplanTests(unittest.TestCase):
         doc["plans"][0]["points"] = [{**point, "kind": ["unsafe"]}]
         with self.assertRaises(ValueError):
             floorplan.validate(doc)
+
+    def test_multiple_spots_can_reference_one_knx_light(self):
+        points = [{"id": "spot_1", "kind": "light", "label": "Faretto 1", "icon": "spot",
+                   "entity_id": "light.ufficio_l1", "x": 20, "y": 30},
+                  {"id": "spot_2", "kind": "light", "label": "Faretto 2", "icon": "downlight",
+                   "entity_id": "light.ufficio_l1", "x": 60, "y": 30}]
+        data = floorplan.validate({"version": 1, "plans": [{"id": "f1", "name": "Ufficio", "points": points}]})
+        self.assertEqual(data["plans"][0]["points"][0]["entity_id"], data["plans"][0]["points"][1]["entity_id"])
+        self.assertNotEqual(data["plans"][0]["points"][0]["icon"], data["plans"][0]["points"][1]["icon"])
+
+    def test_rejects_untrusted_entity_ids_and_icons(self):
+        point = {"id": "p", "kind": "light", "label": "Spot", "x": 3, "y": 4, "entity_id": "script.bad", "icon": "spot"}
+        with self.assertRaisesRegex(ValueError, "entity"):
+            floorplan.validate({"version": 1, "plans": [{"id": "f", "name": "Test", "points": [point]}]})
+        point["entity_id"] = "light.good"
+        point["icon"] = "<script>"
+        with self.assertRaisesRegex(ValueError, "symbol"):
+            floorplan.validate({"version": 1, "plans": [{"id": "f", "name": "Test", "points": [point]}]})
