@@ -25,5 +25,7 @@ COPY migration_bundle.py /app/migration_bundle.py
 COPY intelligence.py /app/intelligence.py
 COPY module_plan.py /app/module_plan.py
 COPY floorplan.py /app/floorplan.py
+COPY floorplan_lovelace.py /app/floorplan_lovelace.py
+COPY floorplan_publisher.py /app/floorplan_publisher.py
 WORKDIR /app
 CMD ["/command/with-contenv", "python3", "-u", "/app/bridge.py"]
