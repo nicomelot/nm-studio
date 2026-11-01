@@ -1,5 +1,10 @@
 # NM Studio – Registro versioni
 
+## 4.2.1
+
+- Corretto il percorso dell'API storico quando Home Assistant è raggiunto attraverso il proxy Supervisor `/core`.
+- Test per URL Home Assistant diretto e URL con prefisso Supervisor. Nessuna modifica ai dati o al bus.
+
 ## 4.2.0
 
 - Lettura opzionale delle ultime 24 ore di decisioni simulate da Home Assistant Recorder (solo GET sulla singola entità identificata).
