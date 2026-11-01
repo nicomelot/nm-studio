@@ -1,5 +1,13 @@
 # NM Studio – Registro versioni
 
+## 4.8.0
+
+- Prima attivazione reale dal pannello «Genera HA»: dopo revisione ETS, piano di creazione e backup confermato, l'installatore può creare una singola entità KNX tramite le API ufficiali `knx/validate_entity` e `knx/create_entity`.
+- Controllo in tempo reale degli indirizzi già presenti nell'indice KNX Home Assistant, conferma esplicita del contenuto della richiesta e arresto sui conflitti noti. Creazione una entità alla volta, senza modificare quelle esistenti.
+- Se il token dell'add-on non ha permessi amministrativi, la creazione viene rifiutata e rimane utilizzabile il piano di esportazione; nessuna elevazione automatica dei privilegi.
+- La creazione può inizializzare letture KNX; le successive prove di comando richiedono un collaudo esplicito sul sistema reale.
+- Non è ancora prevista la creazione in massa o l'attivazione NM Link. I GA definiti in YAML non sono sempre censiti dall'indice KNX: permane la verifica ETS/HA manuale.
+
 ## 4.7.1
 
 - Le nuove plance HA contengono solo Tile native collegate a entità effettivamente presenti: i widget ancora non associati compaiono nel rapporto di configurazione, non come card fittizie.
