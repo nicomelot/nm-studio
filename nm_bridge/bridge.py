@@ -24,6 +24,7 @@ from missing_ha_generator import preview as preview_missing_ha, review as review
 from deployment_preflight import preflight as deployment_preflight
 from knx_panel_bridge import inspect as inspect_knx_panel
 from knx_entity_plan import build as build_knx_entity_plan
+from knx_panel_apply import create_one as create_knx_entity
 from migration_bundle import export_bundle as export_migration, restore_bundle as restore_migration
 from intelligence import summarize as intelligence_summary, decision_entity, normalize_history, history_path
 from module_plan import read as read_module_plan, save as save_module_plan, suggest_entities as suggest_module_entities
@@ -315,7 +316,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?", 1)[0]
-        if self.client_address[0] != INGRESS_PROXY or path not in ("/layout", "/modules/plan", "/floorplans", "/ets/preview", "/knx/approved", "/audit", "/knx/widgets", "/knx/ha-preview", "/dashboard/missing-ha/review", "/dashboard/deployment-preflight", "/knx/panel-create-plan", "/dashboard/publish", "/migration/restore", "/nm-link", "/nm-link/preview", "/nm-link/simulate"):
+        if self.client_address[0] != INGRESS_PROXY or path not in ("/layout", "/modules/plan", "/floorplans", "/ets/preview", "/knx/approved", "/audit", "/knx/widgets", "/knx/ha-preview", "/dashboard/missing-ha/review", "/dashboard/deployment-preflight", "/knx/panel-create-plan", "/knx/panel-create-one", "/dashboard/publish", "/migration/restore", "/nm-link", "/nm-link/preview", "/nm-link/simulate"):
             self.send_error(403)
             return
         # Ingress protects access; these checks also reject cross-site form POSTs.
@@ -351,6 +352,8 @@ class Handler(BaseHTTPRequestHandler):
                 data = deployment_preflight(read_widget_layout(), json.loads(body), get_entities())
             elif path == "/knx/panel-create-plan":
                 data = build_knx_entity_plan(read_widget_layout(), json.loads(body))
+            elif path == "/knx/panel-create-one":
+                data = create_knx_entity(read_widget_layout(), json.loads(body))
             elif path == "/migration/restore":
                 request = json.loads(body)
                 if not isinstance(request, dict):
