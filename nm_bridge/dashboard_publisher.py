@@ -91,6 +91,8 @@ def publish(payload, layout, entities, client_factory=HAWebSocket):
     generated = generate(layout, entities)
     if payload.get("expected_fingerprint") != generated["fingerprint"]:
         raise PublishError("Anteprima non aggiornata: rigenera prima di pubblicare")
+    if generated["summary"]["tiles"] == 0:
+        raise PublishError("Nessuna entità HA compatibile: associa almeno un dispositivo reale prima di pubblicare")
     if len(generated["dashboard"]["views"]) != MAX_VIEWS:
         raise PublishError("Numero viste inatteso")
     with client_factory() as client:
