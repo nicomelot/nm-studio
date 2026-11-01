@@ -4,11 +4,12 @@ import json
 import logging
 import os
 import tempfile
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
-from urllib.parse import urlsplit, parse_qs
+from urllib.parse import urlsplit, urlunsplit, parse_qs, urlencode
 from ets_import import MAX_ARCHIVE, preview as ets_preview
 from knx_devices import read_devices, confirm_devices
 from audit_notes import read_notes, save_notes
@@ -24,7 +25,7 @@ from deployment_preflight import preflight as deployment_preflight
 from knx_panel_bridge import inspect as inspect_knx_panel
 from knx_entity_plan import build as build_knx_entity_plan
 from migration_bundle import export_bundle as export_migration, restore_bundle as restore_migration
-from intelligence import summarize as intelligence_summary
+from intelligence import summarize as intelligence_summary, decision_entity, normalize_history
 
 LOG = logging.getLogger("nm_bridge")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -45,6 +46,30 @@ def get_ha_states():
     if not isinstance(raw, list):
         raise ValueError("Unexpected Home Assistant response")
     return raw
+
+
+def get_decision_history():
+    """Read only the discovered simulation sensor's last 24h HA Recorder history."""
+    entity = decision_entity(get_ha_states())
+    if not entity:
+        return {"available": False, "reason": "Motore simulato non rilevato", "items": []}
+    token = os.environ.get("SUPERVISOR_TOKEN")
+    if not token:
+        raise RuntimeError("Supervisor token is unavailable")
+    now = datetime.now(timezone.utc)
+    origin = urlsplit(HA_URL)
+    start = (now - timedelta(days=1)).isoformat()
+    query = urlencode({"filter_entity_id": entity, "end_time": now.isoformat(),
+                       "significant_changes_only": "0"})
+    url = urlunsplit((origin.scheme, origin.netloc, "/api/history/period/" + start, query, ""))
+    req = Request(url, headers={"Authorization": f"Bearer {token}", "Accept": "application/json"})
+    with urlopen(req, timeout=8) as response:
+        raw = response.read(2 * 1024 * 1024 + 1)
+    if len(raw) > 2 * 1024 * 1024:
+        raise ValueError("HA Recorder response too large")
+    items = normalize_history(json.loads(raw), now)
+    return {"available": True, "source": "Home Assistant Recorder", "hours": 24,
+            "items": items, "note": "Lo storico dipende da Recorder e dagli attributi registrati."}
 
 
 def get_entities():
@@ -154,6 +179,14 @@ class Handler(BaseHTTPRequestHandler):
             except (HTTPError, URLError, ValueError, RuntimeError, OSError, TypeError) as exc:
                 LOG.warning("Intelligence read failed (%s)", type(exc).__name__)
                 self.respond(502, "application/json", b'{"error":"Home Assistant Intelligence state unavailable"}')
+        elif path == "/intelligence/history":
+            try:
+                result = get_decision_history()
+                self.respond(200, "application/json; charset=utf-8", json.dumps(result, ensure_ascii=False).encode())
+            except (HTTPError, URLError, ValueError, RuntimeError, OSError, TypeError) as exc:
+                LOG.warning("Intelligence Recorder read failed (%s)", type(exc).__name__)
+                self.respond(200, "application/json; charset=utf-8", json.dumps({"available": False,
+                    "reason": "Storico Home Assistant non disponibile", "items": []}).encode())
         elif path == "/layout":
             try:
                 self.respond(200, "application/json; charset=utf-8", json.dumps(read_layout(), ensure_ascii=False).encode())
