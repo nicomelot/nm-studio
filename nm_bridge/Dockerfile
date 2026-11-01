@@ -20,6 +20,7 @@ COPY missing_ha_generator.py /app/missing_ha_generator.py
 COPY deployment_preflight.py /app/deployment_preflight.py
 COPY knx_panel_bridge.py /app/knx_panel_bridge.py
 COPY knx_entity_plan.py /app/knx_entity_plan.py
+COPY knx_panel_apply.py /app/knx_panel_apply.py
 COPY migration_bundle.py /app/migration_bundle.py
 COPY intelligence.py /app/intelligence.py
 COPY module_plan.py /app/module_plan.py
