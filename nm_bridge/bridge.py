@@ -24,6 +24,7 @@ from deployment_preflight import preflight as deployment_preflight
 from knx_panel_bridge import inspect as inspect_knx_panel
 from knx_entity_plan import build as build_knx_entity_plan
 from migration_bundle import export_bundle as export_migration, restore_bundle as restore_migration
+from intelligence import summarize as intelligence_summary
 
 LOG = logging.getLogger("nm_bridge")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -34,7 +35,7 @@ CONFIG_PATH = Path(os.getenv("NM_CONFIG_PATH", "/data/nm_control_layout.json"))
 MAX_BODY = 65536
 
 
-def get_entities():
+def get_ha_states():
     token = os.environ.get("SUPERVISOR_TOKEN")
     if not token:
         raise RuntimeError("Supervisor token is unavailable")
@@ -43,6 +44,11 @@ def get_entities():
         raw = json.load(response)
     if not isinstance(raw, list):
         raise ValueError("Unexpected Home Assistant response")
+    return raw
+
+
+def get_entities():
+    raw = get_ha_states()
     items = []
     for entry in raw:
         entity_id = entry.get("entity_id", "")
@@ -141,6 +147,13 @@ class Handler(BaseHTTPRequestHandler):
             except (HTTPError, URLError, ValueError, RuntimeError, OSError) as exc:
                 LOG.warning("State query failed (%s)", type(exc).__name__)
                 self.respond(502, "application/json", b'{"error":"Home Assistant state query unavailable"}')
+        elif path == "/intelligence/summary":
+            try:
+                data = intelligence_summary(get_ha_states())
+                self.respond(200, "application/json; charset=utf-8", json.dumps(data, ensure_ascii=False).encode())
+            except (HTTPError, URLError, ValueError, RuntimeError, OSError, TypeError) as exc:
+                LOG.warning("Intelligence read failed (%s)", type(exc).__name__)
+                self.respond(502, "application/json", b'{"error":"Home Assistant Intelligence state unavailable"}')
         elif path == "/layout":
             try:
                 self.respond(200, "application/json; charset=utf-8", json.dumps(read_layout(), ensure_ascii=False).encode())
