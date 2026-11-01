@@ -184,9 +184,20 @@ class Handler(BaseHTTPRequestHandler):
                 result = get_decision_history()
                 self.respond(200, "application/json; charset=utf-8", json.dumps(result, ensure_ascii=False).encode())
             except (HTTPError, URLError, ValueError, RuntimeError, OSError, TypeError) as exc:
-                LOG.warning("Intelligence Recorder read failed (%s)", type(exc).__name__)
+                if isinstance(exc, HTTPError):
+                    reason = f"Home Assistant Recorder: HTTP {exc.code}"
+                    code = "http_error"
+                elif isinstance(exc, json.JSONDecodeError):
+                    reason, code = "Recorder ha restituito JSON non valido", "invalid_json"
+                elif isinstance(exc, ValueError) and str(exc) == "HA Recorder response too large":
+                    reason, code = "Risposta Recorder oltre il limite di 2 MB (24 ore)", "response_too_large"
+                elif isinstance(exc, ValueError) and str(exc) == "Unexpected HA Recorder response":
+                    reason, code = "Recorder ha restituito un formato inatteso", "unexpected_format"
+                else:
+                    reason, code = "Storico Home Assistant non disponibile", "read_failed"
+                LOG.warning("Intelligence Recorder read failed (%s: %s)", type(exc).__name__, code)
                 self.respond(200, "application/json; charset=utf-8", json.dumps({"available": False,
-                    "reason": "Storico Home Assistant non disponibile", "items": []}).encode())
+                    "reason": reason, "code": code, "items": []}).encode())
         elif path == "/layout":
             try:
                 self.respond(200, "application/json; charset=utf-8", json.dumps(read_layout(), ensure_ascii=False).encode())
