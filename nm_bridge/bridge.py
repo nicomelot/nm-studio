@@ -27,6 +27,7 @@ from knx_entity_plan import build as build_knx_entity_plan
 from migration_bundle import export_bundle as export_migration, restore_bundle as restore_migration
 from intelligence import summarize as intelligence_summary, decision_entity, normalize_history, history_path
 from module_plan import read as read_module_plan, save as save_module_plan, suggest_entities as suggest_module_entities
+from floorplan import read as read_floorplans, save as save_floorplans
 
 LOG = logging.getLogger("nm_bridge")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -213,6 +214,11 @@ class Handler(BaseHTTPRequestHandler):
                 self.respond(200, "application/json; charset=utf-8", json.dumps(read_module_plan(), ensure_ascii=False).encode())
             except (ValueError, OSError, json.JSONDecodeError):
                 self.respond(500, "application/json", b'{"error":"Module checklist unavailable"}')
+        elif path == "/floorplans":
+            try:
+                self.respond(200, "application/json; charset=utf-8", json.dumps(read_floorplans(), ensure_ascii=False).encode())
+            except (ValueError, OSError, TypeError, json.JSONDecodeError):
+                self.respond(500, "application/json", b'{"error":"Floorplans unavailable"}')
         elif path == "/modules/suggestions":
             try:
                 data = suggest_module_entities(get_entities())
@@ -309,7 +315,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?", 1)[0]
-        if self.client_address[0] != INGRESS_PROXY or path not in ("/layout", "/modules/plan", "/ets/preview", "/knx/approved", "/audit", "/knx/widgets", "/knx/ha-preview", "/dashboard/missing-ha/review", "/dashboard/deployment-preflight", "/knx/panel-create-plan", "/dashboard/publish", "/migration/restore", "/nm-link", "/nm-link/preview", "/nm-link/simulate"):
+        if self.client_address[0] != INGRESS_PROXY or path not in ("/layout", "/modules/plan", "/floorplans", "/ets/preview", "/knx/approved", "/audit", "/knx/widgets", "/knx/ha-preview", "/dashboard/missing-ha/review", "/dashboard/deployment-preflight", "/knx/panel-create-plan", "/dashboard/publish", "/migration/restore", "/nm-link", "/nm-link/preview", "/nm-link/simulate"):
             self.send_error(403)
             return
         # Ingress protects access; these checks also reject cross-site form POSTs.
@@ -319,7 +325,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             n = int(self.headers.get("Content-Length", "0"))
-            max_body = MAX_ARCHIVE if path == "/ets/preview" else 1024 * 1024 if path == "/migration/restore" else 256 * 1024 if path in ("/knx/widgets", "/knx/ha-preview") else MAX_BODY
+            max_body = MAX_ARCHIVE if path == "/ets/preview" else 4 * 1024 * 1024 if path == "/floorplans" else 1024 * 1024 if path == "/migration/restore" else 256 * 1024 if path in ("/knx/widgets", "/knx/ha-preview") else MAX_BODY
             if not 0 < n <= max_body:
                 raise ValueError("Invalid length")
             body = self.rfile.read(n)
@@ -329,6 +335,8 @@ class Handler(BaseHTTPRequestHandler):
                 data = {"saved": True}
             elif path == "/modules/plan":
                 data = save_module_plan(json.loads(body))
+            elif path == "/floorplans":
+                data = save_floorplans(json.loads(body))
             elif path == "/knx/approved":
                 data = confirm_devices(json.loads(body))
             elif path == "/knx/widgets":
