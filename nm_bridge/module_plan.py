@@ -19,7 +19,7 @@ ENTITY = re.compile(r"^(?:sensor|binary_sensor|light|switch|cover|climate)\.[a-z
 
 
 def empty_plan():
-    return {"version": 1, "modules": {key: {"enabled": False, "checked": [], "notes": "", "assignments": {}} for key in MODULES}}
+    return {"version": 1, "modules": {key: {"enabled": False, "checked": [], "notes": "", "assignments": {}, "verified": []} for key in MODULES}}
 
 
 def validate(payload):
@@ -40,8 +40,11 @@ def validate(payload):
         assigned = info.get("assignments", {})
         if not isinstance(assigned, dict) or any(role not in ROLES[key] or not isinstance(entity, str) or not ENTITY.fullmatch(entity) for role, entity in assigned.items()):
             raise ValueError("Invalid HA entity assignments")
+        verified = info.get("verified", [])
+        if not isinstance(verified, list) or len(verified) > len(ROLES[key]) or any(not isinstance(role, str) or role not in assigned for role in verified):
+            raise ValueError("Verified roles must have an assigned entity")
         clean["modules"][key] = {"enabled": info["enabled"], "checked": sorted(set(checked)),
-                                 "notes": notes.strip(), "assignments": dict(assigned)}
+                                 "notes": notes.strip(), "assignments": dict(assigned), "verified": sorted(set(verified))}
     return clean
 
 
