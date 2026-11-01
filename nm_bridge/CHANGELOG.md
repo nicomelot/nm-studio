@@ -1,5 +1,12 @@
 # NM Studio – Registro versioni
 
+## 3.9.0
+
+- Dashboard Intelligence più leggibile: nomi proposte e stati tradotti in italiano, date locali e priorità.
+- Lettura opzionale da stati Home Assistant di sei sensori MQTT di simulazione (FV, consumi, batteria, temperatura, umidità e CO₂), con segnalazione dei dati non recenti.
+- Storico temporaneo, limitato a otto decisioni viste durante la sessione della pagina; nessun database nuovo e nessuna modifica al Decision Engine.
+- Rimangono esclusivamente letture degli stati Home Assistant: niente comandi KNX, MQTT o servizi.
+
 ## 3.8.0
 
 - Nuova scheda Intelligence in sola lettura, con stato, proposte, motivazioni e scadenza delle decisioni simulate di un motore esterno.
