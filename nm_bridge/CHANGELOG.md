@@ -1,5 +1,12 @@
 # NM Studio – Registro versioni
 
+## 4.4.0
+
+- Catalogo guidato per i moduli KNX/ETS, fotovoltaico e climatizzazione direttamente nell'Avvio guidato.
+- Checklist e note per l'installatore, persistenti in un file JSON locale con validazione e salvataggio esplicito.
+- Consigli sui requisiti (Functions ETS, GA/DPT, integrazione HA, dati FV/accumulo, stati PDC); nessun controllo dell'impianto né attivazione automatica.
+- Il piano moduli è una nuova sezione locale: l'esportazione/migrazione esistente non lo include ancora.
+
 ## 4.3.0
 
 - Storico Recorder adattivo: prova 24, 6 e 1 ora, riducendo la finestra soltanto se la risposta supera 2 MB.
