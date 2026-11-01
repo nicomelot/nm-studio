@@ -156,6 +156,13 @@ def decision_entity(states):
     return max(candidates)[1] if candidates else None
 
 
+def history_path(states_path):
+    """Preserve the Home Assistant Supervisor /core prefix, if present."""
+    if not isinstance(states_path, str) or not states_path.endswith("/api/states"):
+        raise ValueError("Unexpected Home Assistant API path")
+    return states_path[:-len("/api/states")] + "/api/history/period/"
+
+
 def normalize_history(rows, now=None):
     """Reduce HA Recorder rows to bounded, safe, non-executable summaries."""
     now = now or datetime.now(timezone.utc)
