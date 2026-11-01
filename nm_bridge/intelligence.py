@@ -68,6 +68,10 @@ def _telemetry(states, now):
 def summarize(states, now=None):
     now = now or datetime.now(timezone.utc)
     base = {"read_only": True, "source": "Home Assistant", "found": False,
+            "contract_version": 1,
+            "capabilities": {"supervision": True, "decision_engine": False,
+                             "simulation": False, "history": False,
+                             "commands": False, "provider": "home_assistant_states"},
             "valid": False, "status": "not_found", "summary": "Nessuna decisione di simulazione presente negli stati Home Assistant.",
             "decision_id": None, "generated_at": None, "expires_at": None,
             "proposals": [], "telemetry": [], "warnings": [], "explanation_facts": [],
@@ -99,6 +103,10 @@ def summarize(states, now=None):
     if not candidates:
         return base
     _, decision = max(candidates, key=lambda c: c[0])
+    # Discovery is based on the validated simulation schema, not on hostnames,
+    # Proxmox, model names or local network endpoints.
+    base["capabilities"] = {**base["capabilities"], "decision_engine": True,
+                             "simulation": True}
     result = {**base, "found": True,
               "decision_id": decision.get("decision_id", "")[:80],
               "status": str(decision.get("status", "unknown"))[:80],
