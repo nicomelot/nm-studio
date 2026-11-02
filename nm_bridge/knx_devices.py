@@ -10,6 +10,11 @@ DEVICE_PATH = Path(os.getenv("NM_KNX_DEVICE_PATH", "/data/nm_knx_approved.json")
 ALLOWED_KINDS = {"light", "dimmer", "cover", "climate", "binary", "unknown"}
 ADDRESS = re.compile(r"^(?:[0-9]|[12][0-9]|3[01])/[0-7]/(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$")
 LIMIT = 300
+EXTRAS = {
+    "dimmer": ("relative", "brightness", "brightness_feedback"),
+    "climate": ("temperature", "target_temperature_state", "heat_cool", "heat_cool_state",
+                "operation_mode", "operation_mode_state"),
+}
 
 
 def validate_device(d):
@@ -36,10 +41,19 @@ def validate_device(d):
         raise ValueError("Group addresses must be distinct")
     if kind != "cover" and (stop is not None or position is not None):
         raise ValueError("Auxiliary group addresses are only supported for covers")
+    extras = {}
+    for field in EXTRAS.get(kind, ()):
+        value = d.get(field)
+        if value is not None and (not isinstance(value, str) or not ADDRESS.fullmatch(value)):
+            raise ValueError("Invalid " + field + " address")
+        extras[field] = value
+    all_addresses = [x for x in (command, feedback, stop, position, *extras.values()) if x]
+    if len(set(all_addresses)) != len(all_addresses):
+        raise ValueError("Group addresses must be distinct")
     if not isinstance(room, str) or not (1 <= len(room.strip()) <= 80):
         raise ValueError("Invalid room name")
     return {"name": name.strip(), "kind": kind, "command": command, "feedback": feedback, "room": room.strip(),
-            "stop": stop, "position": position}
+            "stop": stop, "position": position, **extras}
 
 
 def read_devices():
