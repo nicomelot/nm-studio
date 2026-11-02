@@ -1,5 +1,11 @@
 # NM Studio – Registro versioni
 
+## 5.6.1
+
+- Corretto l'abbinamento tra `ON/OFF L5` e feedback `STATO LED L5` (analogamente L6/L7) quando il feedback appartiene a un canale luce numerato. La variante di nome ETS non impedisce più la proposta del circuito.
+- La regola rimane circoscritta a `LED L` seguito da un numero, senza accorpare indiscriminatamente le segnalazioni LED di altre funzioni.
+- I circuiti sono sempre bozze da verificare; nessuna entità HA viene creata o comandata automaticamente.
+
 ## 5.6.0
 
 - Nell'analisi del vecchio YAML aggiunta «Ricostruzione circuiti · anteprima»: raggruppa le voci che utilizzano lo stesso GA di comando e le confronta con i widget ETS già salvati.
