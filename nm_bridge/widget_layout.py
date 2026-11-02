@@ -14,6 +14,8 @@ FIELDS = {
     "light": {"command", "feedback"},
     "dimmer": {"command", "feedback", "relative", "brightness", "brightness_feedback"},
     "cover": {"command", "stop", "position", "feedback"},
+    "climate": {"command", "temperature", "target_temperature_state", "heat_cool", "heat_cool_state",
+                "operation_mode", "operation_mode_state"},
 }
 HA_ENTITY = re.compile(r"^(?:light|switch|cover|sensor|binary_sensor|climate)\.[a-z0-9_]{1,240}$")
 MAX_WIDGETS = 200
