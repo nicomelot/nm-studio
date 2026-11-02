@@ -19,6 +19,7 @@ COPY entity_matcher.py /app/entity_matcher.py
 COPY missing_ha_generator.py /app/missing_ha_generator.py
 COPY deployment_preflight.py /app/deployment_preflight.py
 COPY knx_panel_bridge.py /app/knx_panel_bridge.py
+COPY knx_entity_audit.py /app/knx_entity_audit.py
 COPY knx_entity_plan.py /app/knx_entity_plan.py
 COPY knx_panel_apply.py /app/knx_panel_apply.py
 COPY migration_bundle.py /app/migration_bundle.py
