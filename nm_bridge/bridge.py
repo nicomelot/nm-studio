@@ -23,6 +23,7 @@ from entity_matcher import suggest as suggest_entities
 from missing_ha_generator import preview as preview_missing_ha, review as review_missing_ha
 from deployment_preflight import preflight as deployment_preflight
 from knx_panel_bridge import inspect as inspect_knx_panel
+from knx_entity_audit import audit as audit_knx_entities
 from knx_entity_plan import build as build_knx_entity_plan
 from knx_panel_apply import create_one as create_knx_entity
 from migration_bundle import export_bundle as export_migration, restore_bundle as restore_migration
@@ -270,6 +271,15 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/knx/panel-capability":
             data = inspect_knx_panel()
             self.respond(200, "application/json; charset=utf-8", json.dumps(data, ensure_ascii=False).encode())
+        elif path == "/knx/entity-audit":
+            try:
+                data = audit_knx_entities(read_widget_layout())
+                self.respond(200, "application/json; charset=utf-8", json.dumps(data, ensure_ascii=False).encode())
+            except Exception as exc:
+                LOG.warning("KNX entity audit unavailable (%s)", type(exc).__name__)
+                self.respond(200, "application/json; charset=utf-8", json.dumps({"read_only": True,
+                    "available": False, "rows": [], "total": 0,
+                    "message": "Indice KNX non accessibile: l'add-on potrebbe non avere i permessi amministratore necessari. Verifica dal pannello KNX di Home Assistant."}).encode())
         elif path == "/migration/export":
             try:
                 data = export_migration(CONFIG_PATH, validate_layout)
