@@ -159,6 +159,73 @@ def cover_suggestions(items, used_commands):
     return result
 
 
+def dimmer_fields(items, suggestions):
+    """Suggest auxiliary dimmer GAs only for an unambiguous numbered channel."""
+    for proposal in suggestions:
+        if proposal["kind"] != "dimmer":
+            continue
+        match = re.search(r"\bL\s*0*(\d{1,3})\b", proposal["name"], re.I)
+        if not match:
+            continue
+        channel = int(match.group(1))
+        related = [item for item in items if item["linked"] and
+                   (m := re.search(r"\bL\s*0*(\d{1,3})\b", item["name"], re.I)) and
+                   int(m.group(1)) == channel]
+        patterns = {
+            "relative": r"regolazion|incrementa|decrementa|dimming",
+            "brightness": r"valore\s+luminosit.*(?:via\s+bus|comando)|comando\s+valore",
+            "brightness_feedback": r"(?:valore\s+luminosit.*(?:corrente|attuale)|stato\s+luminosit)",
+        }
+        for field, pattern in patterns.items():
+            hits = [item for item in related if re.search(pattern, item["name"], re.I)]
+            if len(hits) == 1 and hits[0]["address"] not in (proposal["command"], proposal["feedback"]):
+                proposal[field] = hits[0]["address"]
+
+
+def climate_suggestions(items, used_commands, existing=None):
+    """Conservative room-qualified thermostat drafts: never infer HVAC from temperature alone."""
+    groups = {}
+    for item in items:
+        if not item["linked"]:
+            continue
+        name = item["name"].casefold()
+        match = re.match(r"^(?:termostato|clima|hvac)\s+(.+?)\s*[-:]\s*(.+)$", name)
+        if not match:
+            continue
+        room, function = match.groups()
+        role = ("temperature" if re.search(r"temperatura\s+(?:ambiente|attuale|misurata)", function)
+                else "target_temperature" if re.search(r"(?:setpoint|temperatura\s+desiderata|temperatura\s+impostata)\s*(?:comando)?", function) and not re.search(r"stato|feedback", function)
+                else "target_temperature_state" if re.search(r"(?:setpoint|temperatura\s+desiderata).*?(?:stato|feedback)", function)
+                else "heat_cool" if re.search(r"(?:estate\s*/\s*inverno|riscaldamento\s*/\s*raffrescamento|heat\s*/\s*cool)", function) and not re.search(r"stato|feedback", function)
+                else "heat_cool_state" if re.search(r"(?:estate\s*/\s*inverno|riscaldamento\s*/\s*raffrescamento|heat\s*/\s*cool).*?(?:stato|feedback)", function)
+                else "operation_mode" if re.search(r"modalit[aà].*(?:comando|operativ)", function) and not re.search(r"stato|feedback", function)
+                else "operation_mode_state" if re.search(r"modalit[aà].*(?:stato|feedback)", function)
+                else None)
+        if role:
+            groups.setdefault(room.strip(), {}).setdefault(role, []).append(item)
+    results = []
+    for room, roles in groups.items():
+        if len(roles.get("target_temperature", [])) != 1 or len(roles.get("temperature", [])) != 1:
+            continue
+        command = roles["target_temperature"][0]["address"]
+        if command in used_commands and not any(p["command"] == command and p["kind"] == "climate"
+                                             for p in (existing or [])):
+            continue
+        proposal = {"name": "TERMOSTATO " + room.upper(), "kind": "climate", "command": command,
+                    "feedback": None, "temperature": roles["temperature"][0]["address"],
+                    "room": suggest_room(room), "confidence": "bassa",
+                    "reason": "Setpoint e temperatura ambiente distinti; confermare DPT 9.001 e modalità HVAC in ETS"}
+        for field in ("target_temperature_state", "heat_cool", "heat_cool_state", "operation_mode", "operation_mode_state"):
+            if len(roles.get(field, [])) == 1:
+                proposal[field] = roles[field][0]["address"]
+        matched = next((p for p in (existing or []) if p["command"] == command and p["kind"] == "climate"), None)
+        if matched:
+            matched.update({key: value for key, value in proposal.items() if key not in ("name", "kind", "command")})
+        else:
+            results.append(proposal)
+    return results
+
+
 def application_file(device):
     """Locate one manufacturer application from a project's hardware reference."""
     ref = device.get("Hardware2ProgramRefId", "")
@@ -384,6 +451,8 @@ def preview(raw):
                         if endpoint["kind"] in ("unknown", "binary"):
                             endpoint["kind"] = kind
         suggestions.extend(cover_suggestions(items, {x["command"] for x in suggestions}))
+        suggestions.extend(climate_suggestions(items, {x["command"] for x in suggestions}, suggestions))
+        dimmer_fields(items, suggestions)
         suggestions.sort(key=lambda x: tuple(map(int, x["command"].split("/"))))
         functions = [{"name": item["name"], "space": item["space"],
                       "addresses": list(dict.fromkeys(address_refs[ref] for ref in item["refs"] if ref in address_refs))}
