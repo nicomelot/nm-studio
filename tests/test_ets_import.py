@@ -3,7 +3,7 @@ import unittest
 import zipfile
 from xml.sax.saxutils import escape
 
-from nm_bridge.ets_import import preview, dimmer_fields, climate_suggestions
+from nm_bridge.ets_import import preview, dimmer_fields, climate_suggestions, channel_suggestions
 
 
 def archive_with_addresses(entries, linked=()):
@@ -20,6 +20,20 @@ def archive_with_addresses(entries, linked=()):
 
 
 class ETSImportTests(unittest.TestCase):
+    def test_generic_channel_names_infer_light_dimmer_and_cover(self):
+        raw = [
+            ("0/0/1", "CH-1 - Switching : OnOff", "DPST-1-1"),
+            ("0/0/2", "CH-2 - Dimming : OnOff", "DPST-1-1"),
+            ("0/0/3", "CH-2 - Dimming : Dimming Control", "DPST-3-7"),
+            ("0/0/4", "CH-3 - Blinds Control : Move", "DPST-1-8"),
+            ("0/0/5", "CH-3 - Blinds Control : Step/Stop", "DPST-1-7"),
+        ]
+        items = [{"address": address, "name": name, "dpt": dpt, "linked": True} for address, name, dpt in raw]
+        proposals = channel_suggestions(items, set())
+        self.assertEqual([s["kind"] for s in proposals], ["light", "dimmer", "cover"])
+        self.assertEqual(proposals[1]["relative"], "0/0/3")
+        self.assertEqual(proposals[2]["stop"], "0/0/5")
+
     def test_dimmer_auxiliary_fields_are_individually_matched(self):
         items = [{"name": name, "address": address, "linked": True} for name, address in (
             ("DIMMER ON/OFF L11", "1/0/1"), ("NOTIFICA STATO DIMMER ON/OFF L11", "1/0/3"),
