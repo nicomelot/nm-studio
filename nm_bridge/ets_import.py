@@ -114,7 +114,13 @@ def guess_role(name):
 
 def base_name(name):
     stem = re.sub(r"\b(notifica|stato|status|feedback|riscontro|comando|cmd|command|on/off|accensione)\b", " ", name.casefold())
-    return re.sub(r"\s+", " ", stem).strip(" -_ ")
+    stem = re.sub(r"\s+", " ", stem).strip(" -_ ")
+    # Some ETS projects call actuator feedback "STATO LED L5" while the
+    # corresponding command is "ON/OFF L5". Only remove this exact prefix
+    # for a numbered lighting channel, not for arbitrary LED controls.
+    if re.fullmatch(r"led\s+l\d{1,3}", stem):
+        return stem.split()[-1]
+    return stem
 
 
 def cover_suggestions(items, used_commands):
