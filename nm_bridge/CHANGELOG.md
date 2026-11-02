@@ -1,5 +1,13 @@
 # NM Studio – Registro versioni
 
+## 5.8.0
+
+- Avviato il motore di riconoscimento universale con un catalogo di funzioni e requisiti DPT (luce, dimmer, tapparella, climate).
+- Ogni proposta riceve una revisione spiegabile: DPT confermato, dimensione compatibile, DPT mancante, conflitto oppure GA scollegato; le domande mirate vengono mostrate nel report ETS.
+- Supportata la convenzione ETS per canale (`CH-2 - Dimming : OnOff`), indipendente dai nomi L1/T1: il progetto demo ufficiale KNX Virtual v2.5 passa da 0 a 6 proposte, senza creare o comandare entità automaticamente.
+- Test reale su due progetti dimostrativi KNX Association: la demo luci/dimmer/tapparelle è leggibile; la demo HVAC ha XML interno cifrato e richiederà una futura importazione con password.
+- Gli indicatori di attendibilità sono evidenze preliminari e non autorizzano mai comandi sul bus o creazioni HA.
+
 ## 5.7.0
 
 - Dimmer KNX: l'analisi ETS propone anche regolazione relativa a 4 bit, luminosità assoluta e feedback della luminosità quando sono presenti collegamenti univoci al circuito; tutti i DPT restano da verificare.
