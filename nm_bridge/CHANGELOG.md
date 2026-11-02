@@ -1,5 +1,13 @@
 # NM Studio – Registro versioni
 
+## 5.4.0
+
+- Prima funzione di inventario operativo nell'area «Genera HA»: confronto in sola lettura dei GA di comando/feedback dei widget ETS con l'indice delle entità registrate nel pannello KNX ufficiale di Home Assistant.
+- Classificazione prudente di funzioni coerenti, associazioni sospette, funzioni da associare, da verificare o senza entità rilevata sul GA di comando; elenco dei nomi delle entità KNX effettivamente collegate al GA.
+- Analisi utilizzabile anche quando il progetto ETS non è ricaricato nel browser, poiché si basa sui widget salvati e sull'indice KNX corrente.
+- Se l'API KNX è negata all'add-on, la schermata mostra un limite di permessi e non inventa risultati.
+- Nessuna modifica ai GA o alle entità, nessun telegramma, nessuna installazione automatica. La procedura già esistente di creazione controllata delle sole entità mancanti resta separata e richiede conferme e backup.
+
 ## 5.3.0
 
 - Prima riconciliazione tra nome del GA di comando ETS e inventario Home Assistant, con identificatori circuito (es. L11) e distinzione esplicita dei nomi compatibili con feedback.
