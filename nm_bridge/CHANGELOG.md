@@ -1,5 +1,13 @@
 # NM Studio – Registro versioni
 
+## 5.3.0
+
+- Prima riconciliazione tra nome del GA di comando ETS e inventario Home Assistant, con identificatori circuito (es. L11) e distinzione esplicita dei nomi compatibili con feedback.
+- La pagina «Associa entità» mostra candidati a un comando e avvisa quando l'associazione attuale sembra riferirsi al feedback.
+- «Proponi … (solo bozza)» applica la selezione **soltanto al modulo aperto**, senza salvataggio né comandi e senza modificare le associazioni di altri widget. Il normale pulsante «Conferma e salva» resta l'unico punto di persistenza.
+- Si evita di proporre automaticamente candidati con nomi fisici ambigui (es. pulsantiera/scatola), identificatori diversi o punteggio non univoco.
+- I nomi HA non dimostrano la configurazione KNX sottostante: prima della conferma è ancora richiesta la verifica dell'indirizzo di comando nell'entità Home Assistant.
+
 ## 5.2.0
 
 - Nella pagina «Associa entità» aggiunto il caricamento opzionale del progetto ETS in sola lettura, senza alterare le bozze widget o la programmazione.
