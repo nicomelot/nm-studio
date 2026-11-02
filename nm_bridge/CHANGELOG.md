@@ -1,5 +1,16 @@
 # NM Studio – Registro versioni
 
+## 5.6.0
+
+- Nell'analisi del vecchio YAML aggiunta «Ricostruzione circuiti · anteprima»: raggruppa le voci che utilizzano lo stesso GA di comando e le confronta con i widget ETS già salvati.
+- Evidenzia separatamente i nomi compatibili con feedback, i possibili conflitti tra indirizzi di stato e l'assenza di una funzione ETS corrispondente.
+- Distingue il caricamento ETS, necessario alla creazione da zero, dall'audit facoltativo del vecchio YAML, utile nelle migrazioni. Nessuna entità viene modificata.
+
+## 5.5.0
+
+- Analisi in sola lettura di una copia YAML KNX caricata dall'installatore: gruppi di indirizzi ripetuti e possibili feedback erroneamente configurati come luci separate.
+- Il file viene analizzato in memoria e non viene applicato alla configurazione Home Assistant.
+
 ## 5.4.1
 
 - Corretto il formato dell'indice restituito da `knx/get_entities_by_group`: Home Assistant fornisce record con `platform`, `unique_id`, `ui` e `disabled`, non una lista di stringhe `entity_id`.
