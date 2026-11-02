@@ -1,5 +1,13 @@
 # NM Studio – Registro versioni
 
+## 5.7.0
+
+- Dimmer KNX: l'analisi ETS propone anche regolazione relativa a 4 bit, luminosità assoluta e feedback della luminosità quando sono presenti collegamenti univoci al circuito; tutti i DPT restano da verificare.
+- Le schede del generatore mostrano e salvano questi indirizzi aggiuntivi; anche i widget KNX li ricevono in automatico.
+- Prima bozza termostati KNX/HVAC: temperatura ambiente, setpoint e feedback, scelta caldo/freddo e modalità operativa. Proposte automatiche soltanto da nomi ETS strutturati e univoci, altrimenti inserimento manuale.
+- La bozza YAML Home Assistant include `knx.climate` solo con temperatura ambiente e feedback setpoint; non applica configurazioni e non invia telegrammi. Verificare DPT 9.001, 1.100 e 20.102, direzione e limiti del dispositivo.
+- L'importazione Nuova FR non inventa termostati da semplici indirizzi di temperatura.
+
 ## 5.6.1
 
 - Corretto l'abbinamento tra `ON/OFF L5` e feedback `STATO LED L5` (analogamente L6/L7) quando il feedback appartiene a un canale luce numerato. La variante di nome ETS non impedisce più la proposta del circuito.
