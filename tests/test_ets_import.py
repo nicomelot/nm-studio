@@ -3,7 +3,7 @@ import unittest
 import zipfile
 from xml.sax.saxutils import escape
 
-from nm_bridge.ets_import import preview
+from nm_bridge.ets_import import preview, dimmer_fields, climate_suggestions
 
 
 def archive_with_addresses(entries, linked=()):
@@ -20,6 +20,30 @@ def archive_with_addresses(entries, linked=()):
 
 
 class ETSImportTests(unittest.TestCase):
+    def test_dimmer_auxiliary_fields_are_individually_matched(self):
+        items = [{"name": name, "address": address, "linked": True} for name, address in (
+            ("DIMMER ON/OFF L11", "1/0/1"), ("NOTIFICA STATO DIMMER ON/OFF L11", "1/0/3"),
+            ("DIMMER REGOLAZIONE L11", "1/0/2"), ("VALORE LUMINOSITA VIA BUS L11", "1/0/6"),
+            ("VALORE LUMINOSITA CORRENTE L11", "1/0/8"))]
+        proposals = [{"name": "DIMMER L11", "kind": "dimmer", "command": "1/0/1", "feedback": "1/0/3"}]
+        dimmer_fields(items, proposals)
+        self.assertEqual({key: proposals[0].get(key) for key in ("relative", "brightness", "brightness_feedback")},
+                         {"relative": "1/0/2", "brightness": "1/0/6", "brightness_feedback": "1/0/8"})
+
+    def test_climate_requires_unambiguous_setpoint_and_ambient(self):
+        items = [{"name": name, "address": address, "linked": True} for name, address in (
+            ("TERMOSTATO SALA - Temperatura ambiente", "2/1/0"),
+            ("TERMOSTATO SALA - Setpoint comando", "2/1/1"),
+            ("TERMOSTATO SALA - Setpoint stato", "2/1/2"),
+            ("TERMOSTATO SALA - Riscaldamento/Raffrescamento comando", "2/1/3"))]
+        suggestions = climate_suggestions(items, set())
+        self.assertEqual(len(suggestions), 1)
+        self.assertEqual(suggestions[0]["kind"], "climate")
+        self.assertEqual(suggestions[0]["temperature"], "2/1/0")
+        self.assertEqual(suggestions[0]["target_temperature_state"], "2/1/2")
+        self.assertEqual(suggestions[0]["heat_cool"], "2/1/3")
+        self.assertEqual(climate_suggestions(items[:1], set()), [])
+
     def test_physical_device_links_have_stable_local_identifier(self):
         result = preview(archive_with_addresses([(0x0900, 'ON/OFF L1')], linked=(0,)))
         device = result['devices'][0]
