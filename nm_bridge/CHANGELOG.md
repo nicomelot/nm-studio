@@ -1,5 +1,13 @@
 # NM Studio – Registro versioni
 
+## 5.2.0
+
+- Nella pagina «Associa entità» aggiunto il caricamento opzionale del progetto ETS in sola lettura, senza alterare le bozze widget o la programmazione.
+- Confronto vincolato alla stessa impronta del progetto ETS usato per salvare i widget, per evitare di mostrare associazioni tra impianti diversi.
+- Dettagli espandibili per widget con i GA di comando, feedback, dimmer e tapparelle già salvati; dalla lettura ETS vengono mostrati nomi, DPT, dispositivi, oggetti e flag disponibili.
+- Segnalazione di GA non trovati, indirizzi senza oggetti collegati e DPT mancanti. La direzione assegnata al GA nel widget resta un'ipotesi da confermare, e non è possibile dimostrare l'associazione entità HA↔GA dalla sola API degli stati.
+- Nessuna modifica automatica alle entità HA e nessun invio telegrammi KNX.
+
 ## 5.1.0
 
 - Prima analisi conservativa delle entità HA per riconciliazione con le funzioni ETS: nomi con «notifica/feedback» segnalati come probabili oggetti di stato, etichette «pulsantiera/scatola di derivazione» marcate come ambigue.
