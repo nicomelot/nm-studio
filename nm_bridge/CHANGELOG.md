@@ -1,5 +1,12 @@
 # NM Studio – Registro versioni
 
+## 5.4.1
+
+- Corretto il formato dell'indice restituito da `knx/get_entities_by_group`: Home Assistant fornisce record con `platform`, `unique_id`, `ui` e `disabled`, non una lista di stringhe `entity_id`.
+- Consultazione aggiuntiva, in sola lettura, del registro entità Home Assistant per collegare gli identificatori interni KNX agli `entity_id` reali, quando accessibile.
+- Se il registro non è accessibile, l'interfaccia indica che il GA è in uso, senza inventare un'associazione certa. I record disabilitati e quelli provenienti da YAML restano visibili.
+- Risolve i falsi «collegamenti non interpretabili» osservati su Nuova FR. Nessuna modifica al KNX o alle entità HA.
+
 ## 5.4.0
 
 - Prima funzione di inventario operativo nell'area «Genera HA»: confronto in sola lettura dei GA di comando/feedback dei widget ETS con l'indice delle entità registrate nel pannello KNX ufficiale di Home Assistant.
