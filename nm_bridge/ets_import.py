@@ -7,8 +7,10 @@ import zipfile
 import xml.etree.ElementTree as ET
 try:
     from .ets_rooms import extract_functions, room_matches
+    from .recognition import review_suggestions
 except ImportError:  # The add-on runs the modules directly from /app.
     from ets_rooms import extract_functions, room_matches
+    from recognition import review_suggestions
 
 MAX_ARCHIVE = 8 * 1024 * 1024
 MAX_XML = 12 * 1024 * 1024
@@ -224,6 +226,63 @@ def climate_suggestions(items, used_commands, existing=None):
         else:
             results.append(proposal)
     return results
+
+
+def channel_suggestions(items, used_commands):
+    """Infer standard ETS channel naming without assuming a manufacturer's brand.
+
+    Recognizes `CH-2 - Dimming : OnOff` independently of language-specific
+    installer aliases such as L2 or T2. All suggestions remain unapproved.
+    """
+    groups = {}
+    for item in items:
+        if not item["linked"]:
+            continue
+        match = re.match(r"^CH\s*[- ]\s*(\d{1,3})\s*[-:]\s*(.+?)\s*:\s*(.+)$", item["name"], re.I)
+        if not match:
+            continue
+        channel, label, action = match.groups()
+        family = ("cover" if re.search(r"blind|shutter|tapparel|venezian", label, re.I)
+                  else "dimmer" if re.search(r"dimm|regolaz", label, re.I)
+                  else "light" if re.search(r"switch|commut|on/off", label, re.I) else None)
+        if family:
+            groups.setdefault((int(channel), family), []).append((item, action.casefold()))
+    result = []
+    for (channel, family), group in groups.items():
+        def matched(pattern):
+            return [item for item, action in group if re.search(pattern, action)]
+        command = ([item for item, action in group if re.search(r"\bon\s*/?\s*off\b|\bonoff\b", action)
+                    and not re.search(r"feedback|status|stato", action)] if family != "cover"
+                   else matched(r"\bmove\b|\bup\s*/\s*down\b"))
+        # A command must be unambiguous and match the expected KNX DPT class.
+        expected = "DPST-1-8" if family == "cover" else "DPST-1-1"
+        command = [item for item in command if item.get("dpt", "").upper() in (expected, "")]
+        if len(command) != 1 or command[0]["address"] in used_commands:
+            continue
+        feedback = matched(r"feedback|status|stato")
+        if family == "cover":
+            stop = matched(r"step\s*/\s*stop|\bstop\b|arresto")
+            position = [item for item in feedback if item.get("dpt", "").upper() in ("DPST-5-1", "DPT-5.001")]
+            proposal = {"name": f"CH{channel} TAPPARELLA", "kind": "cover",
+                        "command": command[0]["address"], "feedback": None,
+                        "stop": stop[0]["address"] if len(stop) == 1 else None,
+                        "position": None, "room": "Da assegnare", "confidence": "media",
+                        "reason": "Canale ETS + DPT di movimento/stop; il feedback posizione resta da verificare"}
+            if len(position) == 1:
+                proposal["position_feedback_suggestion"] = position[0]["address"]
+        else:
+            feedback = [item for item in feedback if re.search(r"on\s*/?\s*off|onoff|feedback", item["name"], re.I)]
+            proposal = {"name": f"CH{channel} {'DIMMER' if family == 'dimmer' else 'LUCE'}",
+                        "kind": family, "command": command[0]["address"],
+                        "feedback": feedback[0]["address"] if len(feedback) == 1 else None,
+                        "room": "Da assegnare", "confidence": "media",
+                        "reason": "Canale ETS e funzione riconoscibili; associazioni da verificare"}
+            if family == "dimmer":
+                relative = matched(r"dimming\s+control|regolaz|dimming\s+relative")
+                if len(relative) == 1 and relative[0].get("dpt", "").upper() in ("DPST-3-7", "DPT-3.007", ""):
+                    proposal["relative"] = relative[0]["address"]
+        result.append(proposal)
+    return result
 
 
 def application_file(device):
@@ -452,6 +511,7 @@ def preview(raw):
                             endpoint["kind"] = kind
         suggestions.extend(cover_suggestions(items, {x["command"] for x in suggestions}))
         suggestions.extend(climate_suggestions(items, {x["command"] for x in suggestions}, suggestions))
+        suggestions.extend(channel_suggestions(items, {x["command"] for x in suggestions}))
         dimmer_fields(items, suggestions)
         suggestions.sort(key=lambda x: tuple(map(int, x["command"].split("/"))))
         functions = [{"name": item["name"], "space": item["space"],
@@ -459,5 +519,6 @@ def preview(raw):
                      for item in function_refs]
         matches = room_matches(suggestions[:300], items, building_spaces, functions)
         return {"project_key": project_key, "addresses": items, "devices": device_inventory, "suggestions": suggestions[:300],
+                "recognition_reviews": review_suggestions(items, suggestions),
                 "building": building_spaces, "functions": functions, "room_matches": matches, "total": len(items),
                 "warning": "Tipi e abbinamenti sono ipotesi, non verifiche ETS. DPT mancanti da controllare. Nessun dato salvato."}
