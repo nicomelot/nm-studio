@@ -24,6 +24,7 @@ from missing_ha_generator import preview as preview_missing_ha, review as review
 from deployment_preflight import preflight as deployment_preflight
 from knx_panel_bridge import inspect as inspect_knx_panel
 from knx_entity_audit import audit as audit_knx_entities
+from knx_yaml_audit import inspect_yaml as inspect_knx_yaml
 from knx_entity_plan import build as build_knx_entity_plan
 from knx_panel_apply import create_one as create_knx_entity
 from migration_bundle import export_bundle as export_migration, restore_bundle as restore_migration
@@ -334,7 +335,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?", 1)[0]
-        if self.client_address[0] != INGRESS_PROXY or path not in ("/layout", "/modules/plan", "/floorplans", "/floorplans/dashboard-publish", "/ets/preview", "/knx/approved", "/audit", "/knx/widgets", "/knx/ha-preview", "/dashboard/missing-ha/review", "/dashboard/deployment-preflight", "/knx/panel-create-plan", "/knx/panel-create-one", "/dashboard/publish", "/migration/restore", "/nm-link", "/nm-link/preview", "/nm-link/simulate"):
+        if self.client_address[0] != INGRESS_PROXY or path not in ("/layout", "/modules/plan", "/floorplans", "/floorplans/dashboard-publish", "/ets/preview", "/knx/approved", "/audit", "/knx/widgets", "/knx/ha-preview", "/knx/yaml-audit", "/dashboard/missing-ha/review", "/dashboard/deployment-preflight", "/knx/panel-create-plan", "/knx/panel-create-one", "/dashboard/publish", "/migration/restore", "/nm-link", "/nm-link/preview", "/nm-link/simulate"):
             self.send_error(403)
             return
         # Ingress protects access; these checks also reject cross-site form POSTs.
@@ -344,7 +345,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             n = int(self.headers.get("Content-Length", "0"))
-            max_body = MAX_ARCHIVE if path == "/ets/preview" else 4 * 1024 * 1024 if path == "/floorplans" else 1024 * 1024 if path == "/migration/restore" else 256 * 1024 if path in ("/knx/widgets", "/knx/ha-preview") else MAX_BODY
+            max_body = MAX_ARCHIVE if path == "/ets/preview" else 4 * 1024 * 1024 if path == "/floorplans" else 1024 * 1024 if path == "/migration/restore" else 256 * 1024 if path in ("/knx/widgets", "/knx/ha-preview", "/knx/yaml-audit") else MAX_BODY
             if not 0 < n <= max_body:
                 raise ValueError("Invalid length")
             body = self.rfile.read(n)
@@ -366,6 +367,11 @@ class Handler(BaseHTTPRequestHandler):
                 saved = read_widget_layout()
                 evidence = validate_evidence(json.loads(body), saved["project"])
                 data = ha_knx_preview(saved, evidence)
+            elif path == "/knx/yaml-audit":
+                payload = json.loads(body)
+                if not isinstance(payload, dict):
+                    raise ValueError("Richiesta non valida")
+                data = inspect_knx_yaml(payload.get("yaml"))
             elif path == "/dashboard/missing-ha/review":
                 data = review_missing_ha(read_widget_layout(), json.loads(body))
             elif path == "/dashboard/deployment-preflight":
