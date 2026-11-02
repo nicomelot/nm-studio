@@ -1,5 +1,13 @@
 # NM Studio – Registro versioni
 
+## 5.1.0
+
+- Prima analisi conservativa delle entità HA per riconciliazione con le funzioni ETS: nomi con «notifica/feedback» segnalati come probabili oggetti di stato, etichette «pulsantiera/scatola di derivazione» marcate come ambigue.
+- Le entità sospette non sono più suggerite automaticamente come comandi, ma rimangono selezionabili dall'installatore, con avvisi visibili e senza modificare le associazioni già salvate.
+- La pagina «Associa entità» presenta il conteggio delle entità che richiedono verifica, la motivazione per ciascuna scelta e l'avviso aggiornato cambiando selezione.
+- La planimetria propone inizialmente le entità già associate ai widget ETS, con opzione per mostrare tutte le entità HA e mantenendo la possibilità di ripetere una luce sulla pianta.
+- Classificazione solo euristica basata sui nomi: non equivale a verifica automatica di GA, DPT, direzione o flag di comunicazione. Nessun comando né modifica KNX/HA.
+
 ## 5.0.0
 
 - Generazione di dashboard HA `picture-elements` a partire dalle planimetrie salvate: ogni punto con entità HA presente viene rappresentato mediante un `state-icon` nativo nella posizione originale.
