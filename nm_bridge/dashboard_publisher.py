@@ -15,7 +15,7 @@ except ImportError:
 
 
 URL_PATH = re.compile(r"^nm-studio-[a-z0-9-]{3,52}$")
-MAX_VIEWS = 1
+MAX_VIEWS = 8
 
 
 class PublishError(ValueError):
@@ -93,7 +93,7 @@ def publish(payload, layout, entities, client_factory=HAWebSocket):
         raise PublishError("Anteprima non aggiornata: rigenera prima di pubblicare")
     if generated["summary"]["tiles"] == 0:
         raise PublishError("Nessuna entità HA compatibile: associa almeno un dispositivo reale prima di pubblicare")
-    if len(generated["dashboard"]["views"]) != MAX_VIEWS:
+    if not 1 <= len(generated["dashboard"]["views"]) <= MAX_VIEWS:
         raise PublishError("Numero viste inatteso")
     with client_factory() as client:
         existing = _listed_paths(client.call("lovelace/dashboards/list"))
