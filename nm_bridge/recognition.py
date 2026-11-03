@@ -34,6 +34,46 @@ def _expected_bits(dpt):
     return {"1": 1, "3": 4, "5": 8, "9": 16, "20": 8}.get(dpt.split(".", 1)[0])
 
 
+HVAC_ROLES = (
+    ("flap", r"\b(?:flap|swing|alette|deflettor|oscillazion)\w*\b"),
+    ("fan_speed", r"\b(?:fan\s*speed|ventilator\w*|velocit[aà]\s*(?:ventol|aria)|fan\s*level)\w*"),
+    ("humidity", r"\b(?:umidit[aà]|humidity|humidit[yé])\b"),
+    ("setpoint", r"\b(?:setpoint|temperatura\s*(?:impostata|desiderata)|target\s*temp)\b"),
+    ("temperature", r"\b(?:temperatura\s*(?:ambiente|attuale|misurata)|room\s*temp|actual\s*temp)\b"),
+    ("mode", r"\b(?:modalit[aà]|operating\s*mode|hvac\s*mode|heat\s*/\s*cool|estate\s*/\s*inverno)\b"),
+    ("ventilation", r"\b(?:portata\s*aria|air\s*flow|ricambio\s*aria|bypass|recuperatore)\b"),
+)
+
+
+def hvac_address_inventory(addresses):
+    """Identify possible HVAC/VMC GA semantics without guessing proprietary DPTs.
+
+    This is an independent read-only inventory, not a device/entity proposal.
+    Manufacturer-specific fan levels, swing positions and modes must be mapped
+    only after the installer supplies the corresponding application semantics.
+    """
+    result = []
+    for address in addresses[:6000]:
+        name = " ".join(str(address.get(field) or "") for field in ("name", "description"))
+        objects = " ".join(str(obj.get(field) or "") for obj in address.get("connections", [])[:12]
+                           for field in ("name", "function"))
+        combined = f"{name} {objects}"
+        if not re.search(r"\b(?:hvac|clima|climatizz|termostat|daikin|zennio|intesis|vmc|ventilazion|"
+                         r"recuperator|fan\s*coil|fancoil|condizionator)\w*\b", combined, re.I):
+            continue
+        roles = [role for role, pattern in HVAC_ROLES if re.search(pattern, combined, re.I)]
+        if not roles:
+            continue
+        dpt = _dpt(address.get("dpt"))
+        linked = bool(address.get("linked"))
+        result.append({"address": address.get("address"), "name": str(address.get("name") or "")[:160],
+                       "roles": roles, "dpt": dpt, "linked": linked,
+                       "status": "da_verificare" if linked else "non_collegato",
+                       "question": ("Verificare ruolo, direzione, DPT e codifica dei valori in ETS"
+                                    if linked else "Verificare se questo GA è effettivamente utilizzato")})
+    return result[:300]
+
+
 def review_suggestions(addresses, suggestions):
     """Bounded, deterministic per-field evidence and explicit installer questions."""
     lookup = {a["address"]: a for a in addresses}
