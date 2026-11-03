@@ -1,5 +1,12 @@
 # NM Studio – Registro versioni
 
+## 5.8.4
+
+- Importer ETS: rilevamento prudente dei termostati organizzati per gruppo intermedio KNX, anche quando i nomi non indicano l'ambiente.
+- Richiesti temperatura ambiente, setpoint manuale, setpoint corrente e comandi/stati HVAC univoci con DPT coerenti; caldo/freddo associato soltanto se il relativo GA è realmente collegato.
+- Sul progetto reale `BEPPE VELLO` l'anteprima passa da 108 a 123 proposte, comprendendo 15 zone `climate`; le stanze senza evidenza rimangono da assegnare.
+- Nessuna approvazione automatica, modifica Home Assistant o trasmissione KNX. Aggiunto test di regressione per ambiguità e DPT errati.
+
 ## 5.8.3
 
 - Aumentato da 8 a 16 MB il limite di caricamento dei progetti `.knxproj` sia nell'importatore ETS sia nel confronto con i widget; controllo coerente anche sul server.
