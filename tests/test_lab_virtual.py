@@ -94,7 +94,7 @@ class VirtualLabTests(unittest.TestCase):
             installed = install(request, root)
             self.assertTrue(installed["installed"])
             target = root / "packages" / "nm_lab_virtual.yaml"
-            self.assertEqual(target.read_text(), plan["yaml"])
+            self.assertEqual(target.read_text(encoding="utf-8"), plan["yaml"])
             self.assertTrue(install(request, root)["unchanged"])
             with self.assertRaisesRegex(ValueError, "sovrascrittura"):
                 install({**request, "zones": [payload()["zones"][0]],
