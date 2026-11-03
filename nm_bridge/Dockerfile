@@ -30,5 +30,6 @@ COPY module_plan.py /app/module_plan.py
 COPY floorplan.py /app/floorplan.py
 COPY floorplan_lovelace.py /app/floorplan_lovelace.py
 COPY floorplan_publisher.py /app/floorplan_publisher.py
+COPY lab_virtual.py /app/lab_virtual.py
 WORKDIR /app
 CMD ["/command/with-contenv", "python3", "-u", "/app/bridge.py"]
