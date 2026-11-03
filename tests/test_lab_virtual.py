@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from nm_bridge.lab_virtual import build, inspect, install
+from nm_bridge.lab_virtual import build, inspect, install, packages_setup_preview, enable_packages
 
 
 def payload():
@@ -12,6 +12,48 @@ def payload():
 
 
 class VirtualLabTests(unittest.TestCase):
+    def test_packages_activation_is_confirmed_backed_up_and_idempotent(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            config = root / "configuration.yaml"
+            config.write_text("default_config:\n\nfrontend:\n")
+            check = packages_setup_preview(root)
+            self.assertTrue(check["ready"])
+            self.assertFalse(check["already_enabled"])
+            backup = root / "safekeeping"
+            with self.assertRaisesRegex(ValueError, "Conferma"):
+                enable_packages({"confirm": False, "expected_sha256": check["expected_sha256"]}, root, backup)
+            result = enable_packages({"confirm": True, "expected_sha256": check["expected_sha256"]}, root, backup)
+            self.assertTrue(result["backup_created"])
+            self.assertIn("homeassistant:\n  packages: !include_dir_named packages", config.read_text())
+            self.assertEqual(len(list(backup.glob("configuration-*.yaml"))), 1)
+            self.assertTrue(packages_setup_preview(root)["already_enabled"])
+            self.assertTrue((root / "packages").is_dir())
+
+    def test_packages_activation_preserves_existing_homeassistant_mapping(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            config = root / "configuration.yaml"
+            config.write_text("homeassistant:\n  name: NM Test\n\nlogger:\n  default: warning\n")
+            check = packages_setup_preview(root)
+            enable_packages({"confirm": True, "expected_sha256": check["expected_sha256"]}, root, root / "backups")
+            self.assertIn("homeassistant:\n  packages: !include_dir_named packages\n  name: NM Test", config.read_text())
+            self.assertIn("logger:\n  default: warning", config.read_text())
+
+    def test_packages_activation_refuses_custom_includes_and_stale_preview(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            config = root / "configuration.yaml"
+            config.write_text("homeassistant:\n  packages: !include_dir_merge_named custom\n")
+            with self.assertRaisesRegex(ValueError, "packages"):
+                packages_setup_preview(root)
+            config.write_text("default_config:\n")
+            check = packages_setup_preview(root)
+            config.write_text("default_config:\n# changed\n")
+            with self.assertRaisesRegex(ValueError, "modificato"):
+                enable_packages({"confirm": True, "expected_sha256": check["expected_sha256"]}, root, root / "backups")
+            self.assertFalse((root / "backups").exists())
+
     def test_preview_has_only_virtual_heaters_and_valid_ha_ids(self):
         plan = build(payload())
         self.assertEqual(plan["zones"], 2)
