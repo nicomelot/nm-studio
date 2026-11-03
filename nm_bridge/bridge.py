@@ -2,6 +2,7 @@
 
 import json
 import logging
+import sqlite3
 import os
 import tempfile
 from datetime import datetime, timedelta, timezone
@@ -37,6 +38,7 @@ from lab_virtual import (inspect as inspect_virtual_lab, install as install_virt
                          packages_setup_preview, enable_packages)
 from lab_devices import candidates as lab_candidates
 from lab_dashboard import preview as lab_dashboard_preview, publish as lab_dashboard_publish
+from bus_recorder import Recorder
 
 LOG = logging.getLogger("nm_bridge")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -45,6 +47,7 @@ INGRESS_PROXY = "172.30.32.2"
 DOMAINS = {"light", "cover", "switch", "scene", "climate", "sensor", "binary_sensor"}
 CONFIG_PATH = Path(os.getenv("NM_CONFIG_PATH", "/data/nm_control_layout.json"))
 MAX_BODY = 65536
+BUS_RECORDER = Recorder(CONFIG_PATH.parent / "nm_knx_events.sqlite")
 
 
 def get_ha_states():
@@ -179,7 +182,13 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(403)
             return
         path = self.path.split("?", 1)[0].rstrip("/")
-        if path == "/entities":
+        if path == "/bus-log":
+            try:
+                ga = parse_qs(urlsplit(self.path).query).get("ga", [None])[0]
+                self.respond(200, "application/json; charset=utf-8", json.dumps(BUS_RECORDER.snapshot(ga)).encode())
+            except (OSError, ValueError, RuntimeError, sqlite3.Error):
+                self.respond(500, "application/json", b'{"error":"Registro non disponibile"}')
+        elif path == "/entities":
             try:
                 data = json.dumps({"read_only": True, "entities": get_entities()}, ensure_ascii=False).encode()
                 self.respond(200, "application/json; charset=utf-8", data)
@@ -341,7 +350,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?", 1)[0]
-        if self.client_address[0] != INGRESS_PROXY or path not in ("/layout", "/modules/plan", "/floorplans", "/floorplans/dashboard-publish", "/ets/preview", "/knx/approved", "/audit", "/knx/widgets", "/knx/ha-preview", "/knx/yaml-audit", "/dashboard/missing-ha/review", "/dashboard/deployment-preflight", "/knx/panel-create-plan", "/knx/panel-create-one", "/dashboard/publish", "/migration/restore", "/nm-link", "/nm-link/preview", "/nm-link/simulate", "/lab/preview", "/lab/install", "/lab/replace", "/lab/packages-preview", "/lab/packages-enable", "/lab/dashboard-preview", "/lab/dashboard-publish"):
+        if self.client_address[0] != INGRESS_PROXY or path not in ("/bus-log/start", "/bus-log/stop", "/layout", "/modules/plan", "/floorplans", "/floorplans/dashboard-publish", "/ets/preview", "/knx/approved", "/audit", "/knx/widgets", "/knx/ha-preview", "/knx/yaml-audit", "/dashboard/missing-ha/review", "/dashboard/deployment-preflight", "/knx/panel-create-plan", "/knx/panel-create-one", "/dashboard/publish", "/migration/restore", "/nm-link", "/nm-link/preview", "/nm-link/simulate", "/lab/preview", "/lab/install", "/lab/replace", "/lab/packages-preview", "/lab/packages-enable", "/lab/dashboard-preview", "/lab/dashboard-publish"):
             self.send_error(403)
             return
         # Ingress protects access; these checks also reject cross-site form POSTs.
@@ -355,7 +364,11 @@ class Handler(BaseHTTPRequestHandler):
             if not 0 < n <= max_body:
                 raise ValueError("Invalid length")
             body = self.rfile.read(n)
-            if path == "/layout":
+            if path == "/bus-log/start":
+                data = BUS_RECORDER.start(json.loads(body))
+            elif path == "/bus-log/stop":
+                data = BUS_RECORDER.stop()
+            elif path == "/layout":
                 layout = validate_layout(json.loads(body))
                 write_layout(layout)
                 data = {"saved": True}

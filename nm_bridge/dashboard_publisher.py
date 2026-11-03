@@ -15,7 +15,7 @@ except ImportError:
 
 
 URL_PATH = re.compile(r"^nm-studio-[a-z0-9-]{3,52}$")
-MAX_VIEWS = 8
+MAX_VIEWS = 512
 
 
 class PublishError(ValueError):

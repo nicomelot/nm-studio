@@ -34,6 +34,7 @@ COPY floorplan_publisher.py /app/floorplan_publisher.py
 COPY lab_virtual.py /app/lab_virtual.py
 COPY lab_devices.py /app/lab_devices.py
 COPY lab_dashboard.py /app/lab_dashboard.py
+COPY bus_recorder.py /app/bus_recorder.py
 WORKDIR /app
 CMD ["/command/with-contenv", "python3", "-u", "/app/bridge.py"]
 

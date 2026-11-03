@@ -1,3 +1,12 @@
+## 5.9.6
+
+- NM Control LAB: Home, indice Ambienti raggruppato per percorso edificio/piano, pagina dedicata a ogni stanza; Funzioni con Luci, Motorizzazioni, Clima, Scene e Sensori quando presenti, filtro per ambiente e ritorno alla pagina precedente.
+- Home con luci accese, motorizzazioni aperte e clima. Le viste condividono le entità LAB esistenti. Crea una nuova dashboard sul percorso `-v2`, preservando la precedente; non reinstallare le entità per questa modifica.
+- Diagnostica: registro KNX su richiesta per 1–32 GA, persistente (ultimi 10.000 eventi), consultazione/filtro/esportazione degli ultimi 500. Registra mittente, GA, direzione, tipo, data e valore decodificato se già disponibile. Nessuna lettura o scrittura di valori sul bus.
+- L'avvio tenta la registrazione dei filtri locali `knx_event` in HA. Se mancano i permessi amministratore, ascolta gli eventi già configurati e indica come registrarli dall'interfaccia Azioni HA. Nessun aumento dei privilegi. I filtri non vengono rimossi per non interrompere altre automazioni.
+- Registrazione da riattivare dopo riavvio/disconnessione; non è un monitor completo del bus e non certifica la consegna ai dispositivi. Conservazione a numero di eventi, non 48 ore garantite. Nessuna correzione automatica delle modalità climatiche.
+- Test locali Python/JavaScript; collaudo visivo su HA e registrazione su impianto reale ancora necessari.
+
 ## 5.9.5
 
 - LAB: ricostruisce la posizione comune dei dispositivi collegati dal ramo Edifici ETS; distingue la proposta fisica da un ambiente funzionale verificato. Include i piani nel menu.
