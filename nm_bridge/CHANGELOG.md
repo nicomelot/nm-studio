@@ -1,5 +1,10 @@
 # NM Studio – Registro versioni
 
+## 5.8.1
+
+- Corretto il crash all'avvio dell'app: il Dockerfile ora include `recognition.py`, necessario per l'analisi ETS introdotta nella 5.8.0.
+- Nessuna modifica ai dati salvati, ai comandi KNX o alle configurazioni Home Assistant.
+
 ## 5.8.0
 
 - Avviato il motore di riconoscimento universale con un catalogo di funzioni e requisiti DPT (luce, dimmer, tapparella, climate).
