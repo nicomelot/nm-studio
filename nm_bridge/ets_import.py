@@ -12,7 +12,7 @@ except ImportError:  # The add-on runs the modules directly from /app.
     from ets_rooms import extract_functions, room_matches
     from recognition import review_suggestions, hvac_address_inventory
 
-MAX_ARCHIVE = 8 * 1024 * 1024
+MAX_ARCHIVE = 16 * 1024 * 1024
 MAX_XML = 12 * 1024 * 1024
 MAX_TOTAL_XML = 32 * 1024 * 1024
 MAX_MEMBERS = 500
@@ -67,6 +67,8 @@ def decode_address(value):
 
 def guess_kind(name, dpt):
     s = name.casefold()
+    if "temperatura colore" in s or "color temperature" in s or "colour temperature" in s:
+        return "dimmer"
     if any(x in s for x in ("tapparella", "venezian", "tenda", "serranda", "shutter", "blind")) or re.search(r"\b(?:movimento\s+su/giu|arresto|posizione)\s+t\d+\b", s):
         return "cover"
     if any(x in s for x in ("temperatura", "temperature", "setpoint", "clima", "termostat")):
@@ -123,6 +125,95 @@ def base_name(name):
     if re.fullmatch(r"led\s+l\d{1,3}", stem):
         return stem.split()[-1]
     return stem
+
+
+def structured_suggestions(items):
+    """Infer whole functions from a consistent ETS circuit group, not its mnemonic.
+
+    Requires unambiguous role/DPT combinations and linked GAs. A token like
+    L03, T01 or Z01 is only a grouping key, never proof of an entity type.
+    """
+    groups = {}
+    for item in items:
+        parts = [p.strip() for p in item.get("name", "").split(" - ")]
+        if len(parts) < 3 or not item.get("linked"):
+            continue
+        space, circuit, role = parts[0], parts[1], " - ".join(parts[2:]).casefold()
+        if not space or not circuit or not role:
+            continue
+        groups.setdefault((space, circuit), []).append((item, role))
+
+    proposals, consumed = [], set()
+    def dpt(item):
+        raw = (item.get("dpt") or "").upper()
+        m = re.fullmatch(r"(?:DPST-|DPT-)(\d+)[.-](\d+)", raw)
+        return f"{int(m[1])}.{int(m[2]):03d}" if m else ""
+
+    for (space, circuit), entries in groups.items():
+        def one(pattern, types):
+            matches = [item for item, role in entries
+                       if re.search(pattern, role) and dpt(item) in types]
+            return matches[0]["address"] if len(matches) == 1 else None
+
+        light_on = one(r"\bon\s*/\s*off\s+comando\b", {"1.001"})
+        light_fb = one(r"\bon\s*/\s*off\s+feedback\b", {"1.001", "1.011"})
+        brightness = one(r"luminosit[aà]\s+comando", {"5.001"})
+        brightness_fb = one(r"luminosit[aà]\s+feedback", {"5.001"})
+        relative = one(r"dimmer\s+relativ|regolazione\s+relativ", {"3.007"})
+        cct = one(r"temperatura\s+colore\s+comando", {"7.600"})
+        cct_fb = one(r"temperatura\s+colore\s+feedback", {"7.600"})
+
+        move = one(r"movimento\s+comando", {"1.008"})
+        stop = one(r"(?:step\s*/?\s*stop|stop)\s+comando", {"1.007", "1.017"})
+        position = one(r"^posizione\s+comando$", {"5.001"})
+        position_fb = one(r"^posizione\s+feedback$", {"5.001"})
+        slats = one(r"lamelle\s+comando", {"5.001"})
+        slats_fb = one(r"lamelle\s+feedback", {"5.001"})
+
+        ambient = one(r"^temperatura\s+ambiente$", {"9.001"})
+        setpoint = one(r"^setpoint\s+comando$", {"9.001"})
+        setpoint_fb = one(r"^setpoint\s+(?:corrente|stato|feedback)$", {"9.001"})
+        humidity = one(r"^umidit[aà]\s+ambiente$", {"9.007", "5.001"})
+        mode = one(r"^hvac\s+comando$", {"20.102"})
+        mode_fb = one(r"^hvac\s+feedback$", {"20.102"})
+        heat = one(r"^riscaldamento\s+comando$", {"1.001"})
+        valve_fb = one(r"^valvola\s+stato$", {"1.011", "1.001"})
+
+        fields = {}
+        kind = None
+        if light_on and light_fb and not (move or ambient or setpoint):
+            kind = "dimmer" if brightness and brightness_fb else "light"
+            fields = {"command": light_on, "feedback": light_fb}
+            if kind == "dimmer":
+                fields.update({"brightness": brightness, "brightness_feedback": brightness_fb})
+                if relative:
+                    fields["relative"] = relative
+                if cct and cct_fb:
+                    fields.update({"color_temperature": cct, "color_temperature_feedback": cct_fb})
+        elif move and stop and not (light_on or ambient or setpoint):
+            kind = "cover"
+            fields = {"command": move, "stop": stop}
+            if position and position_fb:
+                fields.update({"position": position, "position_feedback": position_fb})
+            if slats and slats_fb:
+                fields.update({"slats": slats, "slats_feedback": slats_fb})
+        elif ambient and setpoint and setpoint_fb and not (light_on or move):
+            kind = "climate"
+            fields = {"command": setpoint, "temperature": ambient,
+                      "target_temperature_state": setpoint_fb}
+            for key, value in (("humidity", humidity), ("operation_mode", mode),
+                               ("operation_mode_state", mode_fb), ("heating_demand", heat),
+                               ("valve_state", valve_fb)):
+                if value:
+                    fields[key] = value
+        if not kind:
+            continue
+        fields = {k: v for k, v in fields.items() if v}
+        proposals.append({"name": f"{space} - {circuit}", "kind": kind, **fields,
+                          "room": space, "confidence": "media",
+                          "reason": "Ruoli di circuito e DPT coerenti; verificare direzione e oggetti ETS"})
+        consumed.update(fields.values())
+    return proposals, consumed
 
 
 def cover_suggestions(items, used_commands):
@@ -513,6 +604,9 @@ def preview(raw):
         suggestions.extend(climate_suggestions(items, {x["command"] for x in suggestions}, suggestions))
         suggestions.extend(channel_suggestions(items, {x["command"] for x in suggestions}))
         dimmer_fields(items, suggestions)
+        structured, covered_addresses = structured_suggestions(items)
+        suggestions = [s for s in suggestions if s["command"] not in covered_addresses]
+        suggestions.extend(structured)
         suggestions.sort(key=lambda x: tuple(map(int, x["command"].split("/"))))
         functions = [{"name": item["name"], "space": item["space"],
                       "addresses": list(dict.fromkeys(address_refs[ref] for ref in item["refs"] if ref in address_refs))}
