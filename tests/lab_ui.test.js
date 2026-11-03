@@ -22,7 +22,7 @@ function harness(candidates){
  const context={
   etsData:{project_key:'a'.repeat(64),lab_candidates:candidates,building:[]},
   $:id=>ids[id],escapeHTML:value=>String(value),confirm:()=>true,
-  document:{querySelectorAll:selector=>selector.includes(':checked')?rows.filter(r=>r.checked):rows.flatMap(r=>[r,r.kind,r.room])},
+  document:{querySelectorAll:selector=>selector.includes('.lab-room-choice')?[]:selector.includes(':checked')?rows.filter(r=>r.checked):rows.flatMap(r=>[r,r.kind,r.room])},
   api:async(path,options)=>{
    const body=JSON.parse(options.body);calls.push({path,body});
    if(path==='lab/preview')return {ready:true,packages_enabled:true,blocked_by_existing:false,already_installed:false,devices:body.devices.length,sha256:'fresh',target:'packages/nm_lab_virtual.yaml',message:'Virtuale'};
@@ -71,4 +71,11 @@ test('empty recognition still shows diagnostic laboratory panel',()=>{
  const h=harness([]);
  assert.match(h.html,/Nessuna funzione riconosciuta/);
  assert.match(h.html,/id="lab-check" class="primary" disabled/);
+});
+
+test('room picker exposes choices independently of current text',()=>{
+ const h=harness([{kind:'light',command:'1/1/0',name:'L1',room:'Ufficio'}]);
+ assert.match(h.html,/class="lab-room-choice"/);
+ assert.match(h.html,/<option value="Ufficio">Ufficio<\/option>/);
+ assert.match(h.html,/class="lab-room"/);
 });

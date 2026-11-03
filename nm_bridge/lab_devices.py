@@ -11,11 +11,15 @@ GA = re.compile(r"^(?:[0-9]|[12][0-9]|3[01])/[0-7]/(?:[0-9]|[1-9][0-9]|1[0-9]{2}
 def candidates(preview):
     """Separate lab proposals; never promote these guesses to real KNX approval."""
     result, used = [], set()
+    rooms = {item['command']: item['room'] for item in preview.get('room_matches', [])
+             if item.get('confidence') in ('ets_function', 'name') and item.get('room')}
     for item in preview.get("suggestions", []):
         if item.get("kind") not in KINDS or item.get("command") in used:
             continue
         result.append({key: item.get(key, "Da assegnare" if key == "room" else "")
                        for key in ("kind", "command", "name", "room")})
+        if item.get('command') in rooms:
+            result[-1]['room'] = rooms[item['command']]
         used.update(value for value in item.values() if isinstance(value, str) and GA.fullmatch(value))
     for item in preview.get("addresses", []):
         address, dpt = item["address"], item.get("dpt", "")

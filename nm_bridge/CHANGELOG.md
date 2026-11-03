@@ -1,3 +1,7 @@
+## 5.9.4
+
+- Laboratorio: applica le proposte ambiente ETS e mostra un menu esplicito delle stanze, con inserimento manuale sempre disponibile.
+
 # NM Studio – Registro versioni
 
 ## 5.9.3

@@ -27,6 +27,14 @@ def inventory(payload):
 
 
 class LabDevicesTests(unittest.TestCase):
+    def test_lab_uses_unambiguous_room_proposals(self):
+        data = {'suggestions': [{'kind': 'light', 'command': '1/1/0', 'name': 'L1', 'room': 'Da assegnare'}],
+                'room_matches': [{'command': '1/1/0', 'room': 'Edificio / Ufficio', 'confidence': 'ets_function'}]}
+        self.assertEqual(candidates(data)[0]['room'], 'Edificio / Ufficio')
+        data['room_matches'][0]['confidence'] = 'ambiguous'
+        self.assertEqual(candidates(data)[0]['room'], 'Da assegnare')
+        self.assertEqual(data['suggestions'][0]['room'], 'Da assegnare')
+
     def test_ets_without_thermostats_reaches_installable_package(self):
         imported = ets_preview(archive_with_addresses([
             (2048, "ON/OFF L1"), (2049, "STATO LED L1"),
