@@ -305,6 +305,16 @@ function wireETS(){
   finally{button.disabled=false}
  };
  if(etsData)$('ets-download').onclick=()=>{let blob=new Blob([JSON.stringify(etsData,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='nm-control-ets-preview.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
+ if(etsData){
+  let zones=(etsData.suggestions||[]).filter(s=>s.kind==='climate'&&s.temperature).map(s=>({kind:'climate',command:s.command,temperature:s.temperature}));
+  const host=$('ets-progress')?.closest('.card');
+  if(host&&zones.length){
+   host.insertAdjacentHTML('afterend',`<section class="card"><div class="workspace-label">NM Studio · Laboratorio virtuale</div><h2>Prepara Home Assistant di test</h2><p class="muted">${zones.length} termostati riconosciuti. Verranno create soltanto entità virtuali, senza KNX e senza modificare la configurazione esistente. Prima verifica, poi conferma esplicita.</p><div class="bar"><button id="lab-check" class="primary">Verifica laboratorio</button><button id="lab-install" disabled>Installa entità virtuali</button></div><p id="lab-status" class="small muted">Nessuna modifica eseguita. Necessario accesso in scrittura ai packages HA.</p></section>`);
+   let plan=null,base={mode:'virtual_climate',zones};
+   $('lab-check').onclick=async()=>{let b=$('lab-check');b.disabled=true;$('lab-status').textContent='Verifica permessi e configurazione packages…';try{plan=await api('lab/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(base)});let msg=plan.packages_enabled?'Pacchetti HA abilitati. ':'Pacchetti HA non ancora abilitati in configuration.yaml. ';msg+=plan.blocked_by_existing?'Esiste già un file NM Lab differente: nessuna sovrascrittura.':plan.already_installed?'Il laboratorio è già installato.':'Pronto a creare '+plan.zones+' termostati virtuali.';$('lab-status').textContent=msg;$('lab-install').disabled=!plan.ready||plan.blocked_by_existing||plan.already_installed}catch(e){plan=null;$('lab-status').textContent='Verifica non riuscita: '+e.message}finally{b.disabled=false}};
+   $('lab-install').onclick=async()=>{if(!plan||!plan.ready)return;if(!confirm(`Installare ${plan.zones} termostati VIRTUALI in ${plan.target}? Nessun dispositivo KNX verrà comandato. Sarà necessario verificare e riavviare Home Assistant manualmente.`))return;let b=$('lab-install');b.disabled=true;try{let result=await api('lab/install',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...base,confirm:true,expected_sha256:plan.sha256})});$('lab-status').textContent=result.installed?'Package NM Lab installato. Verifica la configurazione YAML e riavvia Home Assistant per attivare le entità.':'Installazione non completata.'}catch(e){$('lab-status').textContent='Installazione non eseguita: '+e.message}};
+  }
+ }
 }
 function changed(){dirty=true;let u=$('unsaved');if(u)u.textContent='Modifiche non salvate'}
 function wireConfigure(){
