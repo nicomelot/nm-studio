@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from nm_bridge.lab_devices import build, candidates
+from nm_bridge.lab_devices import build, candidates, building_location
 from nm_bridge.lab_virtual import inspect, install, replace
 from nm_bridge.lab_dashboard import preview, publish
 from test_dashboard_publisher import FakeClient
@@ -27,6 +27,20 @@ def inventory(payload):
 
 
 class LabDevicesTests(unittest.TestCase):
+    def test_building_common_floor_and_ambiguous_locations(self):
+        data = {'devices': [{'id': 'd1', 'ets_id': 'ets1'}, {'id': 'd2', 'ets_id': 'ets2'}],
+                'building': [{'path': 'FR / MAGAZZINO PRIMO / PULSANTIERA', 'devices': ['ets1']},
+                             {'path': 'FR / MAGAZZINO PRIMO / SCATOLA DI DERIVAZIONE', 'devices': ['ets2']}],
+                'addresses': [{'address': '1/1/0', 'connections': [{'device_id': 'd1'}, {'device_id': 'd2'}]}],
+                'suggestions': [{'command': '1/1/0', 'name': 'L1', 'kind': 'light', 'room': 'Da assegnare'}]}
+        self.assertEqual(building_location(data, '1/1/0'), 'FR / MAGAZZINO PRIMO')
+        self.assertEqual(candidates(data)[0]['room'], 'FR / MAGAZZINO PRIMO')
+        self.assertIn('room_source', candidates(data)[0])
+        data['building'][1]['path'] = 'FR / MAGAZZINO TERRA / QUADRO'
+        self.assertIsNone(building_location(data, '1/1/0'))
+        data['building'] = []
+        self.assertIsNone(building_location(data, '1/1/0'))
+
     def test_lab_uses_unambiguous_room_proposals(self):
         data = {'suggestions': [{'kind': 'light', 'command': '1/1/0', 'name': 'L1', 'room': 'Da assegnare'}],
                 'room_matches': [{'command': '1/1/0', 'room': 'Edificio / Ufficio', 'confidence': 'ets_function'}]}

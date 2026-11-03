@@ -8,6 +8,36 @@ KINDS = {"light", "dimmer", "cover", "scene", "sensor", "binary_sensor", "climat
 GA = re.compile(r"^(?:[0-9]|[12][0-9]|3[01])/[0-7]/(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$")
 
 
+def building_location(preview, command):
+    """Physical common location, only a LAB proposal, never a bus assignment."""
+    devices = {d['id']: d.get('ets_id') for d in preview.get('devices', [])}
+    locations = {}
+    for space in preview.get('building', []):
+        for ref in space.get('devices', []):
+            locations.setdefault(ref, []).append(space['path'])
+    record = next((a for a in preview.get('addresses', []) if a['address'] == command), {})
+    connections = record.get('connections', [])
+    if not connections:
+        return None
+    paths = []
+    for connection in connections:
+        found = locations.get(devices.get(connection.get('device_id')), [])
+        if len(found) != 1:
+            return None
+        parts = found[0].split(' / ')
+        # Installation containers are not functional rooms.
+        while parts and re.search(r'quadro|scatola|pulsantier|derivazione', parts[-1], re.I):
+            parts.pop()
+        paths.append(parts)
+    common = []
+    for level in zip(*paths):
+        if len(set(level)) != 1:
+            break
+        common.append(level[0])
+    # A building alone provides no useful room/floor assignment.
+    return ' / '.join(common) if len(common) >= 2 else None
+
+
 def candidates(preview):
     """Separate lab proposals; never promote these guesses to real KNX approval."""
     result, used = [], set()
@@ -20,6 +50,11 @@ def candidates(preview):
                        for key in ("kind", "command", "name", "room")})
         if item.get('command') in rooms:
             result[-1]['room'] = rooms[item['command']]
+        elif result[-1]['room'] in ('', 'Da assegnare'):
+            location = building_location(preview, item['command'])
+            if location:
+                result[-1]['room'] = location
+                result[-1]['room_source'] = 'Posizione edificio ETS dei dispositivi collegati: da verificare'
         used.update(value for value in item.values() if isinstance(value, str) and GA.fullmatch(value))
     for item in preview.get("addresses", []):
         address, dpt = item["address"], item.get("dpt", "")

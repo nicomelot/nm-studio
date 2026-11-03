@@ -586,6 +586,7 @@ def preview(raw):
                 objects = catalog_objects(archive, program_file, app_cache, catalog_budget)
                 device_id = f"device-{len(device_inventory) + 1}"
                 device_inventory.append({"id": device_id, "name": dev_label, "address_suffix": device.get("Address"),
+                                         "ets_id": (device.get("Id") or "")[:120],
                                          "product_ref": (device.get("ProductRefId") or "")[:140],
                                          "program": program_file or "", "catalog_read": bool(objects),
                                          "connected_objects": 0, "linked_addresses": 0,
@@ -670,3 +671,4 @@ def preview(raw):
                 "hvac_inventory": hvac_address_inventory(items),
                 "building": building_spaces, "functions": functions, "room_matches": matches, "total": len(items),
                 "warning": "Tipi e abbinamenti sono ipotesi, non verifiche ETS. DPT mancanti da controllare. Nessun dato salvato."}
+

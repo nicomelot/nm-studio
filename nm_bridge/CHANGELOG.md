@@ -1,3 +1,7 @@
+## 5.9.5
+
+- LAB: ricostruisce la posizione comune dei dispositivi collegati dal ramo Edifici ETS; distingue la proposta fisica da un ambiente funzionale verificato. Include i piani nel menu.
+
 ## 5.9.4
 
 - Laboratorio: applica le proposte ambiente ETS e mostra un menu esplicito delle stanze, con inserimento manuale sempre disponibile.
