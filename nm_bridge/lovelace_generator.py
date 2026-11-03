@@ -40,10 +40,11 @@ def generate(layout, entities):
     if not rooms:
         rooms = ["Da assegnare"]
 
-    view = {"title": "NM Studio", "path": "nm-studio", "type": "sections", "sections": []}
+    overview = {"title": "Panoramica casa", "path": "panoramica", "icon": "mdi:home-outline",
+                "type": "sections", "sections": []}
     reports = []
+    approved = []
     for room in rooms:
-        cards = []
         for w in widgets:
             if w.get("room", "Da assegnare") != room:
                 continue
@@ -61,19 +62,57 @@ def generate(layout, entities):
                     card["features"] = [{"type": "cover-open-close"}]
                 elif ident.startswith("climate."):
                     card["features"] = [{"type": "climate-hvac-modes"}]
-                cards.append(card)
+                parts = [p.strip() for p in room.split(" / ") if p.strip()]
+                floor = parts[-2] if len(parts) >= 3 else "Da assegnare"
+                zone = parts[-1] if len(parts) >= 3 else room
+                category = {"light": "Illuminazione", "dimmer": "Illuminazione",
+                            "cover": "Schermature", "climate": "Climatizzazione",
+                            "sensor": "Sensori", "fan": "Ventilazione", "switch": "Altri carichi"}.get(kind, "Altri carichi")
+                approved.append({"card": card, "room": room, "floor": floor,
+                                 "zone": zone, "category": category})
             else:
                 reason = ("Entità non assegnata" if not ident else
                           "Dominio HA incompatibile" if not compatible else "Entità non presente nell'inventario HA")
                 reports.append({"room": room, "widget": w["name"], "entity_id": ident, "reason": reason})
+    # These are actual HA tile cards linked to verified entity IDs. No sample
+    # values, simulated controls or placeholder entities are ever rendered.
+    categories = ("Illuminazione", "Climatizzazione", "Schermature", "Ventilazione",
+                  "Sensori", "Altri carichi")
+    for category in categories:
+        cards = [item["card"] for item in approved if item["category"] == category]
         if cards:
-            view["sections"].append({"type": "grid", "title": room, "cards": cards})
-    dashboard = {"title": "NM Studio", "views": [view]}
+            overview["sections"].append({"type": "grid", "title": category,
+                                         "cards": cards[:4]})
+    views = [overview]
+    icons = {"Illuminazione": "mdi:lightbulb-group-outline", "Climatizzazione": "mdi:thermostat",
+             "Schermature": "mdi:blinds", "Ventilazione": "mdi:fan",
+             "Sensori": "mdi:access-point", "Altri carichi": "mdi:power-socket-eu"}
+    paths = {"Illuminazione": "illuminazione", "Climatizzazione": "climatizzazione",
+             "Schermature": "schermature", "Ventilazione": "ventilazione",
+             "Sensori": "sensori", "Altri carichi": "carichi"}
+    for category in categories:
+        scoped = [item for item in approved if item["category"] == category]
+        if not scoped:
+            continue
+        section_keys = sorted({(item["floor"], item["zone"]) for item in scoped})
+        sections = [{"type": "grid", "title": f"{floor} · {zone}",
+                     "cards": [item["card"] for item in scoped
+                               if (item["floor"], item["zone"]) == (floor, zone)]}
+                    for floor, zone in section_keys]
+        views.append({"title": category, "path": paths[category], "icon": icons[category],
+                      "type": "sections", "sections": sections})
+    if approved:
+        views.append({"title": "Ambienti", "path": "ambienti", "icon": "mdi:floor-plan",
+                      "type": "sections", "sections": [
+                          {"type": "grid", "title": room,
+                           "cards": [item["card"] for item in approved if item["room"] == room]}
+                          for room in rooms if any(item["room"] == room for item in approved)]})
+    dashboard = {"title": "NM Control", "views": views}
     fingerprint = hashlib.sha256(json.dumps(dashboard, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
     return {"version": 1, "read_only": True, "applied": False,
             "dashboard": dashboard, "fingerprint": fingerprint,
-            "summary": {"rooms": len(view["sections"]),
-                        "tiles": sum(c["type"] == "tile" for s in view["sections"] for c in s["cards"]),
+            "summary": {"rooms": len({item["room"] for item in approved}),
+                        "tiles": len(approved),
                         "placeholders": len(reports)},
             "warnings": reports}
 
