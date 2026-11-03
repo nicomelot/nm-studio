@@ -1,5 +1,12 @@
 # NM Studio – Registro versioni
 
+## 5.9.1
+
+- Primo laboratorio virtuale installabile dall'analisi ETS: dopo anteprima e conferma, crea un package Home Assistant con termostati `generic_thermostat`, sensori e interruttori virtuali; nessun collegamento al bus KNX.
+- L'add-on richiede l'accesso alla configurazione HA ma può creare esclusivamente `packages/nm_lab_virtual.yaml`, senza modificare `configuration.yaml`, avviare riavvii o sovrascrivere un file differente.
+- Se Home Assistant non ha già abilitato `packages: !include_dir_named packages`, l'installazione resta bloccata e mostra l'istruzione necessaria.
+- Conferma obbligatoria e impronta SHA-256 dell'anteprima; test di idempotenza, duplicati, percorsi simbolici e separazione dei dati reali.
+
 ## 5.9.0
 
 - Nuovo generatore Lovelace **NM Control** con schermata iniziale Panoramica casa, navigazione per Illuminazione, Climatizzazione, Schermature, Ventilazione, Sensori, Altri carichi e vista Ambienti.
