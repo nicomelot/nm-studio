@@ -33,8 +33,10 @@ from module_plan import read as read_module_plan, save as save_module_plan, sugg
 from floorplan import read as read_floorplans, save as save_floorplans
 from floorplan_lovelace import generate as generate_floorplan_dashboard
 from floorplan_publisher import publish as publish_floorplan_dashboard
-from lab_virtual import (inspect as inspect_virtual_lab, install as install_virtual_lab,
+from lab_virtual import (inspect as inspect_virtual_lab, install as install_virtual_lab, replace as replace_virtual_lab,
                          packages_setup_preview, enable_packages)
+from lab_devices import candidates as lab_candidates
+from lab_dashboard import preview as lab_dashboard_preview, publish as lab_dashboard_publish
 
 LOG = logging.getLogger("nm_bridge")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -321,6 +323,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.respond(400, "application/json", json.dumps({"error": str(exc)[:120]}).encode())
             except (OSError, json.JSONDecodeError):
                 self.respond(500, "application/json", b'{"error":"Review unavailable"}')
+        elif path == "/lab_ui.js":
+            self.respond(200, "text/javascript; charset=utf-8", Path(__file__).with_name("lab_ui.js").read_bytes())
         elif path in ("", "/"):
             self.respond(200, "text/html; charset=utf-8", HTML)
         else:
@@ -337,7 +341,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?", 1)[0]
-        if self.client_address[0] != INGRESS_PROXY or path not in ("/layout", "/modules/plan", "/floorplans", "/floorplans/dashboard-publish", "/ets/preview", "/knx/approved", "/audit", "/knx/widgets", "/knx/ha-preview", "/knx/yaml-audit", "/dashboard/missing-ha/review", "/dashboard/deployment-preflight", "/knx/panel-create-plan", "/knx/panel-create-one", "/dashboard/publish", "/migration/restore", "/nm-link", "/nm-link/preview", "/nm-link/simulate", "/lab/preview", "/lab/install", "/lab/packages-preview", "/lab/packages-enable"):
+        if self.client_address[0] != INGRESS_PROXY or path not in ("/layout", "/modules/plan", "/floorplans", "/floorplans/dashboard-publish", "/ets/preview", "/knx/approved", "/audit", "/knx/widgets", "/knx/ha-preview", "/knx/yaml-audit", "/dashboard/missing-ha/review", "/dashboard/deployment-preflight", "/knx/panel-create-plan", "/knx/panel-create-one", "/dashboard/publish", "/migration/restore", "/nm-link", "/nm-link/preview", "/nm-link/simulate", "/lab/preview", "/lab/install", "/lab/replace", "/lab/packages-preview", "/lab/packages-enable", "/lab/dashboard-preview", "/lab/dashboard-publish"):
             self.send_error(403)
             return
         # Ingress protects access; these checks also reject cross-site form POSTs.
@@ -393,8 +397,14 @@ class Handler(BaseHTTPRequestHandler):
                 data = publish_dashboard(json.loads(body), read_widget_layout(), get_entities())
             elif path == "/lab/preview":
                 data = inspect_virtual_lab(json.loads(body))
+            elif path == "/lab/dashboard-preview":
+                data = lab_dashboard_preview(json.loads(body), get_ha_states())
+            elif path == "/lab/dashboard-publish":
+                data = lab_dashboard_publish(json.loads(body), get_ha_states())
             elif path == "/lab/install":
                 data = install_virtual_lab(json.loads(body))
+            elif path == "/lab/replace":
+                data = replace_virtual_lab(json.loads(body))
             elif path == "/lab/packages-preview":
                 data = packages_setup_preview()
             elif path == "/lab/packages-enable":
@@ -409,6 +419,7 @@ class Handler(BaseHTTPRequestHandler):
                 data = save_notes(json.loads(body))
             else:
                 data = ets_preview(body)
+                data["lab_candidates"] = lab_candidates(data)
             self.respond(200, "application/json; charset=utf-8", json.dumps(data, ensure_ascii=False).encode())
         except (ValueError, UnicodeDecodeError, OSError, json.JSONDecodeError, RuntimeError) as exc:
             LOG.warning("Request rejected (%s): %s", type(exc).__name__, str(exc)[:160])
@@ -419,3 +430,4 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     LOG.info("Starting read-only bridge behind Home Assistant Ingress")
     ThreadingHTTPServer(("0.0.0.0", 8099), Handler).serve_forever()
+

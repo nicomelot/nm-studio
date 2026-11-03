@@ -3,6 +3,7 @@ FROM ${BUILD_FROM}
 RUN apk add --no-cache python3 py3-websocket-client
 COPY bridge.py /app/bridge.py
 COPY index.html /app/index.html
+COPY lab_ui.js /app/lab_ui.js
 COPY ets_import.py /app/ets_import.py
 COPY recognition.py /app/recognition.py
 COPY knx_devices.py /app/knx_devices.py
@@ -31,5 +32,8 @@ COPY floorplan.py /app/floorplan.py
 COPY floorplan_lovelace.py /app/floorplan_lovelace.py
 COPY floorplan_publisher.py /app/floorplan_publisher.py
 COPY lab_virtual.py /app/lab_virtual.py
+COPY lab_devices.py /app/lab_devices.py
+COPY lab_dashboard.py /app/lab_dashboard.py
 WORKDIR /app
 CMD ["/command/with-contenv", "python3", "-u", "/app/bridge.py"]
+

@@ -80,6 +80,11 @@ def _listed_paths(raw):
 
 
 def publish(payload, layout, entities, client_factory=HAWebSocket):
+    return publish_generated(payload, generate(layout, entities), client_factory)
+
+
+def publish_generated(payload, generated, client_factory=HAWebSocket):
+    """Publish a server-generated preview, never a client-supplied configuration."""
     if not isinstance(payload, dict) or payload.get("confirm") is not True:
         raise PublishError("Conferma esplicita obbligatoria")
     url_path = payload.get("url_path")
@@ -88,7 +93,6 @@ def publish(payload, layout, entities, client_factory=HAWebSocket):
         raise PublishError("Percorso non valido: usa nm-studio- seguito da lettere, numeri o trattini")
     if not isinstance(title, str) or not 3 <= len(title.strip()) <= 60:
         raise PublishError("Titolo dashboard non valido")
-    generated = generate(layout, entities)
     if payload.get("expected_fingerprint") != generated["fingerprint"]:
         raise PublishError("Anteprima non aggiornata: rigenera prima di pubblicare")
     if generated["summary"]["tiles"] == 0:
@@ -114,3 +118,4 @@ def publish(payload, layout, entities, client_factory=HAWebSocket):
             raise PublishError("Dashboard creata, ma verifica contenuto non riuscita: " + url_path)
     return {"created": True, "url_path": url_path, "title": title.strip(),
             "summary": generated["summary"], "warnings": generated["warnings"]}
+

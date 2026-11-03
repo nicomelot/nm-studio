@@ -1,7 +1,7 @@
 name: NM Bridge (installer laboratory)
 slug: nm_bridge
 description: NM Studio installer lab with explicitly confirmed KNX entity provisioning
-version: 5.9.2
+version: 5.9.3
 arch:
   - amd64
   - aarch64
@@ -20,3 +20,4 @@ map:
     read_only: false
 options: {}
 schema: {}
+

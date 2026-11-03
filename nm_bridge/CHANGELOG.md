@@ -1,5 +1,16 @@
 # NM Studio – Registro versioni
 
+## 5.9.3
+
+- Il laboratorio compare dopo ogni analisi ETS, anche senza termostati; mostra una diagnosi esplicita se non trova funzioni supportate.
+- Selezione di fino a 200 funzioni, tipo virtuale e stanza modificabili prima della verifica: luci, dimmer, tapparelle, richiami scena, sensori numerici/binari e clima.
+- Entità HA isolate per progetto (`nm_lab_<progetto>_*`), generate con helper e template moderni. Nessun indirizzo di gruppo viene configurato come destinazione KNX.
+- Luci on/off, dimmer con luminosità, tapparelle con posizione istantanea e stop senza movimento, scene con registrazione del solo richiamo, sensori regolabili manualmente. Non viene simulata la fisica degli attuatori né ricostruito il contenuto delle scene ETS.
+- Wizard per installazione e sostituzione di un precedente package NM Lab: conferme, impronte delle anteprime, backup del file sostituito e blocco delle modifiche concorrenti rilevate. File estranei e package KNX reali non vengono sovrascritti.
+- Dopo il riavvio manuale di HA, verifica delle entità e pubblicazione separata di NM Control LAB con Panoramica casa e Ambienti. Nessuna modifica delle associazioni o dashboard KNX reali.
+- Corretti riconoscimento dell'include packages sotto il blocco homeassistant, configurazione senza newline finale e installazione su Windows; rifiutata l'indentazione non standard per la modifica automatica.
+- Test di regressione Python, handler HTTP, wizard JavaScript e workflow GitHub per Windows/Linux e validazione del package con Home Assistant 2026.10.4. Il collaudo su HA e impianto reale resta separato dai test locali.
+
 ## 5.9.2
 
 - La procedura Laboratorio virtuale può attivare i pacchetti Home Assistant con un pulsante dedicato: propone l'aggiunta di `homeassistant.packages: !include_dir_named packages`, mostra l'anteprima e richiede conferma separata.
@@ -267,3 +278,4 @@
 ## 3.3.0
 
 - Preflight di rilascio e rilevazione di conflitti tra indirizzi KNX.
+

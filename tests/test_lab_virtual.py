@@ -12,6 +12,24 @@ def payload():
 
 
 class VirtualLabTests(unittest.TestCase):
+    def test_packages_under_other_mapping_never_enable_lab(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / "configuration.yaml").write_text("homeassistant:\n  name: Test\nother:\n  packages: !include_dir_named packages\n")
+            self.assertFalse(inspect(payload(), root)["ready"])
+            with self.assertRaises(ValueError): packages_setup_preview(root)
+
+    def test_no_final_newline_and_nonstandard_indentation(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            config = root / "configuration.yaml"
+            config.write_text("homeassistant:")
+            plan = packages_setup_preview(root)
+            enable_packages({"confirm": True, "expected_sha256": plan["expected_sha256"]}, root, root / "backup")
+            self.assertTrue(inspect(payload(), root)["ready"])
+            config.write_text("homeassistant:\n    name: Test\n")
+            with self.assertRaisesRegex(ValueError, "Indentazione"): packages_setup_preview(root)
+
     def test_packages_activation_is_confirmed_backed_up_and_idempotent(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
@@ -89,10 +107,16 @@ class VirtualLabTests(unittest.TestCase):
             root = Path(folder)
             (root / "configuration.yaml").write_text("homeassistant:\n  packages: !include_dir_named packages\n")
             (root / "packages").mkdir()
-            (root / "packages" / "nm_lab_virtual.yaml").symlink_to(root / "configuration.yaml")
+            try:
+                (root / "packages" / "nm_lab_virtual.yaml").symlink_to(root / "configuration.yaml")
+            except OSError as exc:
+                if getattr(exc, "winerror", None) == 1314:
+                    self.skipTest("Windows host does not grant symlink creation; exercised on Linux CI")
+                raise
             with self.assertRaisesRegex(ValueError, "sicuro"):
                 inspect(payload(), root)
 
 
 if __name__ == "__main__":
     unittest.main()
+
