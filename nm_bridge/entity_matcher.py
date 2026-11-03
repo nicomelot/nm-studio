@@ -4,10 +4,17 @@ import re
 import unicodedata
 
 
-COMPATIBLE = {"light": {"light", "switch"}, "dimmer": {"light"}, "cover": {"cover"}}
+COMPATIBLE = {"light": {"light", "switch"}, "dimmer": {"light"}, "cover": {"cover"},
+              "climate": {"climate"}, "sensor": {"sensor", "binary_sensor"},
+              "switch": {"switch"}, "fan": {"fan"}}
 STOP = {"luce", "luci", "stato", "comando", "on", "off", "knx", "ha", "di", "del", "della", "il", "la", "le", "the"}
 FEEDBACK_WORDS = {"notifica", "feedback", "riscontro", "segnalazione", "status"}
 UNCERTAIN_WORDS = {"pulsantiera", "pulsante", "scatola", "derivazione"}
+
+
+def is_lab_entity(entity_id):
+    """All NM simulation helpers and template entities use this reserved prefix."""
+    return str(entity_id or "").partition(".")[2].startswith("nm_lab_")
 
 
 def classify_entity(entity):
@@ -31,13 +38,15 @@ def tokens(value):
 
 def suggest(layout, entities):
     """Suggestions only: no persistent changes, services or KNX requests."""
+    entities = [e for e in entities if isinstance(e, dict) and not is_lab_entity(e.get("entity_id"))]
     widgets = layout.get("widgets", [])
     indexed = {e.get("entity_id"): e for e in entities if isinstance(e, dict) and isinstance(e.get("entity_id"), str)}
     used = {w.get("entity_id") for w in widgets if w.get("entity_id")}
     proposed = set()
     proposals = []
     for index, widget in enumerate(widgets):
-        current = widget.get("entity_id", "")
+        previous = widget.get("entity_id", "")
+        current = "" if is_lab_entity(previous) else previous
         widget_tokens = set(tokens(widget.get("name", "")))
         room_tokens = set(tokens(widget.get("room", "")))
         compatible = COMPATIBLE.get(widget.get("type"), set())
@@ -77,6 +86,7 @@ def suggest(layout, entities):
         confidence = "alta" if unambiguous and leading["score"] >= 0.9 else "media" if unambiguous else "da verificare"
         proposals.append({"index": index, "name": widget.get("name", ""), "room": widget.get("room", ""),
                           "type": widget.get("type", ""), "current_entity_id": current,
+                          "replaced_lab_entity_id": previous if is_lab_entity(previous) else "",
                           "suggested_entity_id": leading["entity_id"] if unambiguous and not current else "",
                           "confidence": confidence if not current else "già associato",
                           "candidates": candidates[:6],
@@ -85,7 +95,8 @@ def suggest(layout, entities):
                                                   for e in sorted(entities, key=lambda x: x.get("name", ""))
                                                   if e.get("entity_id", "").split(".", 1)[0] in compatible]})
     roles = {eid: classify_entity(entity) for eid, entity in indexed.items()}
-    return {"proposals": proposals, "total": len(widgets), "linked": sum(bool(w.get("entity_id")) for w in widgets),
+    return {"proposals": proposals, "total": len(widgets), "linked": sum(bool(w.get("entity_id")) and not is_lab_entity(w.get("entity_id")) for w in widgets),
             "suggested": sum(bool(p["suggested_entity_id"]) for p in proposals),
             "inventory_count": len(indexed), "role_hints": roles,
             "review_count": sum(role != "funzione_candidata" for role in roles.values())}
+

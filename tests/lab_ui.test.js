@@ -44,7 +44,7 @@ function harness(candidates){
 
 test('project without climate exposes install and publishes separate LAB dashboard',async()=>{
  const h=harness([{kind:'light',command:'1/1/0',name:'L1',room:'Magazzino'}]);
- assert.match(h.html,/Configura la supervisione/);
+ assert.match(h.html,/Simulazione LAB/);
  await h.ids['lab-check'].onclick();
  assert.equal(h.ids['lab-install'].disabled,false);
  await h.ids['lab-install'].onclick();

@@ -100,6 +100,21 @@ def publish_generated(payload, generated, client_factory=HAWebSocket):
         raise PublishError("Nessuna entità HA compatibile: associa almeno un dispositivo reale prima di pubblicare")
     if not 1 <= len(generated["dashboard"]["views"]) <= MAX_VIEWS:
         raise PublishError("Numero viste inatteso")
+    # Rebase only generated internal navigation when a custom path is chosen.
+    config = json.loads(json.dumps(generated["dashboard"]))
+    original = generated.get("url_path")
+    def rebase(value):
+        if isinstance(value, dict):
+            for key, item in value.items():
+                if key in {"navigation_path", "back_path"} and isinstance(item, str) and original and item.startswith('/' + original + '/'):
+                    value[key] = '/' + url_path + item[len(original) + 1:]
+                else:
+                    rebase(item)
+        elif isinstance(value, list):
+            for item in value:
+                rebase(item)
+    rebase(config)
+    config["title"] = title.strip()
     with client_factory() as client:
         existing = _listed_paths(client.call("lovelace/dashboards/list"))
         if url_path in existing:
@@ -109,13 +124,13 @@ def publish_generated(payload, generated, client_factory=HAWebSocket):
         # If save fails the empty dashboard may remain. Never silently delete
         # or retry by overwriting: report the exact path to the installer.
         try:
-            client.call("lovelace/config/save", url_path=url_path, config=generated["dashboard"])
+            client.call("lovelace/config/save", url_path=url_path, config=config)
         except Exception as exc:
             raise PublishError("Dashboard creata ma configurazione non salvata (" + url_path + "): " + str(exc)[:140]) from exc
         # Confirm a readable config; avoid claiming a successful publish on
         # an unexpected response or mismatched view structure.
         stored = client.call("lovelace/config", url_path=url_path)
-        if not isinstance(stored, dict) or stored.get("views") != generated["dashboard"]["views"]:
+        if not isinstance(stored, dict) or stored.get("views") != config["views"]:
             raise PublishError("Dashboard creata, ma verifica contenuto non riuscita: " + url_path)
     return {"created": True, "url_path": url_path, "title": title.strip(),
             "summary": generated["summary"], "warnings": generated["warnings"]}

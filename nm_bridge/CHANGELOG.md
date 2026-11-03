@@ -1,3 +1,11 @@
+## 5.13.0
+
+- Percorso Dashboard reale visibile nel menu e nell'avvio guidato: verifica widget, associa in blocco le entità esistenti, genera e pubblica la nuova plancia. Non occorre rinominare ID o eliminare dashboard.
+- Entità NM LAB escluse da suggerimenti, selettori widget e generazione delle plance reali. Associazioni LAB precedenti segnalate e proponibili per sostituzione; proposte ambigue da verificare.
+- Dashboard reale con Home, Ambienti e Funzioni, navigazione piano → stanza e popup nativi. Stati e comandi provengono dalle entità HA associate. Nessuna creazione di dispositivi duplicati.
+- Pubblicazione conserva le vecchie plance; navigazione adattata anche a un percorso personalizzato. Avvisi per tutte le funzioni non pubblicabili.
+- Percorso simulazione esplicitamente etichettato LAB. Test su esclusione simulazioni, L5/L15, ambiguità, popup e navigazione della dashboard pubblicata.
+
 ## 5.12.1
 
 - Rinomine e spostamenti nell'editor Edificio ETS aggiornano anche le stanze delle funzioni nel configuratore guidato. Percorsi completi distinti: nessuna fusione di stanze omonime su piani diversi.

@@ -15,6 +15,7 @@ COPY nm_link.py /app/nm_link.py
 COPY dpt_registry.py /app/dpt_registry.py
 COPY function_engine.py /app/function_engine.py
 COPY ets_rooms.py /app/ets_rooms.py
+COPY real_dashboard.py /app/real_dashboard.py
 COPY lovelace_generator.py /app/lovelace_generator.py
 COPY dashboard_publisher.py /app/dashboard_publisher.py
 COPY entity_matcher.py /app/entity_matcher.py

@@ -19,9 +19,13 @@ class LovelaceGeneratorTests(unittest.TestCase):
         result = generate(self.sample(), [{"entity_id": "light.l1"}])
         self.assertFalse(result["applied"])
         self.assertEqual(result["summary"], {"rooms": 1, "tiles": 1, "placeholders": 1})
-        cards = result["dashboard"]["views"][0]["sections"][0]["cards"]
-        self.assertEqual(cards[0], {"type": "tile", "entity": "light.l1", "name": "L1", "hold_action": {"action": "more-info"}})
-        self.assertEqual(len(cards), 1)
+        cards = [c for v in result['dashboard']['views'] for section in v['sections']
+                 for c in section['cards'] if c.get('type') == 'tile']
+        self.assertTrue(cards)
+        for card in cards:
+            self.assertEqual(card['entity'], 'light.l1')
+            self.assertEqual(card['tap_action'], {'action': 'more-info'})
+            self.assertEqual(card['icon_tap_action'], {'action': 'more-info'})
         self.assertEqual(result["warnings"][0]["widget"], "T1")
 
     def test_unavailable_entity_is_not_exported_as_live_tile(self):
@@ -38,18 +42,19 @@ class LovelaceGeneratorTests(unittest.TestCase):
     def test_empty_layout_has_no_fake_controls(self):
         result = generate({"rooms": [], "structure": [], "widgets": []}, [])
         self.assertEqual(result["summary"]["tiles"], 0)
-        self.assertEqual(result["dashboard"]["views"][0]["sections"], [])
+        self.assertNotIn('"type": "tile"', __import__("json").dumps(result["dashboard"]))
 
     def test_cover_has_native_open_close_feature(self):
         sample = self.sample()
         sample["widgets"][1]["entity_id"] = "cover.t1"
         result = generate(sample, [{"entity_id": "light.l1"}, {"entity_id": "cover.t1"}])
         views = result["dashboard"]["views"]
-        self.assertEqual([v["path"] for v in views],
-                         ["panoramica", "illuminazione", "schermature", "ambienti"])
-        cover_cards = views[2]["sections"][0]["cards"]
-        self.assertEqual(cover_cards[0]["features"], [{"type": "cover-open-close"}])
-        self.assertEqual(views[2]["sections"][0]["title"], "Terra · Ufficio")
+        self.assertEqual([v['title'] for v in views[:3]], ['Home', 'Ambienti', 'Funzioni'])
+        cover_cards = [c for v in views for section in v['sections'] for c in section['cards'] if c.get('entity') == 'cover.t1']
+        self.assertTrue(cover_cards)
+        self.assertTrue(all(c['features'] == [{'type': 'cover-open-close'}] for c in cover_cards))
+        self.assertTrue(any(v['title'] == 'Terra' for v in views))
+        self.assertTrue(any(v['title'] == 'Ufficio' for v in views))
         self.assertEqual(result["summary"]["tiles"], 2)  # Unique HA entities, not repeated views.
 
     def test_navigation_does_not_create_fake_cards_or_states(self):
@@ -57,7 +62,7 @@ class LovelaceGeneratorTests(unittest.TestCase):
         result = generate(sample, [{"entity_id": "light.l1"}])
         views = result["dashboard"]["views"]
         all_cards = [c for v in views for s in v["sections"] for c in s["cards"]]
-        self.assertTrue(all(c["entity"] == "light.l1" for c in all_cards))
+        self.assertTrue(all(c["entity"] == "light.l1" for c in all_cards if c.get("type") == "tile"))
         self.assertFalse(any("state" in c for c in all_cards))
         self.assertEqual(result["summary"]["placeholders"], 1)
 
