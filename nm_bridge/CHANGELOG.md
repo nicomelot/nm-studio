@@ -1,5 +1,12 @@
 # NM Studio – Registro versioni
 
+## 5.9.2
+
+- La procedura Laboratorio virtuale può attivare i pacchetti Home Assistant con un pulsante dedicato: propone l'aggiunta di `homeassistant.packages: !include_dir_named packages`, mostra l'anteprima e richiede conferma separata.
+- Prima della modifica salva una copia di `configuration.yaml` nella cartella privata dell'add-on, quindi aggiorna il file in modo atomico; non riavvia Home Assistant automaticamente.
+- Se `configuration.yaml` è stato modificato dopo l'anteprima, contiene già una direttiva `packages` diversa o presenta una struttura non standard, l'operazione viene rifiutata senza sovrascritture.
+- Aggiunti test per backup, duplicazioni, configurazioni personalizzate e modifiche concorrenti. Il laboratorio resta virtuale e non interagisce con KNX.
+
 ## 5.9.1
 
 - Primo laboratorio virtuale installabile dall'analisi ETS: dopo anteprima e conferma, crea un package Home Assistant con termostati `generic_thermostat`, sensori e interruttori virtuali; nessun collegamento al bus KNX.
