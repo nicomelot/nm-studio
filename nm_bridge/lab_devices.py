@@ -4,6 +4,11 @@ import hashlib
 import json
 import re
 
+try:
+    from .ets_rooms import room_matches
+except ImportError:
+    from ets_rooms import room_matches
+
 KINDS = {"light", "dimmer", "cover", "scene", "sensor", "binary_sensor", "climate"}
 GA = re.compile(r"^(?:[0-9]|[12][0-9]|3[01])/[0-7]/(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$")
 
@@ -73,6 +78,18 @@ def candidates(preview):
         if kind:
             result.append({"kind": kind, "command": address, "name": name[:80], "room": "Da assegnare"})
             used.add(address)
+    # Include fallback sensors/scenes too, using the same functional evidence.
+    matches = {m['command']: m for m in room_matches(result, preview.get('addresses', []),
+                preview.get('building', []), preview.get('functions', []))}
+    supplied = {m['command']: m for m in preview.get('room_matches', [])}
+    for item in result:
+        match = supplied.get(item['command']) or matches.get(item['command'], {})
+        if match.get('confidence') in ('ets_function', 'name') and match.get('room'):
+            item['room'] = match['room']
+            item['room_source'] = match.get('reason', 'Ambiente ETS: da verificare')
+        elif match.get('confidence') == 'ambiguous':
+            item['room'] = 'Da assegnare'
+            item['room_source'] = match.get('reason', 'Più ambienti compatibili: scegli la stanza')
     return result
 
 

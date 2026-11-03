@@ -120,16 +120,6 @@ def preview(payload, entities):
             path = route('stanza', room)
             zone_links.append(button(label, path, _room_icon(label)))
             sections = [grid(grouped[room], category) for category, grouped in categories.items() if room in grouped]
-            history = ['sensor.' + c['entity'].split('.', 1)[1] + '_temperature'
-                       if c['entity'].startswith('climate.') else c['entity']
-                       for c in rooms[room] if not c['entity'].startswith('input_button.')]
-            if history:
-                history_path = route('storico', room)
-                sections.append(grid([button('Storico 48 ore', history_path, 'mdi:chart-line')]))
-                details.append(view(label + ' · Storico', history_path, [grid([
-                    {'type': 'markdown', 'content': 'Storico 48 ore. Richiede Recorder attivo; i periodi non registrati non sono ricostruibili.'},
-                    *[{'type': 'history-graph', 'entities': history[i:i+12], 'hours_to_show': 48}
-                      for i in range(0, len(history), 12)]])], path))
             details.append(view(label, path, sections, floor_path))
         details.append(view(floor_title(key), floor_path,
                             [grid(zone_links[i:i+6]) for i in range(0, len(zone_links), 6)], 'ambienti'))
@@ -137,7 +127,7 @@ def preview(payload, entities):
     function_links = []
     for category, grouped in categories.items():
         path = route('funzione', category)
-        function_links.append(button(category, path))
+        function_links.append(button(category, path, {'Luci': 'mdi:lightbulb-group-outline', 'Motorizzazioni': 'mdi:window-shutter', 'Clima': 'mdi:thermostat', 'Scene': 'mdi:movie-open-outline', 'Sensori': 'mdi:access-point'}.get(category, 'mdi:view-grid-outline')))
         sections = []
         for key in sorted(floors, key=floor_order):
             for room in sorted(floors[key]):

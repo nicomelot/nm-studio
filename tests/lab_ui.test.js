@@ -13,7 +13,7 @@ test('all inline application scripts remain valid JavaScript',()=>{
 });
 
 function harness(candidates){
- const ids=Object.fromEntries(['project-save','project-label','lab-stage','lab-real-path','lab-filter','lab-kind-filter','lab-status','lab-check','lab-setup','lab-install','lab-dashboard-check','lab-dashboard-publish'].map(id=>[id,{disabled:true,textContent:'',value:''}]));
+ const ids=Object.fromEntries(['lab-open-dashboard','lab-room-filter','lab-step-help','lab-prev','lab-next','project-save','project-label','lab-stage','lab-real-path','lab-filter','lab-kind-filter','lab-status','lab-check','lab-setup','lab-install','lab-dashboard-check','lab-dashboard-publish'].map(id=>[id,{disabled:true,textContent:'',value:''}]));
  const rows=candidates.map((d,i)=>{
   const kind={value:d.kind},room={value:d.room},name={value:d.name};
   return {dataset:{index:String(i)},checked:d.selected!==false,closest:()=>({querySelector:s=>s==='.lab-kind'?kind:s==='.lab-name'?name:room}),kind,room,name};
@@ -44,7 +44,7 @@ function harness(candidates){
 
 test('project without climate exposes install and publishes separate LAB dashboard',async()=>{
  const h=harness([{kind:'light',command:'1/1/0',name:'L1',room:'Magazzino'}]);
- assert.match(h.html,/Non servono termostati/);
+ assert.match(h.html,/Configura la supervisione/);
  await h.ids['lab-check'].onclick();
  assert.equal(h.ids['lab-install'].disabled,false);
  await h.ids['lab-install'].onclick();
@@ -92,4 +92,36 @@ test('saving captures all reviews including deselected functions and edited name
  assert.equal(saved.body.label,'Nuova FR');assert.equal(saved.body.reviews.length,2);
  assert.equal(saved.body.reviews[0].name,'Luce ufficio');assert.equal(saved.body.reviews[1].selected,false);
  assert.equal(h.ids['lab-stage'].value,'install');
+});
+
+
+test('guided navigation preserves reviewed installation and filters do not invalidate it',async()=>{
+ const h=harness([{kind:'light',command:'1/1/0',name:'L1',room:'Ufficio'}]);
+ assert.equal(h.ids['lab-stage'].value,'review');
+ h.ids['lab-next'].onclick();assert.equal(h.ids['lab-stage'].value,'install');
+ await h.ids['lab-check'].onclick();
+ h.ids['lab-next'].onclick();assert.equal(h.ids['lab-stage'].value,'publish');
+ h.ids['lab-prev'].onclick();assert.equal(h.ids['lab-stage'].value,'install');
+ assert.equal(h.ids['lab-install'].disabled,false);
+ assert.equal(h.ids['lab-filter'].oninput,undefined);
+ assert.equal(h.ids['lab-stage'].oninput,undefined);
+ await h.ids['lab-install'].onclick();assert.equal(h.calls.at(-1).path,'lab/install');
+});
+
+test('empty selection cannot advance the guided workflow',()=>{
+ const h=harness([{kind:'light',command:'1/1/0',name:'L1',room:'Ufficio',selected:false}]);
+ h.ids['lab-next'].onclick();assert.equal(h.ids['lab-stage'].value,'review');
+ assert.equal(h.calls.length,0);assert.match(h.ids['lab-status'].textContent,/Seleziona/);
+});
+
+test('technical panels are moved without losing their elements or handlers',()=>{
+ function element(id){return {id,children:[],appendChild(child){if(child.parent){child.parent.children=child.parent.children.filter(c=>c!==child);}this.children.push(child);child.parent=this;}};}
+ const content=element('content'),lab=element('lab-wizard'),importer=element('importer'),technical=element('technical');
+ technical.onclick=()=>42;content.appendChild(importer);content.appendChild(lab);content.appendChild(technical);
+ const context={document:{createElement:()=>element('details')},$:id=>id==='content'?content:id==='lab-wizard'?lab:{closest:()=>importer}};
+ vm.createContext(context);vm.runInContext(fs.readFileSync('nm_bridge/project_ui.js','utf8'),context);
+ context.organizeInstallerPage();
+ assert.equal(content.children[0],lab);assert.equal(content.children.length,3);
+ assert.equal(technical.parent,content.children[2]);assert.equal(technical.onclick(),42);
+ assert.equal(importer.parent,content.children[1]);
 });

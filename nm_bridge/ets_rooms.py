@@ -19,7 +19,9 @@ def local_name(tag):
 def normalized(text):
     value = unicodedata.normalize("NFKD", str(text).casefold())
     value = "".join(char for char in value if not unicodedata.combining(char))
-    return " ".join(re.findall(r"[a-z0-9]+", value))
+    words = re.findall(r"[a-z0-9]+", value)
+    return " ".join({'interr': 'interrato'}.get(word, word) for word in words
+                    if word not in {'di', 'da', 'del', 'della', 'delle', 'dei'})
 
 
 def extract_functions(root):
@@ -58,7 +60,7 @@ def extract_functions(root):
 def room_matches(suggestions, addresses, spaces, functions):
     """Return reviewable proposals; ties and weak matches stay unassigned."""
     room_paths = [item["path"] for item in spaces
-                  if item["type"] in ("Room", "Corridor", "Stairway")]
+                  if item.get("type") in ("Room", "Corridor", "Stairway")]
     lookup = {item["address"]: item for item in addresses}
     proposals = []
     for suggestion in suggestions[:MAX_ROOM_MATCHES]:
@@ -80,15 +82,38 @@ def room_matches(suggestions, addresses, spaces, functions):
             record = lookup.get(address)
             if record:
                 labels.extend([record.get("name", ""), record.get("description", "")])
-        haystacks = [" " + normalized(label) + " " for label in labels]
+        haystacks = [' ' + normalized(label) + ' ' for label in labels]
         candidates = []
-        for room in room_paths:
-            leaf = room.split(" / ")[-1].strip()
-            needle = normalized(leaf)
-            if len(needle) < 4 or needle in {"stanza", "locale", "vano", "room", "prove", "test"}:
-                continue
-            if any(" " + needle + " " in label for label in haystacks):
+        for room in dict.fromkeys(room_paths):
+            parts = room.split(' / ')
+            leaf = normalized(parts[-1])
+            aliases = {leaf}
+            # ETS often repeats the floor in room names: Bagno PIANO TERRA.
+            if len(parts) >= 3:
+                floor = normalized(parts[-2])
+                for suffix in {floor, floor.removeprefix('piano ')}:
+                    if suffix and leaf.endswith(' ' + suffix):
+                        aliases.add(leaf[:-len(suffix)].strip())
+            matches = [alias for alias in aliases if len(alias) >= 4
+                       and alias not in {'stanza', 'locale', 'vano', 'room', 'prove', 'test'}
+                       and any(' ' + alias + ' ' in label for label in haystacks)]
+            if matches:
                 candidates.append(room)
+        # Prefer the most specific room name (Bagno ospiti over Bagno),
+        # but never break ties using iteration order or device addresses.
+        if len(candidates) > 1:
+            explicit = [room for room in candidates
+                        if any(' ' + normalized(room.split(' / ')[-1]) + ' ' in h for h in haystacks)]
+            if explicit:
+                candidates = [room for room in candidates if not any(
+                    normalized(room.split(' / ')[-1]) != normalized(other.split(' / ')[-1])
+                    and ' ' + normalized(room.split(' / ')[-1]) + ' ' in ' ' + normalized(other.split(' / ')[-1]) + ' '
+                    for other in explicit)]
+        if len(candidates) > 1:
+            by_floor = [room for room in candidates if len(room.split(' / ')) >= 3
+                        and any(' ' + alias + ' ' in h for alias in {normalized(room.split(' / ')[-2]), normalized(room.split(' / ')[-2]).removeprefix('piano ')} if alias for h in haystacks)]
+            if by_floor:
+                candidates = by_floor
         if len(candidates) == 1:
             proposals.append({"command": suggestion["command"], "room": candidates[0],
                               "confidence": "name", "reason": "Nome ambiente presente nel nome/descrizione GA · da verificare"})
@@ -97,3 +122,4 @@ def room_matches(suggestions, addresses, spaces, functions):
                               "confidence": "ambiguous" if candidates else "none",
                               "reason": "Più ambienti compatibili" if candidates else "Nessun collegamento funzionale o nome ambiente riconoscibile"})
     return proposals
+

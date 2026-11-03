@@ -1,3 +1,11 @@
+## 5.11.0
+
+- Icone dedicate per Luci, Motorizzazioni, Clima, Scene e Sensori. Rimosse le viste e i pulsanti Storico 48 ore dalle stanze LAB; lo storico resta accessibile dai popup nativi HA. Nessuna modifica alla registrazione o alla diagnostica bus.
+- Ingresso installatore semplificato: navigazione principale compatta, strumenti avanzati raccolti, percorso reale e moduli opzionali separati dal laboratorio. Dopo l'importazione si vede il configuratore; dettagli ETS e reimportazione sono richiudibili.
+- Passaggi LAB con istruzioni contestuali, Indietro/Continua, filtro Da assegnare e collegamento alla dashboard pubblicata. I filtri e la navigazione non invalidano più una verifica; cambiare le funzioni sì. Restano le conferme per scritture e sostituzioni.
+- Riconoscimento stanze: nomi ETS con piano ripetuto, abbreviazione INTERR., preposizioni nei nomi, nome stanza specifico e distinzione del piano quando esplicito. Sensori e scene di fallback usano le stesse evidenze. Conflitti restano Da assegnare; nessuna deduzione dai numeri dei termostati.
+- Per applicare il riconoscimento aggiornato reimportare il progetto ETS e rivedere le proposte; le correzioni manuali salvate sono conservate. Per aggiornare la grafica rigenerare la dashboard LAB con backup, senza reinstallare le entità.
+
 ## 5.10.1
 
 - Dashboard LAB: piano → zona → entità, nomi brevi, icone stanza e schede a larghezza intera. Percorsi completi conservati come identità: edifici e zone omonime restano distinti.

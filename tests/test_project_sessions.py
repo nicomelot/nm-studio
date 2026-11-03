@@ -109,7 +109,7 @@ class DashboardUpdateTests(unittest.TestCase):
             self.assertEqual(json.loads(Path(result['backup']).read_text(encoding='utf-8')), original)
             self.assertEqual(client.saved, generated['dashboard'])
             self.assertTrue(result['updated'])
-        self.assertTrue(any('history-graph' in json.dumps(v) for v in generated['dashboard']['views']))
+        self.assertFalse(any('history-graph' in json.dumps(v) for v in generated['dashboard']['views']))
 
     def test_failed_backup_does_not_write_ha(self):
         request = project(); states = inventory(request); generated = preview(request, states)

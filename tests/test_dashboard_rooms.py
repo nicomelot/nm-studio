@@ -31,7 +31,11 @@ class RoomDashboardTests(unittest.TestCase):
             self.assertEqual(card['grid_options']['columns'], 12)
         self.assertFalse(any(c['type'] in ('entities', 'history-graph') for c in cards(zone)))
         graphs = [c for v in views.values() for c in cards(v) if c['type'] == 'history-graph']
-        self.assertTrue(graphs)
+        self.assertFalse(graphs)
+        self.assertFalse(any(v['path'].startswith('storico-') for v in views.values()))
+        icons = [c['icon'] for c in cards(views['funzioni']) if c['type'] == 'button']
+        self.assertNotIn('mdi:arrow-right', icons)
+        self.assertEqual(len(icons), len(set(icons)))
         self.assertFalse(any(e.startswith('climate.') for c in graphs for e in c['entities']))
         helpers = [e['entity'] for c in cards(views['strumenti-lab']) if c['type'] == 'entities' for e in c['entities']]
         self.assertEqual(set(helpers), {e for m in build(request)['manifest'] for e in m['controls']})
