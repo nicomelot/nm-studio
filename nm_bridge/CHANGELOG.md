@@ -1,5 +1,13 @@
 # NM Studio – Registro versioni
 
+## 5.9.0
+
+- Nuovo generatore Lovelace **NM Control** con schermata iniziale Panoramica casa, navigazione per Illuminazione, Climatizzazione, Schermature, Ventilazione, Sensori, Altri carichi e vista Ambienti.
+- Le pagine di funzione raggruppano le schede reali per piano e zona, utilizzando esclusivamente i widget collegati a entità presenti nell'inventario Home Assistant.
+- Ogni entità è una sola entità HA, riutilizzata in viste diverse; nessun valore di stato o dispositivo dimostrativo viene inventato. Widget incompleti e incompatibili rimangono nel report anomalie.
+- Pubblicazione protetta: conferma esplicita, impronta della bozza, dashboard nuova e mai sovrascritta. Supportate fino a otto viste anziché una.
+- Il progetto ETS di Beppe può guidare il futuro mapping degli ambienti, ma senza entità HA reali non vengono creati controlli operativi.
+
 ## 5.8.4
 
 - Importer ETS: rilevamento prudente dei termostati organizzati per gruppo intermedio KNX, anche quando i nomi non indicano l'ambiente.
