@@ -33,7 +33,8 @@ from module_plan import read as read_module_plan, save as save_module_plan, sugg
 from floorplan import read as read_floorplans, save as save_floorplans
 from floorplan_lovelace import generate as generate_floorplan_dashboard
 from floorplan_publisher import publish as publish_floorplan_dashboard
-from lab_virtual import inspect as inspect_virtual_lab, install as install_virtual_lab
+from lab_virtual import (inspect as inspect_virtual_lab, install as install_virtual_lab,
+                         packages_setup_preview, enable_packages)
 
 LOG = logging.getLogger("nm_bridge")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -336,7 +337,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?", 1)[0]
-        if self.client_address[0] != INGRESS_PROXY or path not in ("/layout", "/modules/plan", "/floorplans", "/floorplans/dashboard-publish", "/ets/preview", "/knx/approved", "/audit", "/knx/widgets", "/knx/ha-preview", "/knx/yaml-audit", "/dashboard/missing-ha/review", "/dashboard/deployment-preflight", "/knx/panel-create-plan", "/knx/panel-create-one", "/dashboard/publish", "/migration/restore", "/nm-link", "/nm-link/preview", "/nm-link/simulate", "/lab/preview", "/lab/install"):
+        if self.client_address[0] != INGRESS_PROXY or path not in ("/layout", "/modules/plan", "/floorplans", "/floorplans/dashboard-publish", "/ets/preview", "/knx/approved", "/audit", "/knx/widgets", "/knx/ha-preview", "/knx/yaml-audit", "/dashboard/missing-ha/review", "/dashboard/deployment-preflight", "/knx/panel-create-plan", "/knx/panel-create-one", "/dashboard/publish", "/migration/restore", "/nm-link", "/nm-link/preview", "/nm-link/simulate", "/lab/preview", "/lab/install", "/lab/packages-preview", "/lab/packages-enable"):
             self.send_error(403)
             return
         # Ingress protects access; these checks also reject cross-site form POSTs.
@@ -394,6 +395,10 @@ class Handler(BaseHTTPRequestHandler):
                 data = inspect_virtual_lab(json.loads(body))
             elif path == "/lab/install":
                 data = install_virtual_lab(json.loads(body))
+            elif path == "/lab/packages-preview":
+                data = packages_setup_preview()
+            elif path == "/lab/packages-enable":
+                data = enable_packages(json.loads(body))
             elif path == "/nm-link":
                 data = save_links(json.loads(body))
             elif path == "/nm-link/preview":
