@@ -58,6 +58,7 @@ def generate(layout, entities):
             confirmed = compatible and ident in available
             if confirmed:
                 card = {"type": "tile", "entity": ident, "name": w["name"]}
+                card["hold_action"] = {"action": "more-info"}
                 if ident.startswith("cover."):
                     card["features"] = [{"type": "cover-open-close"}]
                 elif ident.startswith("climate."):
@@ -124,3 +125,4 @@ def _ancestors(node, by_id):
         seen.add(current)
         yield current
         current = by_id[current].get("parent")
+

@@ -2,6 +2,12 @@
 
 import hashlib
 import json
+import os
+import threading
+from pathlib import Path
+from datetime import datetime, timezone
+
+UPDATE_LOCK = threading.RLock()
 
 try:
     from .lab_devices import build
@@ -22,6 +28,7 @@ def preview(payload, entities):
             warnings.append({"entity_id": ident, "reason": "Entità virtuale assente o non disponibile; verifica configurazione e riavvio HA"})
             continue
         card = {"type": "tile", "entity": ident, "name": "LAB " + item["name"]}
+        card["hold_action"] = {"action": "more-info"}
         if item["kind"] == "cover":
             card["features"] = [{"type": "cover-open-close"}, {"type": "cover-position"}]
         elif item["kind"] == "dimmer":
@@ -57,7 +64,16 @@ def preview(payload, entities):
         path = "stanza-" + str(i)
         floor = room.rsplit(" / ", 1)[0] if " / " in room else "Ambienti"
         room_links.setdefault(floor, []).append(button(room, path, "mdi:door"))
-        details.append(view(room, path, [grid(cards)], "ambienti"))
+        history = [c["entity"] for c in cards if c.get("entity") and not c["entity"].startswith("input_button.")]
+        history += ["sensor." + c["entity"].split(".", 1)[1] + "_temperature"
+                    for c in cards if c.get("entity", "").startswith("climate.")]
+        history = list(dict.fromkeys(history))
+        sections = [grid(cards)]
+        if history:
+            sections.append(grid([{"type": "markdown", "content": "### Storico 48 ore\nRichiede Recorder attivo per queste entità. I periodi non registrati non possono essere ricostruiti."},
+                *[{"type": "history-graph", "entities": history[i:i+12], "hours_to_show": 48}
+                  for i in range(0, len(history), 12)]], "Andamento"))
+        details.append(view(room, path, sections, "ambienti"))
     function_links = []
     for i, (category, grouped) in enumerate(categories.items()):
         path = "funzione-" + str(i)
@@ -96,3 +112,49 @@ def publish(payload, entities, client_factory=HAWebSocket):
     request = {"confirm": payload.get("confirm"), "expected_fingerprint": payload.get("expected_fingerprint"),
                "url_path": generated["url_path"], "title": "NM Control LAB"}
     return publish_generated(request, generated, client_factory)
+
+
+def inspect_existing(payload, entities, client_factory=HAWebSocket):
+    generated = preview(payload, entities)
+    with client_factory() as client:
+        dashboards = client.call('lovelace/dashboards/list')
+        if not isinstance(dashboards, list):
+            raise ValueError('Elenco dashboard non riconosciuto')
+        if not any(d.get('url_path') == generated['url_path'] for d in dashboards):
+            return {'exists': False}
+        current = client.call('lovelace/config', url_path=generated['url_path'])
+    if not isinstance(current, dict) or not isinstance(current.get('views'), list):
+        raise ValueError('Dashboard esistente non riconosciuta')
+    return {'exists': True, 'fingerprint': hashlib.sha256(json.dumps(current, sort_keys=True).encode()).hexdigest()}
+
+
+def update(payload, entities, client_factory=HAWebSocket, backup_root=None):
+    if not isinstance(payload, dict):
+        raise ValueError('Richiesta aggiornamento non valida')
+    if payload.get('confirm') is not True:
+        raise ValueError('Conferma aggiornamento dashboard obbligatoria')
+    generated = preview(payload, entities)
+    if generated['warnings'] or not generated['summary']['tiles']:
+        raise ValueError('Entità mancanti: aggiornamento dashboard bloccato')
+    if payload.get('expected_fingerprint') != generated['fingerprint']:
+        raise ValueError('Anteprima non aggiornata')
+    with UPDATE_LOCK, client_factory() as client:
+        current = client.call('lovelace/config', url_path=generated['url_path'])
+        if not isinstance(current, dict) or not isinstance(current.get('views'), list):
+            raise ValueError('Dashboard esistente non riconosciuta')
+        fingerprint = hashlib.sha256(json.dumps(current, sort_keys=True).encode()).hexdigest()
+        if fingerprint != payload.get('expected_existing_fingerprint'):
+            raise ValueError('Dashboard modificata: ripeti la verifica')
+        root = Path(backup_root or '/data/nm_lab_dashboard_backups')
+        root.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')
+        backup = root / (generated['url_path'] + '-' + stamp + '.json')
+        with backup.open('x', encoding='utf-8') as stream:
+            json.dump(current, stream, ensure_ascii=False, indent=2)
+            stream.flush()
+            os.fsync(stream.fileno())
+        client.call('lovelace/config/save', url_path=generated['url_path'], config=generated['dashboard'])
+        stored = client.call('lovelace/config', url_path=generated['url_path'])
+        if not isinstance(stored, dict) or stored.get('views') != generated['dashboard']['views']:
+            raise ValueError('Aggiornamento inviato ma verifica fallita; backup disponibile in ' + str(backup))
+    return {'updated': True, 'url_path': generated['url_path'], 'backup': str(backup)}

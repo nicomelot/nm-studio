@@ -20,7 +20,7 @@ class LovelaceGeneratorTests(unittest.TestCase):
         self.assertFalse(result["applied"])
         self.assertEqual(result["summary"], {"rooms": 1, "tiles": 1, "placeholders": 1})
         cards = result["dashboard"]["views"][0]["sections"][0]["cards"]
-        self.assertEqual(cards[0], {"type": "tile", "entity": "light.l1", "name": "L1"})
+        self.assertEqual(cards[0], {"type": "tile", "entity": "light.l1", "name": "L1", "hold_action": {"action": "more-info"}})
         self.assertEqual(len(cards), 1)
         self.assertEqual(result["warnings"][0]["widget"], "T1")
 
@@ -64,3 +64,4 @@ class LovelaceGeneratorTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

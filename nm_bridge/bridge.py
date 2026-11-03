@@ -37,8 +37,11 @@ from floorplan_publisher import publish as publish_floorplan_dashboard
 from lab_virtual import (inspect as inspect_virtual_lab, install as install_virtual_lab, replace as replace_virtual_lab,
                          packages_setup_preview, enable_packages)
 from lab_devices import candidates as lab_candidates
-from lab_dashboard import preview as lab_dashboard_preview, publish as lab_dashboard_publish
+from lab_dashboard import (preview as lab_dashboard_preview, publish as lab_dashboard_publish,
+                           inspect_existing as lab_dashboard_existing, update as lab_dashboard_update)
 from bus_recorder import Recorder
+from project_sessions import Sessions
+from knx_history import query as query_knx_history
 
 LOG = logging.getLogger("nm_bridge")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -48,6 +51,7 @@ DOMAINS = {"light", "cover", "switch", "scene", "climate", "sensor", "binary_sen
 CONFIG_PATH = Path(os.getenv("NM_CONFIG_PATH", "/data/nm_control_layout.json"))
 MAX_BODY = 65536
 BUS_RECORDER = Recorder(CONFIG_PATH.parent / "nm_knx_events.sqlite")
+PROJECTS = Sessions(CONFIG_PATH.parent / "nm_projects")
 
 
 def get_ha_states():
@@ -182,7 +186,14 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(403)
             return
         path = self.path.split("?", 1)[0].rstrip("/")
-        if path == "/bus-log":
+        if path in ("/projects", "/projects/resume", "/projects/export"):
+            try:
+                key = parse_qs(urlsplit(self.path).query).get("project", [""])[0]
+                data = PROJECTS.list() if path == "/projects" else PROJECTS.resume(key) if path.endswith("resume") else PROJECTS.read(key)
+                self.respond(200, "application/json; charset=utf-8", json.dumps(data, ensure_ascii=False).encode())
+            except (ValueError, OSError, KeyError):
+                self.respond(400, "application/json", b'{"error":"Progetto non disponibile"}')
+        elif path == "/bus-log":
             try:
                 ga = parse_qs(urlsplit(self.path).query).get("ga", [None])[0]
                 self.respond(200, "application/json; charset=utf-8", json.dumps(BUS_RECORDER.snapshot(ga)).encode())
@@ -334,6 +345,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.respond(500, "application/json", b'{"error":"Review unavailable"}')
         elif path == "/lab_ui.js":
             self.respond(200, "text/javascript; charset=utf-8", Path(__file__).with_name("lab_ui.js").read_bytes())
+        elif path == "/project_ui.js":
+            self.respond(200, "text/javascript; charset=utf-8", Path(__file__).with_name("project_ui.js").read_bytes())
         elif path in ("", "/"):
             self.respond(200, "text/html; charset=utf-8", HTML)
         else:
@@ -350,7 +363,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?", 1)[0]
-        if self.client_address[0] != INGRESS_PROXY or path not in ("/bus-log/start", "/bus-log/stop", "/layout", "/modules/plan", "/floorplans", "/floorplans/dashboard-publish", "/ets/preview", "/knx/approved", "/audit", "/knx/widgets", "/knx/ha-preview", "/knx/yaml-audit", "/dashboard/missing-ha/review", "/dashboard/deployment-preflight", "/knx/panel-create-plan", "/knx/panel-create-one", "/dashboard/publish", "/migration/restore", "/nm-link", "/nm-link/preview", "/nm-link/simulate", "/lab/preview", "/lab/install", "/lab/replace", "/lab/packages-preview", "/lab/packages-enable", "/lab/dashboard-preview", "/lab/dashboard-publish"):
+        if self.client_address[0] != INGRESS_PROXY or path not in ("/knx/history", "/lab/dashboard-existing", "/lab/dashboard-update", "/projects/save", "/bus-log/start", "/bus-log/stop", "/layout", "/modules/plan", "/floorplans", "/floorplans/dashboard-publish", "/ets/preview", "/knx/approved", "/audit", "/knx/widgets", "/knx/ha-preview", "/knx/yaml-audit", "/dashboard/missing-ha/review", "/dashboard/deployment-preflight", "/knx/panel-create-plan", "/knx/panel-create-one", "/dashboard/publish", "/migration/restore", "/nm-link", "/nm-link/preview", "/nm-link/simulate", "/lab/preview", "/lab/install", "/lab/replace", "/lab/packages-preview", "/lab/packages-enable", "/lab/dashboard-preview", "/lab/dashboard-publish"):
             self.send_error(403)
             return
         # Ingress protects access; these checks also reject cross-site form POSTs.
@@ -360,11 +373,15 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             n = int(self.headers.get("Content-Length", "0"))
-            max_body = MAX_ARCHIVE if path == "/ets/preview" else 4 * 1024 * 1024 if path == "/floorplans" else 1024 * 1024 if path == "/migration/restore" else 256 * 1024 if path in ("/knx/widgets", "/knx/ha-preview", "/knx/yaml-audit") else MAX_BODY
+            max_body = MAX_ARCHIVE if path == "/ets/preview" else 4 * 1024 * 1024 if path == "/floorplans" else 1024 * 1024 if path == "/migration/restore" else 256 * 1024 if path in ("/knx/widgets", "/knx/ha-preview", "/knx/yaml-audit") else 256 * 1024 if path == "/projects/save" else MAX_BODY
             if not 0 < n <= max_body:
                 raise ValueError("Invalid length")
             body = self.rfile.read(n)
-            if path == "/bus-log/start":
+            if path == "/knx/history":
+                data = query_knx_history(json.loads(body))
+            elif path == "/projects/save":
+                data = PROJECTS.save(json.loads(body))
+            elif path == "/bus-log/start":
                 data = BUS_RECORDER.start(json.loads(body))
             elif path == "/bus-log/stop":
                 data = BUS_RECORDER.stop()
@@ -412,6 +429,10 @@ class Handler(BaseHTTPRequestHandler):
                 data = inspect_virtual_lab(json.loads(body))
             elif path == "/lab/dashboard-preview":
                 data = lab_dashboard_preview(json.loads(body), get_ha_states())
+            elif path == "/lab/dashboard-existing":
+                data = lab_dashboard_existing(json.loads(body), get_ha_states())
+            elif path == "/lab/dashboard-update":
+                data = lab_dashboard_update(json.loads(body), get_ha_states())
             elif path == "/lab/dashboard-publish":
                 data = lab_dashboard_publish(json.loads(body), get_ha_states())
             elif path == "/lab/install":
@@ -433,6 +454,7 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 data = ets_preview(body)
                 data["lab_candidates"] = lab_candidates(data)
+                data = PROJECTS.prepare(data)
             self.respond(200, "application/json; charset=utf-8", json.dumps(data, ensure_ascii=False).encode())
         except (ValueError, UnicodeDecodeError, OSError, json.JSONDecodeError, RuntimeError) as exc:
             LOG.warning("Request rejected (%s): %s", type(exc).__name__, str(exc)[:160])

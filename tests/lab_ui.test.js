@@ -7,27 +7,31 @@ test('all inline application scripts remain valid JavaScript',()=>{
  const html=fs.readFileSync('nm_bridge/index.html','utf8');
  for(const match of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))new vm.Script(match[1]);
  assert.match(html,/<script src="lab_ui.js"><\/script>/);
+ new vm.Script(fs.readFileSync('nm_bridge/project_ui.js','utf8'));
+ assert.match(html,/<script src="project_ui.js"><\/script>/);
  assert.match(fs.readFileSync('nm_bridge/Dockerfile','utf8'),/COPY lab_ui.js \/app\/lab_ui.js/);
 });
 
 function harness(candidates){
- const ids=Object.fromEntries(['lab-status','lab-check','lab-setup','lab-install','lab-dashboard-check','lab-dashboard-publish'].map(id=>[id,{disabled:true,textContent:''}]));
+ const ids=Object.fromEntries(['project-save','project-label','lab-stage','lab-real-path','lab-filter','lab-kind-filter','lab-status','lab-check','lab-setup','lab-install','lab-dashboard-check','lab-dashboard-publish'].map(id=>[id,{disabled:true,textContent:'',value:''}]));
  const rows=candidates.map((d,i)=>{
-  const kind={value:d.kind},room={value:d.room};
-  return {dataset:{index:String(i)},checked:true,closest:()=>({querySelector:s=>s==='.lab-kind'?kind:room}),kind,room};
+  const kind={value:d.kind},room={value:d.room},name={value:d.name};
+  return {dataset:{index:String(i)},checked:d.selected!==false,closest:()=>({querySelector:s=>s==='.lab-kind'?kind:s==='.lab-name'?name:room}),kind,room,name};
  });
  let html='';
  ids['ets-progress']={closest:()=>({insertAdjacentHTML:(position,value)=>{html=value;}})};
  const calls=[];
  const context={
   etsData:{project_key:'a'.repeat(64),lab_candidates:candidates,building:[]},
-  $:id=>ids[id],escapeHTML:value=>String(value),confirm:()=>true,
-  document:{querySelectorAll:selector=>selector.includes('.lab-room-choice')?[]:selector.includes(':checked')?rows.filter(r=>r.checked):rows.flatMap(r=>[r,r.kind,r.room])},
+  loadProjectLibrary:async()=>{},setPage:()=>{},$:id=>ids[id],escapeHTML:value=>String(value),confirm:()=>true,
+  document:{querySelectorAll:selector=>selector.includes('data-lab-stage')||selector.includes('.lab-room-choice')?[]:selector.includes(':checked')?rows.filter(r=>r.checked):selector.endsWith('.lab-selected')?rows:rows.flatMap(r=>[r,r.kind,r.room,r.name])},
   api:async(path,options)=>{
    const body=JSON.parse(options.body);calls.push({path,body});
    if(path==='lab/preview')return {ready:true,packages_enabled:true,blocked_by_existing:false,already_installed:false,devices:body.devices.length,sha256:'fresh',target:'packages/nm_lab_virtual.yaml',message:'Virtuale'};
    if(path==='lab/install')return {installed:true};
    if(path==='lab/dashboard-preview')return {summary:{tiles:body.devices.length},warnings:[],fingerprint:'dashboard'};
+   if(path==='lab/dashboard-existing')return {exists:false};
+   if(path==='projects/save')return {saved:true,revision:'rev2'};
    if(path==='lab/dashboard-publish')return {created:true,url_path:'nm-studio-lab-test'};
    throw Error('Unexpected endpoint '+path);
   }
@@ -78,4 +82,14 @@ test('room picker exposes choices independently of current text',()=>{
  assert.match(h.html,/class="lab-room-choice"/);
  assert.match(h.html,/<option value="Ufficio">Ufficio<\/option>/);
  assert.match(h.html,/class="lab-room"/);
+});
+
+test('saving captures all reviews including deselected functions and edited names',async()=>{
+ const h=harness([{kind:'light',command:'1/1/0',name:'L1',room:'Magazzino'},{kind:'cover',command:'1/2/0',name:'T1',room:'Sala',selected:false}]);
+ h.ids['project-label'].value='Nuova FR';h.rows[0].name.value='Luce ufficio';
+ await h.ids['project-save'].onclick();
+ const saved=h.calls.find(c=>c.path==='projects/save');
+ assert.equal(saved.body.label,'Nuova FR');assert.equal(saved.body.reviews.length,2);
+ assert.equal(saved.body.reviews[0].name,'Luce ufficio');assert.equal(saved.body.reviews[1].selected,false);
+ assert.equal(h.ids['lab-stage'].value,'install');
 });

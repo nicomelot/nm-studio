@@ -1,3 +1,14 @@
+## 5.10.0
+
+- Archivio locale di massimo 10 progetti ETS analizzati, salvataggio esplicito delle revisioni LAB e ripresa da Avvio guidato anche dopo riavvio. Nessun file .knxproj originale o credenziale salvato; sono conservati i dati estratti del progetto.
+- Reimportazione dello stesso progetto: confronto di GA/funzioni/evidenze, conservazione delle correzioni manuali di nome e ambiente, nuova selezione richiesta per aggiunte e modifiche. Progetti senza GUID stabile possono essere riconosciuti solo dalla stessa esportazione. Nessuna eliminazione o migrazione automatica delle entità HA.
+- Wizard LAB in tre passaggi, ricerca per nome/stanza/GA, filtro categoria, nome funzione modificabile; percorso separato per la preparazione reale e accesso alle planimetrie. Revisioni LAB distinte dalle approvazioni KNX reali.
+- Salvataggio atomico, controllo revisioni concorrenti, backup della revisione precedente ed esportazione JSON del progetto. Il vecchio backup migrazione non include questi archivi: usare anche il backup completo HA. Importazione dei backup progetto non ancora esposta nell'interfaccia.
+- Dashboard LAB aggiornabile esplicitamente sul medesimo percorso v2, con verifica impronte e backup prima della scrittura. Eventuali personalizzazioni vengono sostituite solo dopo conferma. Il pubblicatore generale resta create-only.
+- Storico nativo HA di 48 ore nelle pagine stanza LAB e pressione prolungata per dettagli nelle schede LAB/reali. Richiede Recorder e dati già registrati.
+- Diagnostica: consultazione dello storico KNX HA tramite API 2026.10, intervalli di 48 ore, filtro GA/mittente, pagine da 500 eventi ed esportazione della pagina. Non abilita la conservazione né garantisce copertura; richiede permessi HA amministratore. Nessun aumento dei privilegi, nessun telegramma KNX.
+- Da collaudare nell'installazione HA: aspetto delle viste, permessi API, continuità e copertura dello storico. Aree HA native, provisioning reale completamente guidato, accesso remoto e integrazione completa delle planimetrie restano da completare.
+
 ## 5.9.6
 
 - NM Control LAB: Home, indice Ambienti raggruppato per percorso edificio/piano, pagina dedicata a ogni stanza; Funzioni con Luci, Motorizzazioni, Clima, Scene e Sensori quando presenti, filtro per ambiente e ritorno alla pagina precedente.
