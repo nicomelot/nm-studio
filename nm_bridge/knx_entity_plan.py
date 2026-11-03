@@ -18,6 +18,12 @@ def build(layout, request):
         kind = original["type"]
         if not fields.get("command"):
             raise ValueError("A selected device has no KNX command address")
+        if kind not in ('light', 'dimmer', 'cover'):
+            raise ValueError('Creazione diretta supportata solo per luci, dimmer e tapparelle')
+        if kind == 'dimmer' and not fields.get('brightness'):
+            raise ValueError('Dimmer: GA luminosità assoluta obbligatorio')
+        if kind == 'cover' and not fields.get('stop'):
+            raise ValueError('Tapparella: GA arresto obbligatorio per il collaudo')
         data = {"name": item["name"].strip()}
         if kind in ("light", "dimmer"):
             platform = "light"
@@ -43,3 +49,4 @@ def build(layout, request):
                 "Controllare DPT, GA già esistenti e backup prima di creare entità.",
                 "I campi posizione tapparella non verificati non sono inclusi nelle richieste.",
             ]}
+

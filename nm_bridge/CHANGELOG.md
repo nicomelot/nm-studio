@@ -1,3 +1,11 @@
+## 5.12.0
+
+- Pagina Collaudo KNX reale: scelta di una sola luce, dimmer o tapparella dai widget salvati, verifica accesso KNX, revisione configurazione, controllo conflitti e creazione esplicita tramite API già disponibili. Nessun cambio dei permessi dell'add-on.
+- Creazione disabilitata senza accesso KNX, connessione, supporto piattaforma e conferme ETS/backup. Progetto ETS aperto diverso dai widget salvati blocca il percorso. I dati si correggono nei widget prima della verifica per conservare la coerenza delle associazioni.
+- Dimmer senza GA luminosità assoluta e tapparelle senza arresto bloccati anche nel backend. Clima escluso dalla creazione diretta. Posizione tapparella non interpretata automaticamente come comando percentuale.
+- Dopo la creazione: lettura dello stato HA, istruzioni per il collaudo fisico e accessi ad associazione, dashboard e diagnostica. Il configuratore non invia comandi di prova al bus. La prova sull'impianto resta da eseguire dall'installatore.
+- Inclusi test dei blocchi, cancellazione conferma, invio singolo, mapping GA e pacchetto JavaScript. Aspetto e accesso API da verificare nella reale installazione HA; con permessi insufficienti resta disponibile la preparazione YAML.
+
 ## 5.11.0
 
 - Icone dedicate per Luci, Motorizzazioni, Clima, Scene e Sensori. Rimosse le viste e i pulsanti Storico 48 ore dalle stanze LAB; lo storico resta accessibile dai popup nativi HA. Nessuna modifica alla registrazione o alla diagnostica bus.

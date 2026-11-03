@@ -75,5 +75,29 @@ class PanelApplyTests(unittest.TestCase):
         self.assertNotIn("knx/create_entity", fake.calls)
 
 
+    def test_plan_rejects_missing_dimmer_level_or_cover_stop(self):
+        from nm_bridge.missing_ha_generator import fingerprint
+        for kind in ('dimmer', 'cover', 'climate'):
+            layout = {**self.layout, 'widgets': [{**self.layout['widgets'][0], 'type': kind, 'fields': {'command': '1/1/0'}}]}
+            request = {'source_fingerprint': fingerprint(layout), 'devices': [{'index': 0, 'approved': True, 'name': 'Test', 'fields': {'command': '1/1/0'}}]}
+            with self.subTest(kind=kind), self.assertRaises(ValueError):
+                build(layout, request)
+
+    def test_dimmer_feedback_and_cover_position_mapping(self):
+        from nm_bridge.missing_ha_generator import fingerprint
+        for kind, fields in [('dimmer', {'command': '1/1/0', 'feedback': '1/1/1', 'brightness': '1/1/2', 'brightness_feedback': '1/1/3'}),
+                             ('cover', {'command': '1/2/0', 'stop': '1/2/1', 'position': '1/2/2'})]:
+            layout = {**self.layout, 'widgets': [{**self.layout['widgets'][0], 'type': kind, 'fields': fields}]}
+            request = {'source_fingerprint': fingerprint(layout), 'devices': [{'index': 0, 'approved': True, 'name': 'Test', 'fields': fields}]}
+            data = build(layout, request)['calls'][0]['data']
+            if kind == 'dimmer':
+                self.assertEqual(data['brightness_state_address'], '1/1/3')
+                self.assertEqual(data['state_address'], '1/1/1')
+            else:
+                self.assertEqual(data['stop_address'], '1/2/1')
+                self.assertNotIn('position_address', data)
+
+
 if __name__ == "__main__":
     unittest.main()
+

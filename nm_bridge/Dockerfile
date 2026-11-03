@@ -37,6 +37,7 @@ COPY lab_dashboard.py /app/lab_dashboard.py
 COPY bus_recorder.py /app/bus_recorder.py
 COPY project_sessions.py /app/project_sessions.py
 COPY project_ui.js /app/project_ui.js
+COPY real_ui.js /app/real_ui.js
 COPY knx_history.py /app/knx_history.py
 WORKDIR /app
 CMD ["/command/with-contenv", "python3", "-u", "/app/bridge.py"]
