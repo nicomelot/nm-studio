@@ -8,14 +8,18 @@ import re
 
 
 FUNCTION_FIELDS = {
-    "light": {"command": "1.001", "feedback": "1.001"},
-    "dimmer": {"command": "1.001", "feedback": "1.001", "relative": "3.007",
-               "brightness": "5.001", "brightness_feedback": "5.001"},
-    "cover": {"command": "1.008", "stop": "1.007", "position": "5.001"},
+    "light": {"command": "1.001", "feedback": ("1.001", "1.011")},
+    "dimmer": {"command": "1.001", "feedback": ("1.001", "1.011"), "relative": "3.007",
+               "brightness": "5.001", "brightness_feedback": "5.001",
+               "color_temperature": "7.600", "color_temperature_feedback": "7.600"},
+    "cover": {"command": "1.008", "stop": ("1.007", "1.017"),
+              "position": "5.001", "position_feedback": "5.001",
+              "slats": "5.001", "slats_feedback": "5.001"},
     "climate": {"command": "9.001", "temperature": "9.001",
                 "target_temperature_state": "9.001", "heat_cool": "1.100",
                 "heat_cool_state": "1.100", "operation_mode": "20.102",
-                "operation_mode_state": "20.102"},
+                "operation_mode_state": "20.102", "humidity": ("9.007", "5.001"),
+                "heating_demand": "1.001", "valve_state": ("1.011", "1.001")},
 }
 
 
@@ -84,6 +88,8 @@ def review_suggestions(addresses, suggestions):
         questions = []
         strength = []
         for field, expected in FUNCTION_FIELDS.get(kind, {"command": ""}).items():
+            allowed = (expected,) if isinstance(expected, str) else expected
+            expected_label = " / ".join(allowed)
             group = candidate.get(field)
             if not group:
                 if field in ("command", "temperature", "target_temperature_state"):
@@ -98,20 +104,20 @@ def review_suggestions(addresses, suggestions):
                 assigned = _dpt(item.get("dpt"))
                 bits = [_size(c) for c in item.get("connections", [])]
                 known = [bit for bit in bits if bit is not None]
-                expected_bits = _expected_bits(expected)
+                expected_bits = {_expected_bits(value) for value in allowed}
                 if assigned:
-                    status = "verified_dpt" if assigned == expected else "conflict_dpt"
-                elif known and expected_bits and all(bit == expected_bits for bit in known):
+                    status = "verified_dpt" if assigned in allowed else "conflict_dpt"
+                elif known and None not in expected_bits and all(bit in expected_bits for bit in known):
                     status = "compatible_size"
-                elif known and expected_bits:
+                elif known and None not in expected_bits:
                     status = "conflict_size"
                 else:
                     status = "dpt_unknown"
                 if status.startswith("conflict"):
                     questions.append("Verifica DPT e oggetti di " + field + " (" + group + ")")
                 elif status in ("dpt_unknown", "compatible_size"):
-                    questions.append("Conferma DPT " + expected + " per " + field + " (" + group + ")")
-            checks.append({"field": field, "address": group, "expected_dpt": expected, "status": status})
+                    questions.append("Conferma DPT " + expected_label + " per " + field + " (" + group + ")")
+            checks.append({"field": field, "address": group, "expected_dpt": expected_label, "status": status})
             strength.append(status)
         # A high score is an evidence grade, NEVER permission to create or control entities.
         confidence = ("bassa" if any(s in ("unlinked", "missing", "conflict_dpt", "conflict_size") for s in strength)
