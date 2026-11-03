@@ -11,8 +11,10 @@ from pathlib import Path
 
 try:
     from .lab_devices import validate as validate_devices
+    from .widget_layout import read_layout as read_rooms
 except ImportError:
     from lab_devices import validate as validate_devices
+    from widget_layout import read_layout as read_rooms
 
 KEY = re.compile(r"^[0-9a-f]{64}$")
 MAX_SIZE = 8 * 1024 * 1024
@@ -31,8 +33,9 @@ def evidence(data, ga):
 
 
 class Sessions:
-    def __init__(self, root):
+    def __init__(self, root, room_provider=read_rooms):
         self.root = Path(root)
+        self.room_provider = room_provider
         self.pending = OrderedDict()
         self.lock = threading.RLock()
 
@@ -87,6 +90,20 @@ class Sessions:
                     changes['added'].append(ga)
                     updated['selected'] = not bool(old) and len(proposed) < 200
                 proposed.append(updated)
+            catalog = self.room_provider()
+            aliases = catalog.get('room_aliases', {}) if catalog.get('project') == key else {}
+            widget_rooms = {}
+            if catalog.get('project') == key:
+                for widget in catalog.get('widgets', []):
+                    room = widget.get('room')
+                    if room in catalog.get('rooms', []):
+                        widget_rooms.setdefault(widget.get('fields', {}).get('command'), set()).add(room)
+            for item in proposed:
+                if item.get('room') in aliases:
+                    item['room'] = aliases[item['room']]
+                elif item.get('room') not in catalog.get('rooms', []) and len(widget_rooms.get(item['command'], set())) == 1:
+                    item['room'] = next(iter(widget_rooms[item['command']]))
+                    item['room_source'] = 'Stanza del widget KNX salvato con lo stesso GA' 
             token = digest(imported)
             if len(json.dumps(imported).encode()) > MAX_SIZE - 256000:
                 raise ValueError('Progetto troppo grande per il salvataggio guidato')

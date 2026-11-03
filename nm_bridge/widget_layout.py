@@ -94,8 +94,22 @@ def validate(payload):
             checked[key] = value
         clean.append({"type": item["type"], "name": name.strip(), "room": room.strip(), "fields": checked,
                       "entity_id": entity_id})
+    aliases = payload.get('room_aliases', {})
+    if not isinstance(aliases, dict) or len(aliases) > 1500:
+        raise ValueError('Invalid room aliases')
+    paths = set()
+    by_id = {node['id']: node for node in structure}
+    for node in structure:
+        parts, current = [], node
+        while current:
+            parts.insert(0, current['name'])
+            current = by_id.get(current['parent'])
+        paths.add(' / '.join(parts))
+    for old, new in aliases.items():
+        if not isinstance(old, str) or not 1 <= len(old) <= 240 or not isinstance(new, str) or new not in paths:
+            raise ValueError('Invalid room alias path')
     return {"version": 1, "project": payload["project"], "rooms": rooms,
-            "structure": structure, "widgets": clean}
+            "structure": structure, "widgets": clean, **({"room_aliases": aliases} if aliases else {})}
 
 
 def read_layout():
@@ -121,3 +135,4 @@ def save_layout(payload):
         if temp is not None:
             temp.unlink(missing_ok=True)
     return {"saved": len(clean["widgets"])}
+

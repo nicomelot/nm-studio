@@ -13,7 +13,7 @@ test('all inline application scripts remain valid JavaScript',()=>{
 });
 
 function harness(candidates){
- const ids=Object.fromEntries(['lab-open-dashboard','lab-room-filter','lab-step-help','lab-prev','lab-next','project-save','project-label','lab-stage','lab-real-path','lab-filter','lab-kind-filter','lab-status','lab-check','lab-setup','lab-install','lab-dashboard-check','lab-dashboard-publish'].map(id=>[id,{disabled:true,textContent:'',value:''}]));
+ const ids=Object.fromEntries(['lab-edit-rooms','lab-open-dashboard','lab-room-filter','lab-step-help','lab-prev','lab-next','project-save','project-label','lab-stage','lab-real-path','lab-filter','lab-kind-filter','lab-status','lab-check','lab-setup','lab-install','lab-dashboard-check','lab-dashboard-publish'].map(id=>[id,{disabled:true,textContent:'',value:''}]));
  const rows=candidates.map((d,i)=>{
   const kind={value:d.kind},room={value:d.room},name={value:d.name};
   return {dataset:{index:String(i)},checked:d.selected!==false,closest:()=>({querySelector:s=>s==='.lab-kind'?kind:s==='.lab-name'?name:room}),kind,room,name};

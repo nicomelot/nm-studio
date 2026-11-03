@@ -1,3 +1,11 @@
+## 5.12.1
+
+- Rinomine e spostamenti nell'editor Edificio ETS aggiornano anche le stanze delle funzioni nel configuratore guidato. Percorsi completi distinti: nessuna fusione di stanze omonime su piani diversi.
+- Salva struttura e assegnazioni conserva la corrispondenza fra vecchi e nuovi percorsi. Ripresa e reimportazione del progetto applicano i nomi salvati senza modificare il riferimento ETS originale o le selezioni delle funzioni.
+- Per le rinomine precedenti senza corrispondenza storica, riallineamento solo quando un widget dello stesso progetto e dello stesso GA indica una stanza univoca. Associazioni già valide nel catalogo e casi ambigui sono preservati.
+- Il selettore stanze del laboratorio usa la gerarchia modificabile e le assegnazioni correnti. Pulsanti per aprire l'editor dal percorso guidato e tornare alla configurazione. Le modifiche alla dashboard HA richiedono ancora l'aggiornamento esplicito con backup.
+- Test di persistenza, reimportazione, isolamento progetto, omonimie, rinomine successive e validazione dei percorsi. Le corrispondenze fanno parte del layout KNX salvato; conservarlo nel backup NM Studio.
+
 ## 5.12.0
 
 - Pagina Collaudo KNX reale: scelta di una sola luce, dimmer o tapparella dai widget salvati, verifica accesso KNX, revisione configurazione, controllo conflitti e creazione esplicita tramite API già disponibili. Nessun cambio dei permessi dell'add-on.
