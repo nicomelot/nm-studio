@@ -4,6 +4,7 @@ RUN apk add --no-cache python3 py3-websocket-client
 COPY bridge.py /app/bridge.py
 COPY index.html /app/index.html
 COPY ets_import.py /app/ets_import.py
+COPY recognition.py /app/recognition.py
 COPY knx_devices.py /app/knx_devices.py
 COPY audit_notes.py /app/audit_notes.py
 COPY widget_layout.py /app/widget_layout.py
