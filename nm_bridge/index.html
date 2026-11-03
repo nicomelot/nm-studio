@@ -30,7 +30,7 @@
 <header><div><div class="workspace-label" id="workspace-label">NM Studio · Area installatore</div><h1>NM <span style="color:#70b2ff">Control</span> <span class="muted" style="font-size:15px;letter-spacing:0">5.0.0</span></h1><div class="subtitle">KNX · Configurazione guidata · Aggiornamenti GitHub attivi</div></div><div class="header-actions"><span class="pill">⚠ Attivazione KNX su conferma</span><button id="view-switch" aria-label="Cambia visualizzazione">Vista cliente</button></div></header>
 <nav><button data-page="wizard" class="active">Avvio guidato</button><button data-page="dashboard">Dashboard</button><button data-page="configure">Configuratore</button><button data-page="ets">Importa ETS</button><button data-page="building">Edificio ETS</button><button data-page="floorplans">Mappe impianto</button><button data-page="widgets">Widget KNX</button><button data-page="knx">Progetto KNX</button><button data-page="ha-preview">Genera HA</button><button data-page="dashboard-export">Plance HA</button><button data-page="matches">Associa entità</button><button data-page="nm-link">NM Link</button><button data-page="intelligence">Intelligence</button><button data-page="inventory">Entità HA</button><button data-page="diagnostic">Diagnostica</button></nav>
 <div class="bar"><button class="primary" id="refresh">Aggiorna stati</button><span id="message"></span></div><section id="content"></section>
-</main><script>
+</main><script src="lab_ui.js"></script><script>
 'use strict';
 let page='wizard', entities=[], layout={version:1,rooms:[]}, entityError='',dirty=false,selectedRoom='all',clientMode=new URLSearchParams(location.search).get('view')==='client',refreshing=false,lastSync=null,etsData=null,etsError='',candidateDrafts=[],approvedDevices=[],auditReviews={},reviewDirty=false,selectedPhysicalDevice='',widgetDrafts=[],widgetSeq=0,widgetRooms=[],widgetDirty=false,structureDraft=[],structureDirty=false,savedWidgetLayout={version:1,project:'',rooms:[],structure:[],widgets:[]},linkDrafts=[],linkDirty=false,linkPreview=null;
 let intelligenceData=null,intelligenceError='',intelligenceLoading=false;
@@ -305,17 +305,7 @@ function wireETS(){
   finally{button.disabled=false}
  };
  if(etsData)$('ets-download').onclick=()=>{let blob=new Blob([JSON.stringify(etsData,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='nm-control-ets-preview.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
- if(etsData){
-  let zones=(etsData.suggestions||[]).filter(s=>s.kind==='climate'&&s.temperature).map(s=>({kind:'climate',command:s.command,temperature:s.temperature}));
-  const host=$('ets-progress')?.closest('.card');
-  if(host&&zones.length){
-   host.insertAdjacentHTML('afterend',`<section class="card"><div class="workspace-label">NM Studio · Laboratorio virtuale</div><h2>Prepara Home Assistant di test</h2><p class="muted">${zones.length} termostati riconosciuti. Le entità sono solo virtuali, senza KNX. L'abilitazione dei pacchetti HA è una modifica separata, con backup e conferma.</p><div class="bar"><button id="lab-check" class="primary">Verifica laboratorio</button><button id="lab-setup" disabled>Abilita pacchetti HA</button><button id="lab-install" disabled>Installa entità virtuali</button></div><p id="lab-status" class="small muted">Nessuna modifica eseguita. Necessario accesso in scrittura ai packages HA.</p></section>`);
-   let plan=null,setup=null,base={mode:'virtual_climate',zones};
-   $('lab-check').onclick=async()=>{let b=$('lab-check');b.disabled=true;$('lab-status').textContent='Verifica permessi e configurazione packages…';try{plan=await api('lab/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(base)});let msg=plan.packages_enabled?'Pacchetti HA abilitati. ':'Pacchetti HA non ancora abilitati in configuration.yaml. ';msg+=plan.blocked_by_existing?'Esiste già un file NM Lab differente: nessuna sovrascrittura.':plan.already_installed?'Il laboratorio è già installato.':'Pronto a creare '+plan.zones+' termostati virtuali.';$('lab-status').textContent=msg;$('lab-install').disabled=!plan.ready||plan.blocked_by_existing||plan.already_installed;setup=null;$('lab-setup').disabled=true;if(!plan.packages_enabled){try{setup=await api('lab/packages-preview',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});$('lab-setup').disabled=!setup.ready||setup.already_enabled}catch(e){$('lab-status').textContent+=' Configurazione complessa: '+e.message}}}catch(e){plan=null;$('lab-status').textContent='Verifica non riuscita: '+e.message}finally{b.disabled=false}};
-   $('lab-setup').onclick=async()=>{if(!setup||setup.already_enabled||!setup.expected_sha256)return;if(!confirm(`NM Studio propone questa aggiunta a configuration.yaml:\n\n${setup.preview}\n\nPrima farà un backup del file originale. Nessun riavvio automatico. Autorizzi questa modifica?`))return;let b=$('lab-setup');b.disabled=true;try{let result=await api('lab/packages-enable',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirm:true,expected_sha256:setup.expected_sha256})});$('lab-status').textContent=result.enabled?'Pacchetti abilitati e backup creato. Controlla la configurazione YAML; riavvia HA solo dopo la verifica. Poi ripeti Verifica laboratorio.':'Modifica non eseguita.';$('lab-install').disabled=true;plan=null}catch(e){$('lab-status').textContent='Modifica non eseguita: '+e.message}};
-   $('lab-install').onclick=async()=>{if(!plan||!plan.ready)return;if(!confirm(`Installare ${plan.zones} termostati VIRTUALI in ${plan.target}? Nessun dispositivo KNX verrà comandato. Sarà necessario verificare e riavviare Home Assistant manualmente.`))return;let b=$('lab-install');b.disabled=true;try{let result=await api('lab/install',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...base,confirm:true,expected_sha256:plan.sha256})});$('lab-status').textContent=result.installed?'Package NM Lab installato. Verifica la configurazione YAML e riavvia Home Assistant per attivare le entità.':'Installazione non completata.'}catch(e){$('lab-status').textContent='Installazione non eseguita: '+e.message}};
-  }
- }
+ if(etsData)wireVirtualLab();
 }
 function changed(){dirty=true;let u=$('unsaved');if(u)u.textContent='Modifiche non salvate'}
 function wireConfigure(){
@@ -688,3 +678,4 @@ function wireWizard(){
 }
 applyView();init();
 </script></body></html>
+

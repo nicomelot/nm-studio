@@ -1,0 +1,30 @@
+name: NM Studio checks
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m unittest discover -s tests -v
+      - run: node --test tests/lab_ui.test.js
+  home-assistant-schema:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python tests/make_ha_lab_fixture.py /tmp/nm-ha-check
+      - name: Validate virtual package with Home Assistant
+        run: docker run --rm -v /tmp/nm-ha-check:/config ghcr.io/home-assistant/home-assistant:2026.10.4 python -m homeassistant --script check_config -c /config
