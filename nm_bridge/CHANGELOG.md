@@ -1,3 +1,11 @@
+## 5.10.1
+
+- Dashboard LAB: piano → zona → entità, nomi brevi, icone stanza e schede a larghezza intera. Percorsi completi conservati come identità: edifici e zone omonime restano distinti.
+- Tocco su scheda o icona apre il popup nativo HA. Storico 48 ore su richiesta e valori simulati in Strumenti LAB; nessuna dipendenza da HACS. Il grafico clima usa il solo sensore temperatura, evitando serie duplicate.
+- Categorie raggruppate per piano e zona senza colonna di filtri. Percorsi stanza stabili quando si aggiungono altre zone. Funzioni di piano in Generali; stanze senza gerarchia in Altre zone.
+- Aggiornare la dashboard dal passaggio 3 del wizard dopo l'aggiornamento del componente: backup e controllo impronte restano attivi. Nessuna reinstallazione delle entità necessaria. Limite viste adeguato al massimo di 200 zone con storico.
+- Aspetto finale e popup da collaudare nell'installazione Home Assistant.
+
 ## 5.10.0
 
 - Archivio locale di massimo 10 progetti ETS analizzati, salvataggio esplicito delle revisioni LAB e ripresa da Avvio guidato anche dopo riavvio. Nessun file .knxproj originale o credenziale salvato; sono conservati i dati estratti del progetto.

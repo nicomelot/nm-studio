@@ -17,92 +17,159 @@ except ImportError:
     from dashboard_publisher import publish_generated, HAWebSocket
 
 
+def _location(room):
+    """Short display labels never replace the complete room identity."""
+    parts = [p.strip() for p in room.split('/') if p.strip()]
+    if len(parts) >= 3:
+        return tuple(parts[:2]), ' / '.join(parts[2:])
+    if len(parts) == 2:
+        if parts[1].lower().startswith('piano ') or parts[1].lower() in {'interrato', 'seminterrato', 'terra', 'primo', 'secondo'}:
+            return tuple(parts), 'Generali'
+        return (parts[0], 'Zone'), parts[1]
+    return (), room
+
+
+def _floor_name(key):
+    if not key:
+        return 'Altre zone'
+    name = key[-1]
+    if name.lower().startswith('piano '):
+        name = name[6:]
+    return name.capitalize() if name.isupper() else name
+
+
+def _room_icon(name):
+    for words, icon in [(('bagno', 'wellness'), 'mdi:shower'),
+                        (('camera',), 'mdi:bed-outline'),
+                        (('cucina',), 'mdi:silverware-fork-knife'),
+                        (('garage',), 'mdi:garage'),
+                        (('soggiorno', 'sala'), 'mdi:sofa-outline'),
+                        (('ufficio',), 'mdi:desk'),
+                        (('palestra',), 'mdi:dumbbell')]:
+        if any(word in name.lower() for word in words):
+            return icon
+    return 'mdi:door-open'
+
+
 def preview(payload, entities):
     plan = build(payload)
-    inventory = {e["entity_id"]: e for e in entities if isinstance(e, dict) and "entity_id" in e}
-    rooms, categories, warnings, total = {}, {}, [], 0
-    for item in plan["manifest"]:
-        ident = item["entity_id"]
+    inventory = {e['entity_id']: e for e in entities if isinstance(e, dict) and 'entity_id' in e}
+    rooms, categories, controls, warnings, total = {}, {}, {}, [], 0
+    for item in plan['manifest']:
+        ident = item['entity_id']
         entity = inventory.get(ident)
-        if not entity or entity.get("state") in ("unknown", "unavailable") and item["kind"] != "scene":
-            warnings.append({"entity_id": ident, "reason": "Entità virtuale assente o non disponibile; verifica configurazione e riavvio HA"})
+        if not entity or entity.get('state') in ('unknown', 'unavailable') and item['kind'] != 'scene':
+            warnings.append({'entity_id': ident, 'reason': 'Entità virtuale assente o non disponibile; verifica configurazione e riavvio HA'})
             continue
-        card = {"type": "tile", "entity": ident, "name": "LAB " + item["name"]}
-        card["hold_action"] = {"action": "more-info"}
-        if item["kind"] == "cover":
-            card["features"] = [{"type": "cover-open-close"}, {"type": "cover-position"}]
-        elif item["kind"] == "dimmer":
-            card["features"] = [{"type": "light-brightness"}]
-        elif item["kind"] == "scene":
-            card["tap_action"] = {"action": "perform-action", "perform_action": "input_button.press", "target": {"entity_id": ident}}
-        group = rooms.setdefault(item["room"], [])
-        group.append(card)
-        category = {"light": "Luci", "dimmer": "Luci", "cover": "Motorizzazioni",
-                    "climate": "Clima", "scene": "Scene"}.get(item["kind"], "Sensori")
-        categories.setdefault(category, {}).setdefault(item["room"], []).append(card)
-        for control in item["controls"]:
+        card = {'type': 'tile', 'entity': ident, 'name': item['name'],
+                'grid_options': {'columns': 12},
+                'tap_action': {'action': 'more-info'},
+                'icon_tap_action': {'action': 'more-info'},
+                'hold_action': {'action': 'more-info'}}
+        rooms.setdefault(item['room'], []).append(card)
+        category = {'light': 'Luci', 'dimmer': 'Luci', 'cover': 'Motorizzazioni',
+                    'climate': 'Clima', 'scene': 'Scene'}.get(item['kind'], 'Sensori')
+        categories.setdefault(category, {}).setdefault(item['room'], []).append(card)
+        for control in item['controls']:
             if control in inventory:
-                group.append({"type": "entities", "entities": [control], "title": "Valore simulato - " + item["name"]})
+                controls.setdefault(item['room'], []).append({'entity': control, 'name': item['name']})
             else:
-                warnings.append({"entity_id": control, "reason": "Ingresso simulato assente"})
+                warnings.append({'entity_id': control, 'reason': 'Ingresso simulato assente'})
         total += 1
-    notice = {"type": "markdown", "content": "## Laboratorio virtuale\nNessun comando KNX. Posizioni istantanee; scene: solo richiamo; sensori manuali."}
-    # Keep the previous dashboard and any customer customizations intact.
-    url_path = "nm-studio-lab-" + plan["project"][:12] + "-v2"
-    def button(title, path, icon="mdi:arrow-right"):
-        return {"type": "button", "name": title, "icon": icon,
-                "tap_action": {"action": "navigate", "navigation_path": "/" + url_path + "/" + path}}
+    url_path = 'nm-studio-lab-' + plan['project'][:12] + '-v2'
+
+    def route(prefix, identity):
+        return prefix + '-' + hashlib.sha256(identity.encode()).hexdigest()[:12]
+
+    def button(title, path, icon='mdi:arrow-right'):
+        return {'type': 'button', 'name': title, 'icon': icon, 'icon_height': '32px',
+                'grid_options': {'columns': 12, 'rows': 2},
+                'tap_action': {'action': 'navigate', 'navigation_path': '/' + url_path + '/' + path}}
+
     def view(title, path, sections, parent=None):
-        result = {"title": title, "path": path, "type": "sections", "sections": sections}
+        result = {'title': title, 'path': path, 'type': 'sections', 'max_columns': 3, 'sections': sections}
         if parent:
-            result.update(subview=True, back_path="/" + url_path + "/" + parent)
+            result.update(subview=True, back_path='/' + url_path + '/' + parent)
         return result
+
     def grid(cards, title=None):
-        return {"type": "grid", "cards": cards, **({"title": title} if title else {})}
-    room_links, details = {}, []
-    for i, (room, cards) in enumerate(sorted(rooms.items())):
-        path = "stanza-" + str(i)
-        floor = room.rsplit(" / ", 1)[0] if " / " in room else "Ambienti"
-        room_links.setdefault(floor, []).append(button(room, path, "mdi:door"))
-        history = [c["entity"] for c in cards if c.get("entity") and not c["entity"].startswith("input_button.")]
-        history += ["sensor." + c["entity"].split(".", 1)[1] + "_temperature"
-                    for c in cards if c.get("entity", "").startswith("climate.")]
-        history = list(dict.fromkeys(history))
-        sections = [grid(cards)]
-        if history:
-            sections.append(grid([{"type": "markdown", "content": "### Storico 48 ore\nRichiede Recorder attivo per queste entità. I periodi non registrati non possono essere ricostruiti."},
-                *[{"type": "history-graph", "entities": history[i:i+12], "hours_to_show": 48}
-                  for i in range(0, len(history), 12)]], "Andamento"))
-        details.append(view(room, path, sections, "ambienti"))
+        headings = [{'type': 'heading', 'heading': title, 'heading_style': 'title'}] if title else []
+        return {'type': 'grid', 'cards': headings + cards}
+
+    floors, details = {}, []
+    for room in rooms:
+        key, label = _location(room)
+        floors.setdefault(key, []).append(room)
+    buildings = {key[0] for key in floors if key}
+
+    def floor_title(key):
+        name = _floor_name(key)
+        return key[0] + ' · ' + name if key and len(buildings) > 1 else name
+
+    def floor_order(key):
+        ranks = {'interrato': 0, 'seminterrato': 1, 'terra': 2, 'primo': 3, 'secondo': 4}
+        return (key[0] if key else '~', ranks.get(_floor_name(key).lower(), 5), _floor_name(key))
+
+    floor_links = []
+    for key in sorted(floors, key=floor_order):
+        floor_path = route('piano', json.dumps(key))
+        floor_links.append(button(floor_title(key), floor_path, 'mdi:home-floor-0'))
+        zone_links = []
+        for room in sorted(floors[key]):
+            label = _location(room)[1]
+            path = route('stanza', room)
+            zone_links.append(button(label, path, _room_icon(label)))
+            sections = [grid(grouped[room], category) for category, grouped in categories.items() if room in grouped]
+            history = ['sensor.' + c['entity'].split('.', 1)[1] + '_temperature'
+                       if c['entity'].startswith('climate.') else c['entity']
+                       for c in rooms[room] if not c['entity'].startswith('input_button.')]
+            if history:
+                history_path = route('storico', room)
+                sections.append(grid([button('Storico 48 ore', history_path, 'mdi:chart-line')]))
+                details.append(view(label + ' · Storico', history_path, [grid([
+                    {'type': 'markdown', 'content': 'Storico 48 ore. Richiede Recorder attivo; i periodi non registrati non sono ricostruibili.'},
+                    *[{'type': 'history-graph', 'entities': history[i:i+12], 'hours_to_show': 48}
+                      for i in range(0, len(history), 12)]])], path))
+            details.append(view(label, path, sections, floor_path))
+        details.append(view(floor_title(key), floor_path,
+                            [grid(zone_links[i:i+6]) for i in range(0, len(zone_links), 6)], 'ambienti'))
+
     function_links = []
-    for i, (category, grouped) in enumerate(categories.items()):
-        path = "funzione-" + str(i)
+    for category, grouped in categories.items():
+        path = route('funzione', category)
         function_links.append(button(category, path))
-        links = []
-        for j, (room, cards) in enumerate(sorted(grouped.items())):
-            filtered = path + "-stanza-" + str(j)
-            links.append(button(room, filtered, "mdi:filter"))
-            details.append(view(category + " - " + room, filtered, [grid(cards)], path))
-        details.append(view(category, path, [grid(links, "Filtra per ambiente"),
-            *[grid(cards, room) for room, cards in sorted(grouped.items())]], "funzioni"))
-    lights = [c["entity"] for cards in categories.get("Luci", {}).values() for c in cards]
-    covers = [c["entity"] for cards in categories.get("Motorizzazioni", {}).values() for c in cards]
-    climates = [c["entity"] for cards in categories.get("Clima", {}).values() for c in cards]
+        sections = []
+        for key in sorted(floors, key=floor_order):
+            for room in sorted(floors[key]):
+                if room in grouped:
+                    sections.append(grid(grouped[room], floor_title(key) + ' · ' + _location(room)[1]))
+        details.append(view(category, path, sections, 'funzioni'))
+
+    lab_sections = [grid([{'type': 'markdown', 'content': '## Strumenti LAB\nValori simulati, nessun comando KNX. Posizioni istantanee; scene: solo richiamo.'}])]
+    for room, rows in sorted(controls.items()):
+        key, label = _location(room)
+        lab_sections.append(grid([{'type': 'entities', 'entities': rows, 'show_header_toggle': False}],
+                                 floor_title(key) + ' · ' + label))
+    details.append(view('Strumenti LAB', 'strumenti-lab', lab_sections, 'panoramica'))
     overview = []
-    for ids, states, title in [(lights, ["on"], "Luci accese"), (covers, ["open", "opening"], "Motorizzazioni aperte")]:
+    for category, states, title in [('Luci', ['on'], 'Luci accese'),
+                                     ('Motorizzazioni', ['open', 'opening'], 'Motorizzazioni aperte')]:
+        ids = [{'entity': c['entity'], 'name': c['name']} for cards in categories.get(category, {}).values() for c in cards]
         if ids:
-            overview.append({"type": "entity-filter", "entities": ids, "state_filter": states,
-                             "show_empty": False, "card": {"type": "entities", "title": title}})
-    if climates:
-        overview.append({"type": "entities", "entities": climates, "title": "Clima"})
-    dashboard = {"title": "NM Control LAB", "views": [
-        view("Home", "panoramica", [grid([notice, button("Ambienti", "ambienti"), button("Funzioni", "funzioni")]),
-                                     *([grid(overview)] if overview else [])]),
-        view("Ambienti", "ambienti", [grid(cards, floor) for floor, cards in room_links.items()]),
-        view("Funzioni", "funzioni", [grid(function_links)]), *details]}
-    return {"dashboard": dashboard, "fingerprint": hashlib.sha256(json.dumps(dashboard, sort_keys=True).encode()).hexdigest(),
-            "summary": {"tiles": total, "rooms": len(rooms), "placeholders": len(warnings)}, "warnings": warnings,
-            "url_path": url_path, "knx_traffic": False}
+            overview.append({'type': 'entity-filter', 'entities': ids, 'state_filter': states,
+                             'show_empty': False, 'card': {'type': 'entities', 'title': title, 'show_header_toggle': False}})
+    dashboard = {'title': 'NM Control LAB', 'views': [
+        view('Home', 'panoramica', [grid([
+            {'type': 'markdown', 'content': '# La casa\nLaboratorio virtuale · ' + str(total) + ' entità'},
+            button('Ambienti', 'ambienti', 'mdi:floor-plan'),
+            button('Funzioni', 'funzioni', 'mdi:lightbulb-group-outline'),
+            button('Strumenti LAB', 'strumenti-lab', 'mdi:flask-outline')]),
+            *([grid(overview)] if overview else [])]),
+        view('Ambienti', 'ambienti', [grid(floor_links, 'Scegli il piano')]),
+        view('Funzioni', 'funzioni', [grid(function_links, 'Scegli la categoria')]), *details]}
+    return {'dashboard': dashboard, 'fingerprint': hashlib.sha256(json.dumps(dashboard, sort_keys=True).encode()).hexdigest(),
+            'summary': {'tiles': total, 'rooms': len(rooms), 'placeholders': len(warnings)}, 'warnings': warnings,
+            'url_path': url_path, 'knx_traffic': False}
 
 
 def publish(payload, entities, client_factory=HAWebSocket):

@@ -15,7 +15,8 @@ except ImportError:
 
 
 URL_PATH = re.compile(r"^nm-studio-[a-z0-9-]{3,52}$")
-MAX_VIEWS = 512
+# Up to 200 zones, each with a floor, controls and history view.
+MAX_VIEWS = 640
 
 
 class PublishError(ValueError):
