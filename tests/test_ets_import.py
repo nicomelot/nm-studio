@@ -3,7 +3,7 @@ import unittest
 import zipfile
 from xml.sax.saxutils import escape
 
-from nm_bridge.ets_import import preview, dimmer_fields, climate_suggestions, channel_suggestions
+from nm_bridge.ets_import import preview, dimmer_fields, climate_suggestions, climate_zone_suggestions, channel_suggestions
 
 
 def archive_with_addresses(entries, linked=()):
@@ -20,6 +20,29 @@ def archive_with_addresses(entries, linked=()):
 
 
 class ETSImportTests(unittest.TestCase):
+    def test_climate_zones_do_not_require_installers_room_mnemonics(self):
+        role_names = [(0, "Temperatura ambiente", "DPST-9-1"),
+                      (1, "setpoint attuale", "DPST-9-1"),
+                      (2, "setpoint manuale", "DPST-9-1"),
+                      (4, "modo hvac in", "DPST-20-102"),
+                      (5, "modo hvac stato", "DPST-20-102"),
+                      (7, "estate inverno out", "DPST-1-100")]
+        items = [{"address": f"2/3/{i}", "name": name, "dpt": dpt, "linked": True}
+                 for i, name, dpt in role_names]
+        result = climate_zone_suggestions(items, set())
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["command"], "2/3/2")
+        self.assertEqual(result[0]["temperature"], "2/3/0")
+        self.assertEqual(result[0]["operation_mode_state"], "2/3/5")
+        self.assertEqual(result[0]["heat_cool_state"], "2/3/7")
+        self.assertNotIn("heat_cool", result[0])
+        self.assertEqual(result[0]["room"], "Da assegnare")
+        self.assertEqual(climate_zone_suggestions(items, {"2/3/2"}), [])
+        self.assertEqual(climate_zone_suggestions([a for a in items if a["address"] != "2/3/5"], set()), [])
+        wrong = [dict(a, dpt="DPST-5-1") if a["address"] == "2/3/2" else a for a in items]
+        self.assertEqual(climate_zone_suggestions(wrong, set()), [])
+        self.assertEqual(climate_zone_suggestions(items + [dict(items[2], address="2/3/8")], set()), [])
+
     def test_generic_channel_names_infer_light_dimmer_and_cover(self):
         raw = [
             ("0/0/1", "CH-1 - Switching : OnOff", "DPST-1-1"),
