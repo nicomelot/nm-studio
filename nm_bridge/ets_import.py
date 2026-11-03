@@ -7,10 +7,10 @@ import zipfile
 import xml.etree.ElementTree as ET
 try:
     from .ets_rooms import extract_functions, room_matches
-    from .recognition import review_suggestions
+    from .recognition import review_suggestions, hvac_address_inventory
 except ImportError:  # The add-on runs the modules directly from /app.
     from ets_rooms import extract_functions, room_matches
-    from recognition import review_suggestions
+    from recognition import review_suggestions, hvac_address_inventory
 
 MAX_ARCHIVE = 8 * 1024 * 1024
 MAX_XML = 12 * 1024 * 1024
@@ -520,5 +520,6 @@ def preview(raw):
         matches = room_matches(suggestions[:300], items, building_spaces, functions)
         return {"project_key": project_key, "addresses": items, "devices": device_inventory, "suggestions": suggestions[:300],
                 "recognition_reviews": review_suggestions(items, suggestions),
+                "hvac_inventory": hvac_address_inventory(items),
                 "building": building_spaces, "functions": functions, "room_matches": matches, "total": len(items),
                 "warning": "Tipi e abbinamenti sono ipotesi, non verifiche ETS. DPT mancanti da controllare. Nessun dato salvato."}
