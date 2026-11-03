@@ -1,5 +1,12 @@
 # NM Studio – Registro versioni
 
+## 5.8.3
+
+- Aumentato da 8 a 16 MB il limite di caricamento dei progetti `.knxproj` sia nell'importatore ETS sia nel confronto con i widget; controllo coerente anche sul server.
+- Riconoscimento preliminare di circuiti ETS strutturati sulla base di ruoli e DPT verificabili, senza dipendere da mnemonici specifici L/T/Z: comandi e feedback sono raggruppati solo se univoci.
+- Provati i file reali `LOSINE - NM CONTROL LAB` (34 GA) e `O.I.P.` (96 GA, archivio da circa 9,6 MB). Le proposte restano in anteprima e richiedono conferma dell'installatore.
+- I cataloghi prodotto compressi molto grandi non vengono espansi nella lettura dei GA: la dimensione del file compresso non equivale alla dimensione massima dei singoli XML estraibili.
+
 ## 5.8.2
 
 - Nel report di importazione ETS aggiunto un inventario preliminare HVAC/VMC dei GA con indizi di temperatura, setpoint, ventole, flap, modalità, umidità e ventilazione.
