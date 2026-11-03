@@ -319,6 +319,58 @@ def climate_suggestions(items, used_commands, existing=None):
     return results
 
 
+def climate_zone_suggestions(items, used_commands):
+    """Recognize a repeated thermostat GA block without requiring a room mnemonic.
+
+    Each ETS middle group must contain unique, linked ambient, manual target,
+    current target and HVAC mode fields with the right DPT. Their common middle
+    address is evidence of a functional cluster, NOT an assertion of room.
+    """
+    groups = {}
+    for item in items:
+        if not item.get("linked"):
+            continue
+        address = item.get("address", "")
+        if not re.fullmatch(r"\d+/\d+/\d+", address):
+            continue
+        groups.setdefault(address.rsplit("/", 1)[0], []).append(item)
+
+    roles = (
+        ("temperature", r"^temperatura\s+ambiente\b", "DPST-9-1"),
+        ("command", r"^setpoint\s+manuale\b", "DPST-9-1"),
+        ("target_temperature_state", r"^setpoint\s+attuale\b", "DPST-9-1"),
+        ("operation_mode", r"^modo\s+hvac\s+in\b", "DPST-20-102"),
+        ("operation_mode_state", r"^modo\s+hvac\s+stato\b", "DPST-20-102"),
+        ("heat_cool", r"^estate\s+inverno\s+in\b", "DPST-1-100"),
+        ("heat_cool_state", r"^estate\s+inverno\s+out\b", "DPST-1-100"),
+    )
+    proposals = []
+    for group, addresses in groups.items():
+        found = {}
+        for field, pattern, dpt in roles:
+            matched = [a for a in addresses if re.search(pattern, a.get("name", ""), re.I)
+                       and a.get("dpt", "").upper() == dpt]
+            if len(matched) == 1:
+                found[field] = matched[0]["address"]
+            elif len(matched) > 1:
+                found[field] = None  # Ambiguous role must block the proposal.
+        mandatory = ("temperature", "command", "target_temperature_state",
+                     "operation_mode", "operation_mode_state")
+        if any(not found.get(key) for key in mandatory) or found["command"] in used_commands:
+            continue
+        # Only a true named input is a command; never turn an unlinked GA into one.
+        # An individual thermostat need not have its own writable season object.
+        source = next(a for a in addresses if a["address"] == found["temperature"])
+        suffix = re.sub(r"^temperatura\s+ambiente\b", "", source["name"], flags=re.I).strip()
+        label = suffix.upper() if suffix else group.replace("/", "-")
+        proposal = {"name": "TERMOSTATO " + label, "kind": "climate",
+                    **{key: value for key, value in found.items() if value},
+                    "room": "Da assegnare", "confidence": "media",
+                    "reason": "Blocco HVAC ETS coerente per DPT e gruppo; ambiente e direzioni da verificare"}
+        proposals.append(proposal)
+    return proposals
+
+
 def channel_suggestions(items, used_commands):
     """Infer standard ETS channel naming without assuming a manufacturer's brand.
 
@@ -602,6 +654,7 @@ def preview(raw):
                             endpoint["kind"] = kind
         suggestions.extend(cover_suggestions(items, {x["command"] for x in suggestions}))
         suggestions.extend(climate_suggestions(items, {x["command"] for x in suggestions}, suggestions))
+        suggestions.extend(climate_zone_suggestions(items, {x["command"] for x in suggestions}))
         suggestions.extend(channel_suggestions(items, {x["command"] for x in suggestions}))
         dimmer_fields(items, suggestions)
         structured, covered_addresses = structured_suggestions(items)
