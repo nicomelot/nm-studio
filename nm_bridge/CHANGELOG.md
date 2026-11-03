@@ -1,5 +1,12 @@
 # NM Studio – Registro versioni
 
+## 5.8.2
+
+- Nel report di importazione ETS aggiunto un inventario preliminare HVAC/VMC dei GA con indizi di temperatura, setpoint, ventole, flap, modalità, umidità e ventilazione.
+- Il riconoscimento si basa solo sui nomi ETS e sugli oggetti collegati, senza attribuire automaticamente la codifica dei valori proprietari di Zennio, Daikin o Intesis.
+- Le proposte HVAC/VMC sono soltanto diagnostiche: nessuna entità, configurazione o telegramma viene creato o modificato.
+- Aggiunti test di regressione per il riconoscimento HVAC e la presenza di tutti i moduli Python nell'immagine.
+
 ## 5.8.1
 
 - Corretto il crash all'avvio dell'app: il Dockerfile ora include `recognition.py`, necessario per l'analisi ETS introdotta nella 5.8.0.
