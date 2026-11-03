@@ -9,12 +9,14 @@ import hashlib
 import os
 import re
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 
 MAX_ZONES = 30
 GA = re.compile(r"^(?:[0-9]|[12][0-9]|3[01])/[0-7]/(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$")
 TARGET_NAME = "nm_lab_virtual.yaml"
+INCLUDE_LINE = "  packages: !include_dir_named packages"
 
 
 def _zones(payload):
@@ -97,6 +99,97 @@ def inspect(payload, root="/homeassistant"):
             "packages_enabled": enabled, "target": "packages/" + TARGET_NAME,
             "write_scope": "Solo package NM Lab; configuration.yaml non viene modificato",
             "restart_required": True}
+
+
+def _configuration_change(root):
+    """Prepare a minimal, auditable edit; refuse complex/ambiguous YAML.
+
+    We do not parse arbitrary Home Assistant YAML tags, so only insert into a
+    conventional top-level `homeassistant:` mapping or create that mapping.
+    """
+    root, _, _ = _paths(root)
+    config = root / "configuration.yaml"
+    if not config.is_file() or config.is_symlink() or not 0 < config.stat().st_size <= 256_000:
+        raise ValueError("configuration.yaml assente, simbolico o troppo grande")
+    original = config.read_bytes()
+    try:
+        source = original.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("configuration.yaml non è UTF-8") from exc
+    newline = "\r\n" if b"\r\n" in original else "\n"
+    lines = source.splitlines(keepends=True)
+    active = [(i, line.rstrip("\r\n")) for i, line in enumerate(lines)
+              if line.strip() and not line.lstrip().startswith("#")]
+    # A pre-existing packages key may have a custom include, or come from a
+    # merge. Never change or override it without installer inspection.
+    if any(re.match(r"^\s*packages\s*:", line) for _, line in active):
+        raise ValueError("Esiste già una voce packages: verifica manuale necessaria")
+    candidates = [(i, line) for i, line in active if re.match(r"^homeassistant\s*:", line)]
+    if len(candidates) > 1 or (candidates and candidates[0][1].strip() != "homeassistant:"):
+        raise ValueError("Struttura homeassistant non standard: nessuna modifica eseguita")
+    if candidates:
+        pos = candidates[0][0] + 1
+        # Only insert if the following meaningful item is nested or another
+        # top-level key; a multiline scalar would make this unsafe.
+        for next_line in lines[pos:]:
+            if next_line.strip() and not next_line.lstrip().startswith("#"):
+                if next_line.startswith(("|", ">")):
+                    raise ValueError("Configurazione non standard")
+                break
+        proposed = "".join(lines[:pos]) + INCLUDE_LINE + newline + "".join(lines[pos:])
+    else:
+        proposed = "homeassistant:" + newline + INCLUDE_LINE + newline + newline + source
+    return config, original, proposed.encode("utf-8")
+
+
+def packages_setup_preview(root="/homeassistant"):
+    root, _, _ = _paths(root)
+    config = root / "configuration.yaml"
+    if config.is_file() and not config.is_symlink():
+        raw = config.read_text(encoding="utf-8")
+        if re.search(r"(?m)^homeassistant:\s*$", raw) and re.search(
+                r"(?m)^\s+packages:\s*!include_dir_named\s+packages\s*(?:#.*)?$", raw):
+            return {"already_enabled": True, "ready": True, "preview": "Nessuna modifica necessaria"}
+    _, before, after = _configuration_change(root)
+    return {"already_enabled": False, "ready": True,
+            "expected_sha256": hashlib.sha256(before).hexdigest(),
+            "preview": "Aggiungi a configuration.yaml:\n" + "homeassistant:\n" + INCLUDE_LINE,
+            "before_bytes": len(before), "after_bytes": len(after),
+            "backup_required": True, "restart_required": True}
+
+
+def enable_packages(payload, root="/homeassistant", backup_root="/data/nm_lab_backups"):
+    if not isinstance(payload, dict) or payload.get("confirm") is not True:
+        raise ValueError("Conferma esplicita obbligatoria")
+    config, before, after = _configuration_change(root)
+    expected = hashlib.sha256(before).hexdigest()
+    if payload.get("expected_sha256") != expected:
+        raise ValueError("configuration.yaml modificato dopo l'anteprima: ripeti la verifica")
+    backups = Path(backup_root)
+    backups.mkdir(parents=True, exist_ok=True)
+    if backups.is_symlink() or not backups.is_dir():
+        raise ValueError("Percorso backup non sicuro")
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    backup = backups / f"configuration-{stamp}-{expected[:12]}.yaml"
+    with backup.open("xb") as file:
+        file.write(before);file.flush();os.fsync(file.fileno())
+    _, packages, _ = _paths(root)
+    packages.mkdir(exist_ok=True)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile("wb", dir=config.parent, prefix=".nm_lab_config_", delete=False) as file:
+            temporary = Path(file.name)
+            file.write(after);file.flush();os.fsync(file.fileno())
+        os.chmod(temporary, config.stat().st_mode & 0o777)
+        # Defend against a config changed between preview and the final write.
+        if config.is_symlink() or hashlib.sha256(config.read_bytes()).hexdigest() != expected:
+            raise ValueError("configuration.yaml modificato durante il salvataggio")
+        os.replace(temporary, config)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+    return {"enabled": True, "backup_created": True, "restart_required": True,
+            "message": "Verifica YAML e riavvia Home Assistant; nessun riavvio automatico"}
 
 
 def install(payload, root="/homeassistant"):
