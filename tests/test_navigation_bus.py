@@ -59,7 +59,7 @@ class BusTests(unittest.TestCase):
             self.assertIsNone(saved[0]['value'])
             self.assertEqual(r.snapshot('1/2/4')['items'], [])
             with r._db() as db:
-                db.executemany('INSERT INTO events(destination,payload) VALUES (?,?)', [('1/2/3', json.dumps(saved[0]))] * 10010)
+                db.executemany('INSERT INTO events(destination,payload,received) VALUES (?,?,?)', [('1/2/3', json.dumps(saved[0]), __import__('time').time())] * 10010)
             r.record(event)
             with r._db() as db:
                 self.assertEqual(db.execute('SELECT COUNT(*) FROM events').fetchone()[0], 10000)
@@ -85,3 +85,23 @@ class BusTests(unittest.TestCase):
             self.assertEqual(client.calls[1][1]['service'], 'event_register')
             self.assertEqual(r.status, 'stopped')
             self.assertEqual(len(r.snapshot()['items']), 1)
+
+
+class BusQueryTests(unittest.TestCase):
+    def test_retention_source_time_and_pagination(self):
+        import time
+        from datetime import datetime, timezone, timedelta
+        with tempfile.TemporaryDirectory() as folder:
+            r=Recorder(Path(folder)/'events.db'); r.selected=['1/2/3']
+            r.record({'data':{'destination':'1/2/3','source':'1.1.10','value':1}})
+            with r._db() as db:
+                payload=db.execute('SELECT payload FROM events').fetchone()[0]
+                db.execute('INSERT INTO events(destination,payload,received) VALUES (?,?,?)',('1/2/3',payload,time.time()-49*3600))
+                db.executemany('INSERT INTO events(destination,payload,received) VALUES (?,?,?)',[('1/2/3',payload,time.time())]*501)
+            page=r.snapshot(source='1.1.10'); self.assertEqual(len(page['items']),500)
+            self.assertEqual(len(r.snapshot(before=page['next_cursor'])['items']),2)
+            self.assertEqual(r.snapshot(source='1.1.11')['items'],[])
+            future=(datetime.now(timezone.utc)+timedelta(hours=1)).isoformat()
+            self.assertEqual(r.snapshot(start=future)['items'],[])
+            with r._db() as db: self.assertEqual(db.execute('SELECT COUNT(*) FROM events').fetchone()[0],502)
+            with self.assertRaises(ValueError): r.snapshot(start='2026-11-05T10:00:00')

@@ -1,3 +1,16 @@
+## 5.15.0 — Percorso reale, aggiornamento dashboard e diagnostica
+
+- Barra persistente con Salva bozza e Salva e continua alle associazioni.
+- Riepilogo delle modifiche non salvate e del primo campo da completare.
+- Controllo di nomi, ambienti, GA essenziali e comandi duplicati prima di continuare.
+- Dettagli KNX, anteprime e strumenti manuali richiudibili.
+- Aggiunta ETS con nome esplicito e apertura della funzione appena aggiunta.
+- Avviso di uscita con modifiche ai widget o alla struttura non salvate.
+- Aggiornamento esplicito della dashboard reale del progetto: confronto completo prima/dopo, backup persistente prima della scrittura, copia scaricabile e rilettura di verifica. Le personalizzazioni manuali sono sostituite, non unite.
+- Confronto delle impronte per bloccare modifiche alla sorgente o alla dashboard successive all’anteprima. Nessun rollback automatico che possa sovrascrivere modifiche concorrenti.
+- Registro passivo: finestra massima di 48 ore dalla ricezione (limite 10000 eventi), ricerca per mittente/GA/intervallo, paginazione e esportazione della prima pagina filtrata.
+- Il registro richiede ancora riattivazione dopo riavvio/disconnessione. Accesso remoto e nuovi adattatori di protocollo restano da completare e collaudare.
+
 ## 5.14.0
 
 - Confronto del progetto ETS aperto con i widget salvati: recupero selettivo delle funzioni riconosciute ma mancanti, senza sostituire nomi, stanze o associazioni esistenti.

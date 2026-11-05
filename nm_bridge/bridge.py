@@ -19,7 +19,7 @@ from backend_checks import inspect_configuration, export_backup
 from ha_generator import generate as ha_knx_preview, validate_evidence
 from nm_link import read_links, save_links, analyze as analyze_links, simulate as simulate_link
 from lovelace_generator import generate as generate_dashboard
-from dashboard_publisher import publish as publish_dashboard
+from dashboard_publisher import publish as publish_dashboard, preview_update as preview_dashboard_update, update_existing as update_dashboard_existing
 from entity_matcher import suggest as suggest_entities
 from missing_ha_generator import preview as preview_missing_ha, review as review_missing_ha
 from deployment_preflight import preflight as deployment_preflight
@@ -195,8 +195,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.respond(400, "application/json", b'{"error":"Progetto non disponibile"}')
         elif path == "/bus-log":
             try:
-                ga = parse_qs(urlsplit(self.path).query).get("ga", [None])[0]
-                self.respond(200, "application/json; charset=utf-8", json.dumps(BUS_RECORDER.snapshot(ga)).encode())
+                query = parse_qs(urlsplit(self.path).query)
+                filters = {key: query.get(key, [None])[0] for key in ("ga", "source", "start", "end", "before")}
+                self.respond(200, "application/json; charset=utf-8", json.dumps(BUS_RECORDER.snapshot(**filters)).encode())
             except (OSError, ValueError, RuntimeError, sqlite3.Error):
                 self.respond(500, "application/json", b'{"error":"Registro non disponibile"}')
         elif path == "/entities":
@@ -367,7 +368,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?", 1)[0]
-        if self.client_address[0] != INGRESS_PROXY or path not in ("/knx/history", "/lab/dashboard-existing", "/lab/dashboard-update", "/projects/save", "/bus-log/start", "/bus-log/stop", "/layout", "/modules/plan", "/floorplans", "/floorplans/dashboard-publish", "/ets/preview", "/knx/approved", "/audit", "/knx/widgets", "/knx/ha-preview", "/knx/yaml-audit", "/dashboard/missing-ha/review", "/dashboard/deployment-preflight", "/knx/panel-create-plan", "/knx/panel-create-one", "/dashboard/publish", "/migration/restore", "/nm-link", "/nm-link/preview", "/nm-link/simulate", "/lab/preview", "/lab/install", "/lab/replace", "/lab/packages-preview", "/lab/packages-enable", "/lab/dashboard-preview", "/lab/dashboard-publish"):
+        if self.client_address[0] != INGRESS_PROXY or path not in ("/knx/history", "/lab/dashboard-existing", "/lab/dashboard-update", "/projects/save", "/bus-log/start", "/bus-log/stop", "/layout", "/modules/plan", "/floorplans", "/floorplans/dashboard-publish", "/ets/preview", "/knx/approved", "/audit", "/knx/widgets", "/knx/ha-preview", "/knx/yaml-audit", "/dashboard/missing-ha/review", "/dashboard/deployment-preflight", "/knx/panel-create-plan", "/knx/panel-create-one", "/dashboard/publish", "/dashboard/update-preview", "/dashboard/update", "/migration/restore", "/nm-link", "/nm-link/preview", "/nm-link/simulate", "/lab/preview", "/lab/install", "/lab/replace", "/lab/packages-preview", "/lab/packages-enable", "/lab/dashboard-preview", "/lab/dashboard-publish"):
             self.send_error(403)
             return
         # Ingress protects access; these checks also reject cross-site form POSTs.
@@ -427,6 +428,10 @@ class Handler(BaseHTTPRequestHandler):
                 data = restore_migration(request.get("bundle"), CONFIG_PATH, validate_layout,
                                          confirm=request.get("confirm") is True,
                                          overwrite=request.get("overwrite") is True)
+            elif path == "/dashboard/update-preview":
+                data = preview_dashboard_update(json.loads(body), read_widget_layout(), get_entities())
+            elif path == "/dashboard/update":
+                data = update_dashboard_existing(json.loads(body), read_widget_layout(), get_entities())
             elif path == "/dashboard/publish":
                 data = publish_dashboard(json.loads(body), read_widget_layout(), get_entities())
             elif path == "/lab/preview":

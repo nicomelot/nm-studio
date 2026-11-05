@@ -66,3 +66,48 @@ test('recovery script is served, packaged and used in the guided widgets page',(
  assert.match(html,/<script src="recovery_ui.js"><\/script>/);
  assert.match(html,/wireWidgetPersistence\(\);wireRecovery\(\)/);
 });
+
+
+test('progression requires names, rooms and mandatory commands, not an existing HA entity',()=>{
+ const c=fixture();c.widgetFields.light=[['command','Comando','DPT 1',true],['feedback','Stato','DPT 1',false]];
+ const draft={kind:'light',name:'L5',room:'Esterno',fields:{command:'1/1/8'},entity_id:''};
+ assert.equal(c.widgetFlowIssues([draft]).length,0);
+ assert.match(c.widgetFlowIssues([{...draft,room:'Da assegnare'}])[0].message,/stanza/);
+ assert.match(c.widgetFlowIssues([{...draft,fields:{}}])[0].message,/Comando/);
+ assert.match(c.widgetFlowIssues([{...draft,name:''}])[0].message,/nome/);
+ assert.equal(c.widgetFlowIssues([]).length,1);
+});
+test('duplicate commands block progression without changing drafts or bindings',()=>{
+ const c=fixture();const drafts=[...c.widgetDrafts,{...c.widgetDrafts[0],name:'Duplicato'}];
+ const before=JSON.stringify(drafts);
+ assert.match(c.widgetFlowIssues(drafts)[0].message,/duplicato/);
+ assert.equal(JSON.stringify(drafts),before);
+});
+
+
+function updateHarness(){
+ const ids={}, calls=[];
+ const element=()=>({disabled:false,value:'',textContent:'',innerHTML:'',before(){},addEventListener(name,fn){this[name]=fn;}});
+ const $=id=>ids[id]??=element();
+ const preview={url_path:'nm-studio-test',expected_current:'old',expected_fingerprint:'new',dashboard:{views:[]},previous_dashboard:{views:[{title:'Old'}]},changed:true,old_views:1,new_views:2,notice:'Backup'};
+ const c={$,document:{createElement:element},widgetDirty:false,structureDirty:false,nmDashboardDraft:{dashboard:{views:[]}},confirm:()=>true,
+ api:async(path,opts)=>{calls.push({path,body:JSON.parse(opts.body)});return path.endsWith('update-preview')?preview:{updated:true,backup:'test.json'};}};
+ $('dash-publish-path').value='nm-studio-test';$('dash-code').value=JSON.stringify(c.nmDashboardDraft.dashboard,null,2);
+ vm.createContext(c);vm.runInContext(source,c);c.wireRealDashboardUpdate();
+ return {c,ids,calls};
+}
+test('real dashboard update requires comparison and sends both reviewed fingerprints',async()=>{
+ const h=updateHarness();
+ await h.ids['real-update-apply'].onclick();assert.equal(h.calls.length,0);
+ await h.ids['real-update-preview'].onclick();assert.equal(h.ids['real-update-apply'].disabled,false);
+ await h.ids['real-update-apply'].onclick();
+ assert.equal(h.calls[1].path,'dashboard/update');assert.equal(h.calls[1].body.expected_current,'old');
+ assert.equal(h.calls[1].body.expected_fingerprint,'new');assert.equal(h.ids['real-update-apply'].disabled,true);
+});
+test('changing preview or cancelling confirmation prevents update',async()=>{
+ const h=updateHarness();await h.ids['real-update-preview'].onclick();
+ h.c.confirm=()=>false;await h.ids['real-update-apply'].onclick();assert.equal(h.calls.length,1);
+ h.ids['dash-publish-path'].input();h.c.confirm=()=>true;
+ await h.ids['real-update-apply'].onclick();assert.equal(h.calls.length,1);
+ assert.equal(h.ids['real-update-apply'].disabled,true);
+});

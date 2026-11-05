@@ -110,3 +110,89 @@ class DashboardPublisherTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+
+class DashboardUpdateTests(unittest.TestCase):
+    def setup_update(self):
+        from nm_bridge.dashboard_publisher import preview_update
+        generated = generate(LAYOUT, ENTITIES)
+        fake = FakeClient(existing=[generated['url_path']])
+        fake.saved = {'title': 'Nome cliente', 'views': [{'title': 'Personalizzata', 'cards': []}]}
+        request = {'url_path': generated['url_path']}
+        preview = preview_update(request, LAYOUT, ENTITIES, lambda: fake)
+        return fake, {**request, 'confirm': True, 'expected_current': preview['expected_current'],
+                      'expected_fingerprint': preview['expected_fingerprint']}
+
+    def test_preview_does_not_write_and_backup_precedes_save(self):
+        import tempfile
+        from pathlib import Path
+        from nm_bridge.dashboard_publisher import update_existing
+        fake, payload = self.setup_update()
+        before = json.loads(json.dumps(fake.saved))
+        self.assertNotIn('lovelace/config/save', [c[0] for c in fake.calls])
+        with tempfile.TemporaryDirectory() as directory:
+            original_call = fake.call
+            def checked(method, **kw):
+                if method == 'lovelace/config/save':
+                    files = list(Path(directory).glob('*.json'))
+                    self.assertEqual(len(files), 1)
+                    self.assertEqual(json.loads(files[0].read_text(encoding='utf-8'))['config'], before)
+                return original_call(method, **kw)
+            fake.call = checked
+            result = update_existing(payload, LAYOUT, ENTITIES, lambda: fake, directory)
+            self.assertTrue(result['updated'])
+            self.assertEqual(fake.saved['title'], 'Nome cliente')
+            self.assertEqual(result['previous_dashboard'], before)
+            self.assertTrue((Path(directory)/result['backup']).is_file())
+
+    def test_changed_dashboard_or_source_cannot_overwrite(self):
+        import tempfile
+        from nm_bridge.dashboard_publisher import update_existing
+        for change in ['dashboard', 'source', 'confirmation', 'path']:
+            fake, payload = self.setup_update()
+            if change == 'dashboard': fake.saved['views'].append({'title': 'Nuova'})
+            if change == 'source': payload['expected_fingerprint'] = 'old'
+            if change == 'confirmation': payload['confirm'] = False
+            if change == 'path': payload['url_path'] = 'nm-studio-other-project'
+            with tempfile.TemporaryDirectory() as directory, self.assertRaises(PublishError):
+                update_existing(payload, LAYOUT, ENTITIES, lambda: fake, directory)
+            self.assertNotIn('lovelace/config/save', [c[0] for c in fake.calls])
+
+    def test_backup_failure_prevents_ha_write(self):
+        import tempfile
+        from pathlib import Path
+        from nm_bridge.dashboard_publisher import update_existing
+        fake, payload = self.setup_update()
+        with tempfile.TemporaryDirectory() as directory:
+            blocked = Path(directory)/'file'; blocked.write_text('existing')
+            with self.assertRaises(OSError):
+                update_existing(payload, LAYOUT, ENTITIES, lambda: fake, blocked)
+        self.assertNotIn('lovelace/config/save', [c[0] for c in fake.calls])
+
+    def test_write_failure_preserves_backup_and_does_not_delete(self):
+        import tempfile
+        from pathlib import Path
+        from nm_bridge.dashboard_publisher import update_existing
+        fake, payload = self.setup_update(); fake.fail = 'lovelace/config/save'
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(PublishError, 'Backup disponibile'):
+                update_existing(payload, LAYOUT, ENTITIES, lambda: fake, directory)
+            self.assertEqual(len(list(Path(directory).glob('*.json'))), 1)
+        self.assertNotIn('lovelace/dashboards/delete', [c[0] for c in fake.calls])
+
+    def test_change_during_backup_prevents_write(self):
+        import tempfile
+        from nm_bridge.dashboard_publisher import update_existing
+        fake, payload = self.setup_update(); original_call = fake.call; reads = 0
+        def changed(method, **kw):
+            nonlocal reads
+            value = original_call(method, **kw)
+            if method == 'lovelace/config':
+                reads += 1
+                if reads == 2: return {'views': [{'title': 'Concurrent edit'}]}
+            return value
+        fake.call = changed
+        with tempfile.TemporaryDirectory() as directory, self.assertRaisesRegex(PublishError, 'durante il backup'):
+            update_existing(payload, LAYOUT, ENTITIES, lambda: fake, directory)
+        self.assertNotIn('lovelace/config/save', [c[0] for c in fake.calls])

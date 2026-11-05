@@ -135,3 +135,100 @@ def publish_generated(payload, generated, client_factory=HAWebSocket):
     return {"created": True, "url_path": url_path, "title": title.strip(),
             "summary": generated["summary"], "warnings": generated["warnings"]}
 
+
+
+# Updating an existing real dashboard is a separate, previewed operation.
+# The create-only publisher above deliberately retains its original contract.
+import hashlib
+import tempfile
+import threading
+from pathlib import Path
+from datetime import datetime, timezone
+
+_UPDATE_LOCK = threading.Lock()
+BACKUP_DIR = Path('/data/dashboard_backups')
+
+
+def _digest(config):
+    return hashlib.sha256(json.dumps(config, sort_keys=True, ensure_ascii=False,
+                                     separators=(',', ':')).encode()).hexdigest()
+
+
+def _update_target(payload, generated):
+    path = payload.get('url_path') if isinstance(payload, dict) else None
+    if not isinstance(path, str) or not URL_PATH.fullmatch(path) or path != generated.get('url_path'):
+        raise PublishError('Seleziona la dashboard reale generata per questo progetto')
+    if not generated['summary']['tiles']:
+        raise PublishError('Nessuna entità reale associata: aggiornamento annullato')
+    return path
+
+
+def _read_current(client, path):
+    if path not in _listed_paths(client.call('lovelace/dashboards/list')):
+        raise PublishError('Dashboard non presente: usa Crea nuova dashboard')
+    current = client.call('lovelace/config', url_path=path)
+    if not isinstance(current, dict) or not isinstance(current.get('views'), list):
+        raise PublishError('Configurazione esistente non leggibile: nessuna modifica')
+    return current
+
+
+def _replacement(generated, current):
+    config = json.loads(json.dumps(generated['dashboard']))
+    # Keep the existing dashboard title; its sidebar metadata is not changed.
+    if 'title' in current:
+        config['title'] = current['title']
+    return config
+
+
+def preview_update(payload, layout, entities, client_factory=HAWebSocket):
+    generated = generate(layout, entities)
+    path = _update_target(payload, generated)
+    with client_factory() as client:
+        current = _read_current(client, path)
+    config = _replacement(generated, current)
+    return {'url_path': path, 'expected_current': _digest(current),
+            'expected_fingerprint': generated['fingerprint'],
+            'dashboard': config, 'previous_dashboard': current,
+            'changed': current != config, 'old_views': len(current['views']),
+            'new_views': len(config['views']), 'summary': generated['summary'],
+            'warnings': generated['warnings'],
+            'notice': 'La configurazione sarà sostituita. Le personalizzazioni manuali saranno conservate nel backup, non unite automaticamente.'}
+
+
+def update_existing(payload, layout, entities, client_factory=HAWebSocket, backup_dir=None):
+    if not isinstance(payload, dict) or payload.get('confirm') is not True:
+        raise PublishError('Conferma esplicita obbligatoria')
+    generated = generate(layout, entities)
+    path = _update_target(payload, generated)
+    if payload.get('expected_fingerprint') != generated['fingerprint']:
+        raise PublishError('Anteprima non aggiornata: ripeti il confronto')
+    with _UPDATE_LOCK, client_factory() as client:
+        current = _read_current(client, path)
+        if payload.get('expected_current') != _digest(current):
+            raise PublishError('Dashboard modificata dopo il confronto: ripeti anteprima')
+        config = _replacement(generated, current)
+        if current == config:
+            return {'updated': False, 'unchanged': True, 'url_path': path}
+        directory = Path(backup_dir) if backup_dir is not None else BACKUP_DIR
+        directory.mkdir(parents=True, exist_ok=True)
+        # Exclusive file, flush and fsync before any write to Home Assistant.
+        with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', suffix='.json',
+                                         prefix=path+'-', dir=directory, delete=False) as stream:
+            json.dump({'url_path': path, 'created_at': datetime.now(timezone.utc).isoformat(),
+                       'fingerprint': _digest(current), 'config': current}, stream, ensure_ascii=False)
+            stream.flush()
+            os.fsync(stream.fileno())
+            backup = Path(stream.name).name
+        # Narrow the race window for changes from HA's own editor.
+        if _digest(client.call('lovelace/config', url_path=path)) != _digest(current):
+            raise PublishError('Dashboard cambiata durante il backup: nessuna scrittura')
+        try:
+            client.call('lovelace/config/save', url_path=path, config=config)
+            stored = client.call('lovelace/config', url_path=path)
+            if stored != config:
+                raise PublishError('Il contenuto riletto non coincide con la configurazione inviata')
+        except Exception as exc:
+            raise PublishError('Aggiornamento non verificato. Backup disponibile: '+backup+
+                               '. Controlla la dashboard prima di riprovare. '+str(exc)[:140]) from exc
+    return {'updated': True, 'url_path': path, 'backup': backup,
+            'previous_dashboard': current, 'summary': generated['summary']}

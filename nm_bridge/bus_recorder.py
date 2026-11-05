@@ -4,7 +4,7 @@ import re
 import sqlite3
 import threading
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 try:
@@ -41,6 +41,16 @@ class Recorder:
         try:
             with db:
                 db.execute("CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, destination TEXT, payload TEXT)")
+                columns = {row[1] for row in db.execute("PRAGMA table_info(events)")}
+                if 'received' not in columns:
+                    db.execute("ALTER TABLE events ADD COLUMN received REAL NOT NULL DEFAULT 0")
+                    for event_id, payload in db.execute("SELECT id,payload FROM events").fetchall():
+                        try:
+                            received = datetime.fromisoformat(json.loads(payload)['received_at']).timestamp()
+                        except (ValueError, TypeError, KeyError):
+                            received = 0
+                        db.execute("UPDATE events SET received=? WHERE id=?", (received,event_id))
+                    db.execute("CREATE INDEX IF NOT EXISTS events_received ON events(received)")
                 yield db
         finally:
             db.close()
@@ -56,20 +66,39 @@ class Recorder:
         if len(encoded) > 4096:
             return
         with self._db() as db:
-            db.execute("INSERT INTO events(destination,payload) VALUES (?,?)", (row["destination"], encoded))
+            db.execute("INSERT INTO events(destination,payload,received) VALUES (?,?,?)", (row["destination"], encoded, datetime.fromisoformat(row["received_at"]).timestamp()))
+            db.execute("DELETE FROM events WHERE received < ?", ((datetime.now(timezone.utc)-timedelta(hours=48)).timestamp(),))
             db.execute("DELETE FROM events WHERE id <= (SELECT MAX(id)-10000 FROM events)")
 
-    def snapshot(self, ga=None):
+    def snapshot(self, ga=None, source=None, start=None, end=None, before=None):
+        def instant(value):
+            if not value: return None
+            parsed = datetime.fromisoformat(value.replace('Z', '+00:00'))
+            if parsed.tzinfo is None: raise ValueError('Indica il fuso orario')
+            return parsed.timestamp()
+        lower, upper = instant(start), instant(end)
+        if lower is not None and upper is not None and lower > upper:
+            raise ValueError('Intervallo temporale invertito')
         with self.lock:
             with self._db() as db:
-                if ga:
-                    rows = db.execute("SELECT payload FROM events WHERE destination=? ORDER BY id DESC LIMIT 500", (ga,))
-                else:
-                    rows = db.execute("SELECT payload FROM events ORDER BY id DESC LIMIT 500")
-                items = [json.loads(row[0]) for row in rows]
+                cutoff = (datetime.now(timezone.utc)-timedelta(hours=48)).timestamp()
+                db.execute("DELETE FROM events WHERE received < ?", (cutoff,))
+                clauses, args = [], []
+                if ga: clauses.append('destination=?'); args.append(ga)
+                if source: clauses.append("json_extract(payload,'$.source')=?"); args.append(source)
+                if lower is not None: clauses.append('received>=?'); args.append(lower)
+                if upper is not None: clauses.append('received<=?'); args.append(upper)
+                if before is not None:
+                    cursor = int(before)
+                    if cursor < 1: raise ValueError('Cursore non valido')
+                    clauses.append('id<?'); args.append(cursor)
+                where = ' WHERE '+' AND '.join(clauses) if clauses else ''
+                rows = db.execute('SELECT id,payload FROM events'+where+' ORDER BY id DESC LIMIT 501', args).fetchall()
+                items = [json.loads(row[1]) for row in rows[:500]]
             return {"status": self.status, "addresses": self.selected[:], "items": items,
-                    "knx_traffic": False, "limit": 10000,
-                    "note": "Eventi KNX osservati da HA; non prova di consegna ai dispositivi. Ultimi 500 su 10000 conservati. Dopo un riavvio riattivare la registrazione."}
+                    "next_cursor": rows[499][0] if len(rows)>500 else None,
+                    "knx_traffic": False, "limit": 10000, "retention_hours": 48,
+                    "note": "Eventi osservati da HA, non prova di consegna. Finestra massima 48 ore dalla ricezione, fino a 10000 eventi: con traffico elevato la copertura può essere inferiore. Pagina di 500 eventi. Dopo un riavvio riattivare la registrazione."}
 
     def start(self, payload):
         if not isinstance(payload, dict) or payload.get("confirm") is not True:
