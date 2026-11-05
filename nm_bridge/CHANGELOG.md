@@ -1,3 +1,11 @@
+## 5.14.0
+
+- Confronto del progetto ETS aperto con i widget salvati: recupero selettivo delle funzioni riconosciute ma mancanti, senza sostituire nomi, stanze o associazioni esistenti.
+- Ricerca per nome e indirizzo di gruppo. Gli altri GA non rappresentati sono consultabili e permettono la preparazione manuale di una funzione, con tipo scelto dall'installatore.
+- Proposte discordanti, indirizzi già utilizzati in campi ausiliari e GA senza collegamenti richiedono revisione manuale. I comandi assenti dalla nuova importazione vengono segnalati, mai eliminati.
+- Barra di percorso reale fra importazione, funzioni, associazioni, creazione delle entità mancanti e pubblicazione. Pulsante Salva e continua alle associazioni.
+- Il recupero prepara soltanto widget in bozza, senza duplicare entità HA né inviare comandi. Necessario aprire il progetto ETS corretto e salvare le funzioni prima di generare la dashboard.
+
 ## 5.13.0
 
 - Percorso Dashboard reale visibile nel menu e nell'avvio guidato: verifica widget, associa in blocco le entità esistenti, genera e pubblica la nuova plancia. Non occorre rinominare ID o eliminare dashboard.

@@ -343,6 +343,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.respond(400, "application/json", json.dumps({"error": str(exc)[:120]}).encode())
             except (OSError, json.JSONDecodeError):
                 self.respond(500, "application/json", b'{"error":"Review unavailable"}')
+        elif path == "/recovery_ui.js":
+            self.respond(200, "text/javascript; charset=utf-8", Path(__file__).with_name("recovery_ui.js").read_bytes())
         elif path == "/real_ui.js":
             self.respond(200, "text/javascript; charset=utf-8", Path(__file__).with_name("real_ui.js").read_bytes())
         elif path == "/lab_ui.js":
