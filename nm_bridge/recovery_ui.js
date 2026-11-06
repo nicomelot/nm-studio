@@ -209,7 +209,7 @@ function wireRealDashboardUpdate(){
  };
  apply.onclick=async()=>{
   if(busy||!preview||!preview.changed)return;
-  if(!confirm('Aggiornare /'+preview.url_path+'? La configurazione attuale sarà sostituita. Verrà salvato un backup completo prima della scrittura.'))return;
+  if(!confirm('Aggiornare /'+preview.url_path+'? Applicheremo il risultato del confronto conservando le personalizzazioni manuali. Verrà salvato un backup completo prima della scrittura.'))return;
   busy=true;apply.disabled=true;compare.disabled=true;
   try{
    const result=await post('dashboard/update',{confirm:true,url_path:preview.url_path,expected_current:preview.expected_current,expected_fingerprint:preview.expected_fingerprint});

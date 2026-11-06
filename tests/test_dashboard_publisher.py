@@ -279,3 +279,9 @@ class DashboardMergeTests(unittest.TestCase):
         self.assertEqual(card['tap_action']['perform_action'], 'light.turn_off')
         self.assertNotIn('entity', card)
         self.assertEqual(card['hold_action'], {'action': 'none'})
+
+    def test_legacy_custom_masonry_home_is_not_converted_to_sections(self):
+        from nm_bridge.dashboard_publisher import _merge_dashboard
+        current = {'views': [{'path': 'panoramica', 'cards': [{'type': 'button', 'name': 'Chiudi tutto'}]}]}
+        new = {'views': [{'path': 'panoramica', 'type': 'sections', 'sections': [{'type': 'grid', 'cards': []}]}]}
+        self.assertEqual(_merge_dashboard({}, current, new), current)

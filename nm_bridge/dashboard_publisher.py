@@ -1,7 +1,7 @@
-"""Explicit, create-only Home Assistant Lovelace publisher.
+"""Explicit Lovelace publishing and previewed updates preserving manual edits.
 
-The only writes are to a *new* storage-mode Lovelace dashboard. No KNX APIs,
-HA service calls, entity registry writes, or edits to existing dashboards.
+Never call KNX services or alter entity registries. Existing dashboard updates
+require a reviewed fingerprint and a durable backup before writing.
 """
 
 import json
@@ -201,6 +201,8 @@ def _merge_dashboard(base, current, new):
     if new == base or current == new:
         return current
     if all(isinstance(v, dict) for v in (base, current, new)):
+        if ('cards' in current and 'sections' in new) or ('sections' in current and 'cards' in new):
+            return current  # Preserve a manually chosen masonry/sections layout.
         result = dict(current)
         for key, value in new.items():
             if key not in current:
