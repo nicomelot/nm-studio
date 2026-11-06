@@ -24,19 +24,19 @@ def build(layout, request):
             raise ValueError('Dimmer: GA luminosità assoluta obbligatorio')
         if kind == 'cover' and not fields.get('stop'):
             raise ValueError('Tapparella: GA arresto obbligatorio per il collaudo')
-        data = {"name": item["name"].strip()}
+        data = {"entity": {"name": item["name"].strip()}, "knx": {}}
         if kind in ("light", "dimmer"):
             platform = "light"
-            mapping = {"command": "address", "feedback": "state_address",
-                       "brightness": "brightness_address", "brightness_feedback": "brightness_state_address"}
+            mapping = {"command": ("ga_switch", "write"), "feedback": ("ga_switch", "state"),
+                       "brightness": ("ga_brightness", "write"), "brightness_feedback": ("ga_brightness", "state")}
         else:
             platform = "cover"
             # A generic 'position' field is not a verified position *command*;
             # never map it to position_address without ETS evidence.
-            mapping = {"command": "move_long_address", "stop": "stop_address"}
-        for key, target in mapping.items():
+            mapping = {"command": ("ga_up_down", "write"), "stop": ("ga_stop", "write")}
+        for key, (target, direction) in mapping.items():
             if fields.get(key):
-                data[target] = fields[key]
+                data["knx"].setdefault(target, {})[direction] = fields[key]
         calls.append({"type": "knx/create_entity", "platform": platform, "data": data})
     return {"format": "nm-studio-knx-panel-create-plan", "version": 1,
             "source_fingerprint": validated["source_fingerprint"],

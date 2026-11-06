@@ -43,17 +43,20 @@ def create_one(layout, payload, connection_factory=HAWebSocket):
         used = ws.call("knx/get_entities_by_group")
         if not isinstance(used, dict):
             raise KNXApplyError("Indice dei GA KNX non interpretabile: creazione annullata")
-        addresses = {value for key, value in call["data"].items()
-                     if key.endswith("address") and isinstance(value, str)}
+        addresses = {value for group in call["data"]["knx"].values()
+                     if isinstance(group, dict) for key, value in group.items()
+                     if key in ("write", "state") and isinstance(value, str)}
         overlaps = sorted(addresses.intersection(used))
         if overlaps:
             raise KNXApplyError("GA già presente in KNX Home Assistant: " + ", ".join(overlaps))
         validated = ws.call("knx/validate_entity", platform=call["platform"], data=call["data"])
         if not isinstance(validated, dict) or validated.get("success") is not True:
-            raise KNXApplyError("Validazione KNX rifiutata: " + str(validated)[:220])
+            detail = validated.get("error_base", "Formato non accettato") if isinstance(validated, dict) else "Risposta non valida"
+            raise KNXApplyError("Validazione KNX rifiutata: " + str(detail)[:110])
         created = ws.call("knx/create_entity", platform=call["platform"], data=call["data"])
         if not isinstance(created, dict) or created.get("success") is not True or not created.get("entity_id"):
             raise KNXApplyError("Home Assistant non ha confermato la creazione: verifica nel pannello KNX")
         return {"created": True, "entity_id": created["entity_id"],
-                "name": call["data"]["name"], "platform": call["platform"],
+                "name": call["data"]["entity"]["name"], "platform": call["platform"],
                 "note": "Entità creata in HA. I comandi sul bus restano da collaudare."}
+

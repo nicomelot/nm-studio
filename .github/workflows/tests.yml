@@ -27,6 +27,9 @@ jobs:
       - run: node --test tests/*.test.js
   home-assistant-schema:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        ha: ['2026.10.4', '2026.11.0']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -34,4 +37,6 @@ jobs:
           python-version: '3.13'
       - run: python tests/make_ha_lab_fixture.py /tmp/nm-ha-check
       - name: Validate virtual package with Home Assistant
-        run: docker run --rm -v /tmp/nm-ha-check:/config ghcr.io/home-assistant/home-assistant:2026.10.4 python -m homeassistant --script check_config -c /config
+        run: docker run --rm -v /tmp/nm-ha-check:/config ghcr.io/home-assistant/home-assistant:${{ matrix.ha }} python -m homeassistant --script check_config -c /config
+      - name: Validate real KNX panel payloads without bus access
+        run: docker run --rm -v "$PWD:/work:ro" ghcr.io/home-assistant/home-assistant:${{ matrix.ha }} python /work/tests/check_knx_panel_schema.py

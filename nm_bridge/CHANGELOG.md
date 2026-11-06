@@ -1,3 +1,10 @@
+## 5.15.2 - Creazione entita KNX reali
+
+- Corretto il formato delle richieste al pannello KNX: dati entity/knx e GA write/state, invece dei campi YAML.
+- Correzione applicata a luci, dimmer e tapparelle; mantenuti conferma esplicita, verifica duplicati e validazione prima della creazione.
+- Errori di validazione leggibili senza troncare il dettaglio principale.
+- Collaudo automatico dei payload contro lo schema delle immagini ufficiali Home Assistant 2026.10.4 e 2026.11.0, senza accesso al bus.
+
 ## 5.15.1 - Importazione ETS protetta da password
 
 - Campo password nelle due schermate di analisi ETS; svuotato dopo ogni richiesta.

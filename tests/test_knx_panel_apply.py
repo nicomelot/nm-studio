@@ -9,6 +9,7 @@ class FakePanel:
         self.used = {} if used is None else used
         self.validation = validation or {"success": True}
         self.calls = []
+        self.payloads = []
 
     def __enter__(self):
         return self
@@ -18,6 +19,7 @@ class FakePanel:
 
     def call(self, command, **kwargs):
         self.calls.append(command)
+        self.payloads.append(kwargs)
         if command == "knx/get_base_data":
             return {"supported_platforms": ["light", "cover"]}
         if command == "knx/get_entities_by_group":
@@ -48,6 +50,9 @@ class PanelApplyTests(unittest.TestCase):
         result = create_one(self.layout, self.payload, connection_factory=lambda: fake)
         self.assertEqual(result["entity_id"], "light.created")
         self.assertEqual(fake.calls[-2:], ["knx/validate_entity", "knx/create_entity"])
+        expected = {"entity": {"name": "L1"}, "knx": {"ga_switch": {"write": "1/1/0", "state": "1/1/4"}}}
+        self.assertEqual(fake.payloads[-2]["data"], expected)
+        self.assertEqual(fake.payloads[-1]["data"], expected)
 
     def test_refuses_without_backup_and_confirmation(self):
         fake = FakePanel()
@@ -91,11 +96,18 @@ class PanelApplyTests(unittest.TestCase):
             request = {'source_fingerprint': fingerprint(layout), 'devices': [{'index': 0, 'approved': True, 'name': 'Test', 'fields': fields}]}
             data = build(layout, request)['calls'][0]['data']
             if kind == 'dimmer':
-                self.assertEqual(data['brightness_state_address'], '1/1/3')
-                self.assertEqual(data['state_address'], '1/1/1')
+                self.assertEqual(data['knx']['ga_brightness'], {'write': '1/1/2', 'state': '1/1/3'})
+                self.assertEqual(data['knx']['ga_switch']['state'], '1/1/1')
             else:
-                self.assertEqual(data['stop_address'], '1/2/1')
-                self.assertNotIn('position_address', data)
+                self.assertEqual(data['knx']['ga_stop'], {'write': '1/2/1'})
+                self.assertEqual(data['knx']['ga_up_down'], {'write': '1/2/0'})
+                self.assertNotIn('ga_position_set', data['knx'])
+
+    def test_refuses_duplicate_feedback_ga(self):
+        fake = FakePanel(used={"1/1/4": ["light.existing"]})
+        with self.assertRaises(KNXApplyError):
+            create_one(self.layout, self.payload, connection_factory=lambda: fake)
+        self.assertNotIn("knx/create_entity", fake.calls)
 
 
 if __name__ == "__main__":
