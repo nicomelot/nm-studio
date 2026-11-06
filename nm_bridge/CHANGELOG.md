@@ -1,3 +1,11 @@
+## 5.16.0 - Creazione multipla guidata
+
+- Salva e continua porta direttamente alla creazione delle funzioni selezionate; associazioni esistenti e collaudo singolo restano disponibili.
+- Una sola conferma per la sequenza, con salvataggio immediato delle associazioni HA e arresto al primo errore senza perdere i risultati precedenti.
+- Funzioni incomplete visibili con motivazione; stanze e rifiniture completabili dopo.
+- Riconoscimento dei dimmer senza richiedere feedback facoltativi e delle tapparelle con ruoli movimento/arresto e DPT coerenti, anche senza sigle T1/T2.
+- Verifiche automatiche su Linux, Windows, immagine add-on e schemi HA 2026.10.4/2026.11.0. Verifica sul progetto cliente e collaudo fisico ancora da completare.
+
 ## 5.15.2 - Creazione entita KNX reali
 
 - Corretto il formato delle richieste al pannello KNX: dati entity/knx e GA write/state, invece dei campi YAML.
