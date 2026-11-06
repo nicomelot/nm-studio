@@ -12,6 +12,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from urllib.parse import urlsplit, urlunsplit, parse_qs, urlencode
 from ets_import import MAX_ARCHIVE, preview as ets_preview
+from ets_archive import decode_upload, MAX_PASSWORD_BYTES
 from knx_devices import read_devices, confirm_devices
 from audit_notes import read_notes, save_notes
 from widget_layout import read_layout as read_widget_layout, save_layout as save_widget_layout
@@ -372,13 +373,16 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(403)
             return
         # Ingress protects access; these checks also reject cross-site form POSTs.
-        expected_type = "application/octet-stream" if path == "/ets/preview" else "application/json"
-        if self.headers.get("Content-Type", "").split(";", 1)[0].strip().lower() != expected_type or self.headers.get("Sec-Fetch-Site", "same-origin") not in ("same-origin", "none"):
+        content_type = self.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
+        expected_types = ("application/octet-stream", "application/vnd.nm.ets-upload") if path == "/ets/preview" else ("application/json",)
+        if content_type not in expected_types or self.headers.get("Sec-Fetch-Site", "same-origin") not in ("same-origin", "none"):
             self.send_error(415)
             return
         try:
             n = int(self.headers.get("Content-Length", "0"))
             max_body = MAX_ARCHIVE if path == "/ets/preview" else 4 * 1024 * 1024 if path == "/floorplans" else 1024 * 1024 if path == "/migration/restore" else 256 * 1024 if path in ("/knx/widgets", "/knx/ha-preview", "/knx/yaml-audit") else 256 * 1024 if path == "/projects/save" else MAX_BODY
+            if path == "/ets/preview" and content_type == "application/vnd.nm.ets-upload":
+                max_body += MAX_PASSWORD_BYTES + 4
             if not 0 < n <= max_body:
                 raise ValueError("Invalid length")
             body = self.rfile.read(n)
@@ -461,7 +465,11 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/audit":
                 data = save_notes(json.loads(body))
             else:
-                data = ets_preview(body)
+                raw, password = decode_upload(body, content_type, MAX_ARCHIVE)
+                try:
+                    data = ets_preview(raw, password=password)
+                finally:
+                    password = raw = body = None
                 data["lab_candidates"] = lab_candidates(data)
                 data = PROJECTS.prepare(data)
             self.respond(200, "application/json; charset=utf-8", json.dumps(data, ensure_ascii=False).encode())

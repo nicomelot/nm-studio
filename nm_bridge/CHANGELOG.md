@@ -1,3 +1,12 @@
+## 5.15.1 - Importazione ETS protetta da password
+
+- Campo password nelle due schermate di analisi ETS; svuotato dopo ogni richiesta.
+- Lettura in memoria dei contenitori protetti ETS5 (ZIP) ed ETS6 (AES con derivazione KNX).
+- Password e archivio originale non vengono salvati o inseriti nelle analisi esportate.
+- Messaggi specifici per password mancante/errata e archivi danneggiati.
+- Limiti di dimensione, numero di file e controlli XML mantenuti anche sui contenitori interni.
+- Dipendenze di cifratura incluse nell'immagine: aggiornare e ricostruire l'add-on.
+
 ## 5.15.0 — Percorso reale, aggiornamento dashboard e diagnostica
 
 - Barra persistente con Salva bozza e Salva e continua alle associazioni.

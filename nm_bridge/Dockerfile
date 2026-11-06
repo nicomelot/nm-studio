@@ -1,10 +1,15 @@
 ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:latest
 FROM ${BUILD_FROM}
-RUN apk add --no-cache python3 py3-websocket-client
+RUN apk add --no-cache python3 py3-websocket-client py3-pip \
+    && python3 -m venv --system-site-packages /opt/nm-venv
+COPY requirements.txt /app/requirements.txt
+RUN /opt/nm-venv/bin/pip install --no-cache-dir -r /app/requirements.txt
+ENV PATH="/opt/nm-venv/bin:$PATH"
 COPY bridge.py /app/bridge.py
 COPY index.html /app/index.html
 COPY lab_ui.js /app/lab_ui.js
 COPY ets_import.py /app/ets_import.py
+COPY ets_archive.py /app/ets_archive.py
 COPY recognition.py /app/recognition.py
 COPY knx_devices.py /app/knx_devices.py
 COPY audit_notes.py /app/audit_notes.py

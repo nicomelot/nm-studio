@@ -6,9 +6,11 @@ import re
 import zipfile
 import xml.etree.ElementTree as ET
 try:
+    from .ets_archive import open_project
     from .ets_rooms import extract_functions, room_matches
     from .recognition import review_suggestions, hvac_address_inventory
 except ImportError:  # The add-on runs the modules directly from /app.
+    from ets_archive import open_project
     from ets_rooms import extract_functions, room_matches
     from recognition import review_suggestions, hvac_address_inventory
 
@@ -490,14 +492,10 @@ def catalog_objects(archive, filename, cache, budget):
     return objects
 
 
-def preview(raw):
+def preview(raw, password=""):
     if len(raw) > MAX_ARCHIVE or len(raw) < 4:
         raise ValueError("Project file too large or empty")
-    try:
-        archive = zipfile.ZipFile(io.BytesIO(raw))
-    except (zipfile.BadZipFile, OSError) as exc:
-        raise ValueError("Not a valid unencrypted .knxproj archive") from exc
-    with archive:
+    with open_project(raw, password, MAX_MEMBERS, MAX_XML, MAX_TOTAL_XML) as archive:
         members = archive.infolist()
         if len(members) > MAX_MEMBERS:
             raise ValueError("Too many archive entries")

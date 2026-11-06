@@ -28,6 +28,26 @@ def request(path, payload, address=None):
 
 
 class LabHTTPTests(unittest.TestCase):
+    def test_protected_ets_upload_routes_password_without_retaining_it(self):
+        handler = object.__new__(bridge.Handler)
+        handler.path = "/ets/preview"
+        handler.client_address = (bridge.INGRESS_PROXY, 1234)
+        password = "test-password"
+        encoded = password.encode()
+        raw = len(encoded).to_bytes(4, "big") + encoded + b"PKxx"
+        handler.headers = {"Content-Type": "application/vnd.nm.ets-upload", "Content-Length": str(len(raw))}
+        handler.rfile = io.BytesIO(raw)
+        result = {}
+        handler.respond = lambda status, content_type, body: result.update(status=status, data=json.loads(body))
+        handler.send_error = lambda status: result.update(status=status)
+        with patch.object(bridge, "ets_preview", return_value={"project_key": "synthetic"}) as importer, \
+             patch.object(bridge, "lab_candidates", return_value=[]), \
+             patch.object(bridge.PROJECTS, "prepare", side_effect=lambda data: data):
+            handler.do_POST()
+        importer.assert_called_once_with(b"PKxx", password=password)
+        self.assertEqual(result["status"], 200)
+        self.assertNotIn(password, json.dumps(result))
+
     def test_preview_and_dashboard_do_not_use_knx_calls(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)

@@ -3,6 +3,12 @@ on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read
 jobs:
+  addon-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t nm-control-test nm_bridge
+      - run: docker run --rm --entrypoint python3 nm-control-test -c "import pyzipper; import bridge"
   regression:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -16,8 +22,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - run: python -m pip install -r nm_bridge/requirements.txt
       - run: python -m unittest discover -s tests -v
-      - run: node --test tests/lab_ui.test.js tests/real_ui.test.js tests/shared_rooms.test.js tests/real_dashboard_ui.test.js tests/recovery_ui.test.js
+      - run: node --test tests/*.test.js
   home-assistant-schema:
     runs-on: ubuntu-latest
     steps:
