@@ -18,6 +18,21 @@ class RealDashboardTests(unittest.TestCase):
             {'entity_id': 'light.fuori_ufficio_l5', 'name': 'FUORI UFFICIO - L5', 'state': 'on'},
             {'entity_id': 'light.ufficio_l15', 'name': 'UFFICIO - L15', 'state': 'off'}]
 
+    def test_floorless_and_legacy_synthetic_floor_open_rooms_directly(self):
+        for room in ('Casa / Cucina', 'Casa / Altri ambienti / Cucina'):
+            self.widget['room'] = room
+            self.widget['entity_id'] = 'light.fuori_ufficio_l5'
+            config = generate(self.layout, self.entities)['dashboard']
+            views = config['views']
+            self.assertFalse(any(v['path'].startswith('piano-') for v in views))
+            detail = next(v for v in views if v['path'].startswith('stanza-'))
+            self.assertEqual(detail['title'], 'Cucina')
+            self.assertTrue(detail['back_path'].endswith('/ambienti'))
+            ambienti = next(v for v in views if v['path'] == 'ambienti')
+            buttons = [c for section in ambienti['sections'] for c in section['cards'] if c['type'] == 'button']
+            self.assertEqual(buttons[0]['name'], 'Cucina')
+            self.assertTrue(buttons[0]['tap_action']['navigation_path'].endswith('/'+detail['path']))
+
     def test_replace_lab_with_real_l5_not_l15(self):
         original = copy.deepcopy(self.layout)
         result = suggest(self.layout, self.entities)

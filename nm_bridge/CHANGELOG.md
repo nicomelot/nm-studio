@@ -1,3 +1,11 @@
+## 5.18.0
+
+- Unified room-by-room installation review: create, update, already aligned, or review required.
+- Complete existing KNX UI entities through the official update API without changing entity IDs, names, options or existing GA assignments.
+- Compare again before each write, validate with HA, and read back updates; conflicts and stale plans require renewed review.
+- Skip synthetic floor navigation for rooms directly under a building and legacy "Altri ambienti" groups. Real floors and stable room URLs remain intact.
+- Existing dashboards require regeneration and explicit update to adopt the simplified navigation.
+
 ## 5.17.2
 
 - Resolve modular ETS communication objects without mixing module definitions.

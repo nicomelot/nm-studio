@@ -30,3 +30,15 @@ except EntityStoreValidationException:
     print("Confirmed regression: old flat YAML payload is rejected")
 else:
     raise AssertionError("Expected old payload to fail KNX panel validation")
+
+# Existing stored light -> dimmer additive update, without entity recreation.
+from nm_bridge.installation_review import compare
+class Stored:
+    def call(self, method, **kwargs):
+        if method == 'knx/get_entities_by_group': return {}
+        return {'platform': 'light', 'data': {'entity': {'name': 'Existing'}, 'knx': {'ga_switch': {'write': '1/1/0'}}}}
+layout = {'version': 1, 'project': 'a'*64, 'widgets': [{'name': 'Imported', 'type': 'dimmer', 'entity_id': 'light.existing', 'fields': {'command': '1/1/0', 'brightness': '1/1/2', 'brightness_feedback': '1/1/3'}}]}
+row = compare(layout, 0, Stored())
+assert row['status'] == 'update', row
+validate_entity_data(row['call'])
+print('Official HA schema accepted: additive update preserving entity_id')

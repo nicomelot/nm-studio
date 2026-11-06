@@ -1,5 +1,5 @@
 let pilotBusy=false;
-function bulkInstallPage(){return `<section class="card" id="bulk-install"><div class="workspace-label">Impianto reale</div><h2>Crea le funzioni selezionate</h2><p>Controlla il riepilogo, poi crea tutte le funzioni pronte con una sola conferma. Le entità create vengono associate automaticamente ai widget.</p><div class="bar"><button id="install-load">Aggiorna elenco</button><button id="install-edit">Correggi funzioni e stanze</button></div><p id="install-status" role="status"></p><div id="install-list"></div><label class="row"><input type="checkbox" id="install-verified" style="width:auto"> Ho verificato indirizzi e tipi in ETS e il backup HA</label><div class="bar" style="position:sticky;bottom:0;background:var(--panel,#10203b);padding:12px;z-index:2"><button id="install-create" class="primary" disabled>Crea selezionate</button><button id="install-areas">Sincronizza stanze in Home Assistant</button><button id="install-next" hidden>Continua alla dashboard</button></div><pre id="install-results" style="white-space:pre-wrap" aria-live="polite"></pre></section>`;}
+function bulkInstallPage(){return `<section class="card" id="bulk-install"><div class="workspace-label">Impianto reale</div><h2>Controlla e applica le funzioni</h2><p>Riepilogo per stanza: crea le funzioni mancanti e completa le entità KNX esistenti con una sola conferma. Gli indirizzi discordanti restano da verificare.</p><div class="bar"><button id="install-load">Aggiorna elenco</button><button id="install-edit">Correggi funzioni e stanze</button></div><p id="install-status" role="status"></p><div id="install-list"></div><label class="row"><input type="checkbox" id="install-verified" style="width:auto"> Ho verificato indirizzi e tipi in ETS e il backup HA</label><div class="bar" style="position:sticky;bottom:0;background:var(--panel,#10203b);padding:12px;z-index:2"><button id="install-create" class="primary" disabled>Crea selezionate</button><button id="install-areas">Sincronizza stanze in Home Assistant</button><button id="install-next" hidden>Continua alla dashboard</button></div><pre id="install-results" style="white-space:pre-wrap" aria-live="polite"></pre></section>`;}
 
 function installBlocker(device){
  if(!['light','dimmer','cover'].includes(device.type))return 'Tipo da configurare negli strumenti avanzati';
@@ -25,49 +25,52 @@ function wireBulkInstall(){
  let source=null,capability=null,busy=false,rows=[];
  const status=message=>$('install-status').textContent=message;
  const post=(path,body)=>api(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
- const selected=()=>rows.filter(row=>row.checked&&row.dataset.blocked!=='true').map(row=>source.devices.find(d=>d.index===Number(row.dataset.installIndex)));
- function gate(){const n=source?selected().length:0;$('install-create').textContent=`Crea ${n} funzioni selezionate`;$('install-create').disabled=busy||!n||!$('install-verified').checked||!capability?.available||!capability?.connected;}
- async function run(work){if(busy||pilotBusy)return;busy=true;pilotBusy=true;gate();document.querySelectorAll('#bulk-install input,#bulk-install button').forEach(el=>el.disabled=true);try{await work();}catch(e){status('Interrotto: '+e.message+' Le entità già confermate restano salvate.');source=null;}finally{busy=false;pilotBusy=false;document.querySelectorAll('#bulk-install button').forEach(el=>el.disabled=false);$('install-verified').disabled=false;rows.forEach(row=>row.disabled=!source||row.dataset.blocked==='true');gate();}}
+ const selected=()=>rows.filter(r=>r.checked&&r.dataset.blocked!=='true').map(r=>source.devices.find(d=>d.index===Number(r.dataset.installIndex)));
+ function gate(){const n=source?selected().length:0;$('install-create').textContent=`Applica ${n} modifiche`;$('install-create').disabled=busy||!n||!$('install-verified').checked||!capability?.available||!capability?.connected;}
+ async function run(work){if(busy||pilotBusy)return;busy=true;pilotBusy=true;gate();document.querySelectorAll('#bulk-install input,#bulk-install button').forEach(el=>el.disabled=true);try{await work();}catch(e){status('Interrotto: '+e.message+' Le operazioni già confermate restano salvate. Aggiorna elenco prima di riprovare.');source=null;}finally{busy=false;pilotBusy=false;document.querySelectorAll('#bulk-install button').forEach(el=>el.disabled=false);$('install-verified').disabled=false;rows.forEach(r=>r.disabled=!source||r.dataset.blocked==='true');gate();}}
  if($('install-areas'))$('install-areas').onclick=()=>run(async()=>{
   if(widgetDirty||structureDirty)throw Error('Salva prima funzioni e stanze.');
   const current=await api('dashboard/missing-ha');
   if(etsData?.project_key&&current.project!==etsData.project_key)throw Error('Salva prima il progetto aperto.');
-  if(!confirm('Creare le stanze e i piani mancanti in Home Assistant e assegnare le entità collegate? Le assegnazioni HA già presenti saranno conservate.'))return;
+  if(!confirm('Sincronizzare stanze e piani in HA conservando le assegnazioni esistenti?'))return;
   const result=await post('native/areas-sync',{confirm:true,source_fingerprint:current.source_fingerprint});
   status(`${result.rooms} stanze HA, ${result.assigned} nuove assegnazioni. ${result.notices.join(' · ')}`);
  });
- $('install-edit').onclick=()=>{if(!busy&&!pilotBusy)setPage('widgets');};
- $('install-next').onclick=()=>{if(!busy&&!pilotBusy)setPage('dashboard-export');};
+ $('install-edit').onclick=()=>{if(!busy)setPage('widgets');};
+ $('install-next').onclick=()=>{if(!busy)setPage('dashboard-export');};
  $('install-verified').onchange=gate;
  $('install-load').onclick=()=>run(async()=>{
-  source=null;rows=[];$('install-list').innerHTML='';$('install-verified').checked=false;status('Caricamento delle funzioni salvate…');
-  const [data,access]=await Promise.all([api('dashboard/missing-ha'),api('knx/panel-capability')]);
-  if(etsData?.project_key&&data.project!==etsData.project_key)throw Error('Salva prima le funzioni del progetto ETS aperto.');
+  source=null;rows=[];$('install-list').innerHTML='';$('install-verified').checked=false;status('Confronto con la configurazione KNX di Home Assistant.');
+  const [data,access]=await Promise.all([api('knx/installation-review'),api('knx/panel-capability')]);
+  if(etsData?.project_key&&data.project!==etsData.project_key)throw Error('Salva prima le funzioni del progetto aperto.');
   source=data;capability=access;
-  $('install-list').innerHTML=source.devices.map(d=>{const reason=installBlocker(d)||(!access.supported_platforms?.includes(d.type==='cover'?'cover':'light')?'Piattaforma KNX non disponibile':'');return `<label class="card row"><input type="checkbox" data-install-index="${d.index}" data-blocked="${!!reason}" style="width:auto" ${reason?'disabled':'checked'}><span><strong>${escapeHTML(d.name)}</strong> · ${escapeHTML({light:'Luce',dimmer:'Dimmer',cover:'Tapparella'}[d.type]||d.type)}<br>${escapeHTML(d.room)}<br>${escapeHTML(Object.entries(d.fields).filter(([,v])=>v).map(([k,v])=>k+': '+v).join(' · '))}${reason?'<br><strong>'+escapeHTML(reason)+'</strong>':''}</span></label>`;}).join('');
-  rows=[...document.querySelectorAll('[data-install-index]')];rows.forEach(row=>row.onchange=gate);
-  status(source.devices.length?`${source.devices.length} funzioni da creare. ${access.available&&access.connected?'Seleziona quelle da installare.':access.message||'Verifica la connessione KNX.'}`:'Nessuna funzione da creare. Puoi proseguire alla dashboard o correggere le associazioni esistenti.');
-  $('install-next').hidden=source.devices.length>0;
+  const groups=new Map();for(const d of data.devices){const room=d.room||'Da assegnare';if(!groups.has(room))groups.set(room,[]);groups.get(room).push(d);}
+  const labels={create:'Pronta da creare',update:'Da aggiornare',present:'Già presente',review:'Da verificare'};
+  $('install-list').innerHTML=[...groups].map(([room,devices])=>`<section><h3>${escapeHTML(room)}</h3>${devices.map(d=>{
+   const reason=installBlocker(d)||(!access.supported_platforms?.includes(d.type==='cover'?'cover':'light')?'Piattaforma non disponibile':'');
+   const blocked=!!reason||!['create','update'].includes(d.status);
+   return `<label class="card row"><input type="checkbox" data-install-index="${d.index}" data-blocked="${blocked}" style="width:auto" ${blocked?'disabled':'checked'}><span><strong>${escapeHTML(d.name)}</strong> · ${escapeHTML(labels[d.status]||'Da verificare')}<br>${escapeHTML(reason||d.reason)}${d.entity_id?'<br>'+escapeHTML(d.entity_id):''}</span></label>`;
+  }).join('')}</section>`).join('');
+  rows=[...document.querySelectorAll('[data-install-index]')];rows.forEach(r=>r.onchange=gate);
+  status(Object.entries(labels).map(([key,label])=>`${data.devices.filter(d=>d.status===key).length} ${label.toLowerCase()}`).join(' · '));
+  $('install-next').hidden=false;
  });
  $('install-create').onclick=()=>run(async()=>{
   const devices=source?selected():[];
-  if(!devices.length||!$('install-verified').checked||!capability?.available||!capability?.connected)throw Error('Completa la selezione e la verifica.');
-  const review={source_fingerprint:source.source_fingerprint,devices:devices.map(d=>({index:d.index,name:d.name,fields:d.fields,approved:true}))};
-  const plan=await post('knx/panel-create-plan',review);
-  const checks=await post('dashboard/deployment-preflight',review);
-  if(checks.status==='blocked')throw Error(checks.findings.filter(f=>f.severity==='block').map(f=>f.message).join(' · '));
-  if(!confirm(`Creare e associare ${devices.length} funzioni in Home Assistant?\n${devices.map(d=>d.name).join('\n')}\nLa creazione può avviare letture KNX. Non invia comandi di accensione o movimento.`))return;
-  let fingerprint=plan.source_fingerprint;
+  if(!devices.length||!$('install-verified').checked||!capability?.connected)throw Error('Completa selezione e verifica.');
+  if(typeof widgetDirty!=='undefined'&&(widgetDirty||structureDirty))throw Error('Salva prima le modifiche alle funzioni.');
+  if(!confirm(`Applicare ${devices.length} modifiche?\n${devices.map(d=>(d.status==='update'?'Aggiorna: ':'Crea: ')+d.name).join('\n')}\nGli aggiornamenti mantengono ID e nomi HA. Possono avviare letture KNX.`))return;
+  let fingerprint=source.source_fingerprint;
   for(let i=0;i<devices.length;i++){
-   const d=devices[i];status(`Creazione ${i+1}/${devices.length}: ${d.name}`);
-   const done=await post('knx/install-step',{confirm:true,backup_confirmed:true,ets_confirmed:true,source_fingerprint:fingerprint,review:{source_fingerprint:fingerprint,devices:[review.devices[i]]},call_index:0,expected_call:plan.calls[i]});
-   $('install-results').textContent+=`${d.name}: ${done.entity_id}${done.linked?' · creata e associata':' · '+done.message}\n`;
-   if(!done.linked||done.stop)throw Error(done.message||'Verifica l’entità appena creata in HA.');
-   syncCreatedAssociation(source.project,d,done.entity_id);
-   fingerprint=done.source_fingerprint;
-   const row=rows.find(row=>Number(row.dataset.installIndex)===d.index);row.checked=false;row.dataset.blocked='true';
+   const d=devices[i];status(`Applicazione ${i+1}/${devices.length}: ${d.name}`);
+   const done=await post('knx/installation-apply',{confirm:true,backup_confirmed:true,ets_confirmed:true,source_fingerprint:fingerprint,index:d.index,expected:d});
+   $('install-results').textContent+=`${d.name}: ${done.entity_id} · ${done.updated?'aggiornata':'creata e associata'}\n`;
+   if(!done.linked||done.stop)throw Error(done.message||'Verifica la funzione in HA.');
+   syncCreatedAssociation(source.project,d,done.entity_id);fingerprint=done.source_fingerprint;
+   const row=rows.find(r=>Number(r.dataset.installIndex)===d.index);row.checked=false;row.dataset.blocked='true';
   }
-  source.source_fingerprint=fingerprint;$('install-verified').checked=false;$('install-next').hidden=false;status(`${devices.length} funzioni create e associate. Puoi generare la dashboard e provare i comandi da Home Assistant.`);
+  source.source_fingerprint=fingerprint;$('install-verified').checked=false;$('install-next').hidden=false;
+  status(`${devices.length} modifiche applicate. Aggiorna elenco per rileggere il risultato, poi apri la dashboard per il collaudo.`);
  });
  return $('install-load').onclick();
 }

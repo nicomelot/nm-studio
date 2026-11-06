@@ -53,3 +53,5 @@ WORKDIR /app
 CMD ["/command/with-contenv", "python3", "-u", "/app/bridge.py"]
 
 
+
+COPY installation_review.py /app/installation_review.py

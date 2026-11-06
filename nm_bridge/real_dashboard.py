@@ -78,19 +78,30 @@ def render_dashboard(approved, url_path):
         ranks = {'interrato': 0, 'seminterrato': 1, 'terra': 2, 'primo': 3, 'secondo': 4}
         return (key[0] if key else '~', ranks.get(_floor_name(key).lower(), 5), _floor_name(key))
 
+    # Legacy imports inserted a synthetic floor. Hide only that navigation level;
+    # room identities and their stable URLs remain untouched.
+    def direct(key):
+        return not key or key[-1].casefold() in {'altri ambienti', 'zone', 'da assegnare'}
+
     floor_links = []
     for key in sorted(floors, key=floor_order):
         floor_path = route('piano', json.dumps(key))
-        floor_links.append(button(floor_title(key), floor_path, 'mdi:home-floor-0'))
+        if not direct(key):
+            floor_links.append(button(floor_title(key), floor_path, 'mdi:home-floor-0'))
         zone_links = []
         for room in sorted(floors[key]):
             label = _location(room)[1]
+            if direct(key) and key and len(buildings) > 1:
+                label = key[0] + ' · ' + label
             path = route('stanza', room)
             zone_links.append(button(label, path, _room_icon(label)))
             sections = [grid(grouped[room], category) for category, grouped in categories.items() if room in grouped]
-            details.append(view(label, path, sections, floor_path))
-        details.append(view(floor_title(key), floor_path,
-                            [grid(zone_links[i:i+6]) for i in range(0, len(zone_links), 6)], 'ambienti'))
+            details.append(view(label, path, sections, 'ambienti' if direct(key) else floor_path))
+        if direct(key):
+            floor_links.extend(zone_links)
+        else:
+            details.append(view(floor_title(key), floor_path,
+                                [grid(zone_links[i:i+6]) for i in range(0, len(zone_links), 6)], 'ambienti'))
 
     function_links = []
     for category, grouped in categories.items():
@@ -100,7 +111,7 @@ def render_dashboard(approved, url_path):
         for key in sorted(floors, key=floor_order):
             for room in sorted(floors[key]):
                 if room in grouped:
-                    sections.append(grid(grouped[room], floor_title(key) + ' · ' + _location(room)[1]))
+                    sections.append(grid(grouped[room], (_location(room)[1] if direct(key) else floor_title(key) + ' · ' + _location(room)[1])))
         details.append(view(category, path, sections, 'funzioni'))
 
     overview = []
@@ -116,6 +127,6 @@ def render_dashboard(approved, url_path):
             button('Ambienti', 'ambienti', 'mdi:floor-plan'),
             button('Funzioni', 'funzioni', 'mdi:lightbulb-group-outline')]),
             *([grid(overview)] if overview else [])]),
-        view('Ambienti', 'ambienti', [grid(floor_links, 'Scegli il piano')]),
+        view('Ambienti', 'ambienti', [grid(floor_links, 'Scegli la stanza' if all(direct(k) for k in floors) else 'Scegli il piano o la stanza')]),
         view('Funzioni', 'funzioni', [grid(function_links, 'Scegli la categoria')]), *details]}
     return dashboard

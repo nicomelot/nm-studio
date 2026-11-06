@@ -31,6 +31,7 @@ from knx_yaml_audit import inspect_yaml as inspect_knx_yaml
 from knx_entity_plan import build as build_knx_entity_plan
 from knx_panel_apply import create_one as create_knx_entity
 from knx_install import install_step
+from installation_review import preview as installation_preview, apply_one as installation_apply
 from migration_bundle import export_bundle as export_migration, restore_bundle as restore_migration
 from intelligence import summarize as intelligence_summary, decision_entity, normalize_history, history_path
 from module_plan import read as read_module_plan, save as save_module_plan, suggest_entities as suggest_module_entities
@@ -291,6 +292,12 @@ class Handler(BaseHTTPRequestHandler):
                 self.respond(200, "application/json; charset=utf-8", json.dumps(data, ensure_ascii=False).encode())
             except (HTTPError, URLError, ValueError, RuntimeError, OSError, TypeError, KeyError, json.JSONDecodeError):
                 self.respond(502, "application/json", b'{"error":"HA inventory or associations unavailable"}')
+        elif path == "/knx/installation-review":
+            try:
+                data = installation_preview(read_widget_layout())
+                self.respond(200, "application/json; charset=utf-8", json.dumps(data, ensure_ascii=False).encode())
+            except (ValueError, RuntimeError, OSError, TypeError, KeyError):
+                self.respond(502, "application/json", b'{"error":"Confronto KNX non disponibile"}')
         elif path == "/dashboard/missing-ha":
             try:
                 data = preview_missing_ha(read_widget_layout(), get_entities())
@@ -371,7 +378,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?", 1)[0]
-        if self.client_address[0] != INGRESS_PROXY or path not in ("/knx/history", "/lab/dashboard-existing", "/lab/dashboard-update", "/projects/save", "/bus-log/start", "/bus-log/stop", "/layout", "/modules/plan", "/floorplans", "/floorplans/dashboard-publish", "/ets/preview", "/knx/approved", "/audit", "/knx/widgets", "/knx/ha-preview", "/knx/yaml-audit", "/dashboard/missing-ha/review", "/dashboard/deployment-preflight", "/knx/panel-create-plan", "/knx/panel-create-one", "/knx/install-step", "/native/areas-sync", "/dashboard/publish", "/dashboard/update-preview", "/dashboard/update", "/migration/restore", "/nm-link", "/nm-link/preview", "/nm-link/simulate", "/lab/preview", "/lab/install", "/lab/replace", "/lab/packages-preview", "/lab/packages-enable", "/lab/dashboard-preview", "/lab/dashboard-publish"):
+        if self.client_address[0] != INGRESS_PROXY or path not in ("/knx/history", "/lab/dashboard-existing", "/lab/dashboard-update", "/projects/save", "/bus-log/start", "/bus-log/stop", "/layout", "/modules/plan", "/floorplans", "/floorplans/dashboard-publish", "/ets/preview", "/knx/approved", "/audit", "/knx/widgets", "/knx/ha-preview", "/knx/yaml-audit", "/dashboard/missing-ha/review", "/dashboard/deployment-preflight", "/knx/panel-create-plan", "/knx/panel-create-one", "/knx/install-step", "/knx/installation-apply", "/native/areas-sync", "/dashboard/publish", "/dashboard/update-preview", "/dashboard/update", "/migration/restore", "/nm-link", "/nm-link/preview", "/nm-link/simulate", "/lab/preview", "/lab/install", "/lab/replace", "/lab/packages-preview", "/lab/packages-enable", "/lab/dashboard-preview", "/lab/dashboard-publish"):
             self.send_error(403)
             return
         # Ingress protects access; these checks also reject cross-site form POSTs.
@@ -427,6 +434,8 @@ class Handler(BaseHTTPRequestHandler):
                 data = build_knx_entity_plan(read_widget_layout(), json.loads(body))
             elif path == "/native/areas-sync":
                 data = synchronize_saved(json.loads(body))
+            elif path == "/knx/installation-apply":
+                data = installation_apply(json.loads(body))
             elif path == "/knx/install-step":
                 data = install_step(json.loads(body))
             elif path == "/knx/panel-create-one":
