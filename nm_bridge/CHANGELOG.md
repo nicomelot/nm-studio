@@ -1,3 +1,12 @@
+## 5.19.0
+
+- Compact installer cards grouped by room with labelled readiness badges and collapsible KNX details.
+- Sticky installation actions and responsive room grids for desktop and mobile.
+- In-card commissioning for installed lights, dimmers and covers through explicit HA service calls.
+- Commissioning is disabled on entry/reload, limited to saved verified entity bindings, and never activated by state reads or field changes.
+- Distinguish HA service acknowledgement from observed state and physical commissioning result. No automatic retries.
+- Validate command allowlists, percentages, capabilities, availability and current configuration before sending; stop remains available with an unknown cover state when supported.
+
 ## 5.18.0
 
 - Unified room-by-room installation review: create, update, already aligned, or review required.

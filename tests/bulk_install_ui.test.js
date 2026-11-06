@@ -8,7 +8,7 @@ async function harness({failSecond=false,consent=true,connected=true}={}){
  let rows=[];const calls=[];
  Object.defineProperty(ids['install-list'],'innerHTML',{set(html){rows=[...html.matchAll(/data-install-index="(\d+)" data-blocked="(true|false)"/g)].map(m=>({dataset:{installIndex:m[1],blocked:m[2]},checked:m[2]==='false',disabled:m[2]==='true'}));}});
  const devices=[{index:0,name:'A',type:'light',room:'Sala',fields:{command:'1/1/1'}},{index:1,name:'B',type:'cover',room:'Sala',fields:{command:'1/1/2',stop:'1/1/3'}},{index:2,name:'C',type:'dimmer',room:'Sala',fields:{command:'1/1/4',relative:'1/1/5'}}];
- const context={etsData:null,$:id=>ids[id],escapeHTML:String,confirm:()=>consent,setPage:()=>{},document:{querySelectorAll:s=>s==='[data-install-index]'?rows:s.includes('input')?[...Object.values(ids),...rows]:Object.values(ids)},api:async(path,options)=>{
+ const context={etsData:null,$:id=>ids[id],escapeHTML:String,confirm:()=>consent,setPage:()=>{},document:{querySelectorAll:s=>s==='[data-install-index]'?rows:s==='[data-commission-action]'?[]:s.includes('input')?[...Object.values(ids),...rows]:Object.values(ids)},api:async(path,options)=>{
   const body=options?JSON.parse(options.body):null;calls.push({path,body});
   if(path==='knx/installation-review')return {source_fingerprint:'start',devices:devices.map(d=>({...d,status:d.index===0?'update':'create',reason:'Pronta'}))};
   if(path==='knx/panel-capability')return {available:true,connected,supported_platforms:['light','cover']};

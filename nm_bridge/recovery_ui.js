@@ -114,7 +114,7 @@ function wireRecovery(){
 }
 
 function realFlowBar(){
- const steps=[['ets','1 · Importa ETS'],['widgets','2 · Controlla'],['real','3 · Installa']];
+ const steps=[['ets','1 · Importa ETS'],['widgets','2 · Controlla'],['real','3 · Applica e prova']];
  return `<section class="card"><b>Percorso impianto reale</b><div class="bar" style="margin-top:12px">${steps.map(([p,label])=>`<button data-real-flow="${p}" ${p===page?'class="primary" aria-current="step"':''}>${label}</button>`).join('')}</div><p class="small muted">Controlla le proposte, salva e installa. Le associazioni esistenti e la pubblicazione restano disponibili nelle rispettive schermate.</p></section>`;
 }
 
