@@ -47,9 +47,10 @@ def generate(archive, entities):
             views.append({"title": plan["name"], "path": "mappa-" + plan["id"].replace("_", "-").lower(),
                           "cards": [{"type": "picture-elements", "image": plan["background"],
                                      "elements": elements}]})
-    dashboard = {"title": "NM Studio · Planimetrie", "views": views}
+    dashboard = {"title": "NM Control · Planimetrie", "views": views}
     fingerprint = hashlib.sha256(json.dumps(dashboard, sort_keys=True, ensure_ascii=True).encode()).hexdigest()
     return {"version": 1, "dashboard": dashboard, "fingerprint": fingerprint,
             "summary": {"views": len(views), "interactive_points": active_count,
                         "warnings": len(warnings)}, "warnings": warnings,
             "applied": False, "image_mode": "embedded_data_url"}
+

@@ -9,10 +9,12 @@ try:
     from .ets_archive import open_project
     from .ets_rooms import extract_functions, room_matches
     from .recognition import review_suggestions, hvac_address_inventory
+    from .ets_named_functions import descriptive_suggestions
 except ImportError:  # The add-on runs the modules directly from /app.
     from ets_archive import open_project
     from ets_rooms import extract_functions, room_matches
     from recognition import review_suggestions, hvac_address_inventory
+    from ets_named_functions import descriptive_suggestions
 
 MAX_ARCHIVE = 16 * 1024 * 1024
 MAX_XML = 12 * 1024 * 1024
@@ -659,6 +661,9 @@ def preview(raw, password=""):
         structured, covered_addresses = structured_suggestions(items)
         suggestions = [s for s in suggestions if s["command"] not in covered_addresses]
         suggestions.extend(structured)
+        descriptive, covered_addresses = descriptive_suggestions(items)
+        suggestions = [s for s in suggestions if s['command'] not in covered_addresses]
+        suggestions.extend(descriptive)
         suggestions.sort(key=lambda x: tuple(map(int, x["command"].split("/"))))
         functions = [{"name": item["name"], "space": item["space"],
                       "addresses": list(dict.fromkeys(address_refs[ref] for ref in item["refs"] if ref in address_refs))}

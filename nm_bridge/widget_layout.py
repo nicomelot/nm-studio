@@ -25,7 +25,7 @@ ADDRESS = re.compile(r"^(?:[0-9]|[12][0-9]|3[01])/[0-7]/(?:[0-9]|[1-9][0-9]|1[0-
 FIELDS = {
     "light": {"command", "feedback"},
     "dimmer": {"command", "feedback", "relative", "brightness", "brightness_feedback"},
-    "cover": {"command", "stop", "position", "feedback"},
+    "cover": {"command", "stop", "position", "feedback", "position_command", "position_feedback"},
     "climate": {"command", "temperature", "target_temperature_state", "heat_cool", "heat_cool_state",
                 "operation_mode", "operation_mode_state"},
 }
@@ -59,7 +59,7 @@ def validate_structure(nodes):
             raise ValueError("A building cannot have a parent")
         if kind != "building" and parent is None:
             raise ValueError("A floor or room requires a parent")
-        if parent is not None and by_id[parent]["type"] != ("building" if kind == "floor" else "floor"):
+        if parent is not None and by_id[parent]["type"] not in ({"building"} if kind == "floor" else {"building", "floor"}):
             raise ValueError("Invalid building hierarchy")
         sibling = (parent, name.strip().casefold())
         if sibling in sibling_names:

@@ -12,7 +12,7 @@ function recoveryReport(data, drafts){
  }
  const missing=[];
  for(const [command,list] of groups){
-  const signatures=new Set(list.map(s=>JSON.stringify([s.kind,...['feedback','relative','stop','brightness','brightness_feedback','position','temperature','target_temperature_state','heat_cool','heat_cool_state','operation_mode','operation_mode_state'].map(k=>s[k]||'')])));
+  const signatures=new Set(list.map(s=>JSON.stringify([s.kind,...['feedback','relative','stop','brightness','brightness_feedback','position','position_command','position_feedback','temperature','target_temperature_state','heat_cool','heat_cool_state','operation_mode','operation_mode_state'].map(k=>s[k]||'')])));
   const s=list[0],a=addresses.get(command);
   missing.push({...s,command,linked:!!a?.linked,ambiguous:signatures.size>1,
    shared:referenced.has(command)});
@@ -49,6 +49,21 @@ function addRecoveredWidget(command, kind, automatic=true){
  return true;
 }
 
+function recoverableUpgrades(data,drafts){
+ return drafts.flatMap((w,index)=>{
+  const found=(data?.suggestions||[]).filter(s=>s.command===w.fields.command&&s.kind==='dimmer');
+  return w.kind==='light'&&found.length===1&&found[0].brightness?[{index,candidate:found[0]}]:[];
+ });
+}
+function upgradeRecoveredDimmer(index){
+ const upgrade=recoverableUpgrades(etsData,widgetDrafts).find(u=>u.index===index);
+ if(!upgrade)return false;
+ const w=widgetDrafts[index],s=upgrade.candidate;
+ // Keep existing names, rooms, entity links and installer overrides.
+ for(const [key] of widgetFields.dimmer)if(!w.fields[key]&&linkedGA(s[key]))w.fields[key]=s[key];
+ w.kind='dimmer';w.source='Dimmer riconosciuto da ETS; verificare le capacità della eventuale entità HA già collegata';
+ widgetDirty=true;return true;
+}
 function recoveryPanel(){
  if(!etsData)return '';
  const report=recoveryReport(etsData,widgetDrafts);
@@ -58,6 +73,11 @@ function recoveryPanel(){
 
 function wireRecovery(){
  if(!$('recovery-panel'))return;
+ const upgrades=recoverableUpgrades(etsData,widgetDrafts);
+ if(upgrades.length){
+  $('recovery-panel').insertAdjacentHTML('afterbegin',`<div class="card"><h3>Dimmer riconosciuti nelle luci salvate</h3>${upgrades.map(u=>`<p>${escapeHTML(widgetDrafts[u.index].name)} <button data-upgrade-dimmer="${u.index}">Completa come dimmer</button></p>`).join('')}<p>Conserva nomi, stanze e associazioni. Una entità HA già creata va aggiornata separatamente.</p></div>`);
+  document.querySelectorAll('[data-upgrade-dimmer]').forEach(b=>b.onclick=()=>{if(upgradeRecoveredDimmer(Number(b.dataset.upgradeDimmer)))render();});
+ }
  $('recovery-search').oninput=e=>document.querySelectorAll('.recovery-row').forEach(row=>{
   row.hidden=!row.dataset.search.includes(e.target.value.trim().toLowerCase());row.style.display=row.hidden?'none':'';
   if(e.target.value&&row.closest('details'))row.closest('details').open=true;
@@ -73,8 +93,8 @@ function wireRecovery(){
 }
 
 function realFlowBar(){
- const steps=[['ets','1 · Importa ETS'],['widgets','2 · Funzioni e stanze'],['matches','3 · Associa esistenti'],['real','4 · Crea mancanti'],['dashboard-export','5 · Pubblica']];
- return `<section class="card"><b>Percorso impianto reale</b><div class="bar" style="margin-top:12px">${steps.map(([p,label])=>`<button data-real-flow="${p}" ${p===page?'class="primary" aria-current="step"':''}>${label}</button>`).join('')}</div><p class="small muted">Se le entità esistono già, dopo le associazioni puoi passare alla pubblicazione. Il laboratorio virtuale è una prova separata.</p></section>`;
+ const steps=[['ets','1 · Importa ETS'],['widgets','2 · Controlla'],['real','3 · Installa']];
+ return `<section class="card"><b>Percorso impianto reale</b><div class="bar" style="margin-top:12px">${steps.map(([p,label])=>`<button data-real-flow="${p}" ${p===page?'class="primary" aria-current="step"':''}>${label}</button>`).join('')}</div><p class="small muted">Controlla le proposte, salva e installa. Le associazioni esistenti e la pubblicazione restano disponibili nelle rispettive schermate.</p></section>`;
 }
 
 

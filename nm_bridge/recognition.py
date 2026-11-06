@@ -13,7 +13,7 @@ FUNCTION_FIELDS = {
                "brightness": "5.001", "brightness_feedback": "5.001",
                "color_temperature": "7.600", "color_temperature_feedback": "7.600"},
     "cover": {"command": "1.008", "stop": ("1.007", "1.017"),
-              "position": "5.001", "position_feedback": "5.001",
+              "position": "5.001", "position_command": "5.001", "position_feedback": "5.001",
               "slats": "5.001", "slats_feedback": "5.001"},
     "climate": {"command": "9.001", "temperature": "9.001",
                 "target_temperature_state": "9.001", "heat_cool": "1.100",
@@ -128,3 +128,4 @@ def review_suggestions(addresses, suggestions):
                        "command": candidate.get("command"), "confidence": confidence,
                        "checks": checks, "questions": questions[:12], "installer_confirmation_required": True})
     return output
+

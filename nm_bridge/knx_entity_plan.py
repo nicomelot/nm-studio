@@ -33,7 +33,9 @@ def build(layout, request):
             platform = "cover"
             # A generic 'position' field is not a verified position *command*;
             # never map it to position_address without ETS evidence.
-            mapping = {"command": ("ga_up_down", "write"), "stop": ("ga_stop", "write")}
+            mapping = {"command": ("ga_up_down", "write"), "stop": ("ga_stop", "write"),
+                       "position_command": ("ga_position_set", "write"),
+                       "position_feedback": ("ga_position_state", "state")}
         for key, (target, direction) in mapping.items():
             if fields.get(key):
                 data["knx"].setdefault(target, {})[direction] = fields[key]

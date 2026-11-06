@@ -1,5 +1,5 @@
 let pilotBusy=false;
-function bulkInstallPage(){return `<section class="card" id="bulk-install"><div class="workspace-label">Impianto reale</div><h2>Crea le funzioni selezionate</h2><p>Controlla il riepilogo, poi crea tutte le funzioni pronte con una sola conferma. Le entità create vengono associate automaticamente ai widget.</p><div class="bar"><button id="install-load">Aggiorna elenco</button><button id="install-edit">Correggi funzioni e stanze</button></div><p id="install-status" role="status"></p><div id="install-list"></div><label class="row"><input type="checkbox" id="install-verified" style="width:auto"> Ho verificato indirizzi e tipi in ETS e il backup HA</label><div class="bar" style="position:sticky;bottom:0;background:var(--panel,#10203b);padding:12px;z-index:2"><button id="install-create" class="primary" disabled>Crea selezionate</button><button id="install-next" hidden>Continua alla dashboard</button></div><pre id="install-results" style="white-space:pre-wrap" aria-live="polite"></pre></section>`;}
+function bulkInstallPage(){return `<section class="card" id="bulk-install"><div class="workspace-label">Impianto reale</div><h2>Crea le funzioni selezionate</h2><p>Controlla il riepilogo, poi crea tutte le funzioni pronte con una sola conferma. Le entità create vengono associate automaticamente ai widget.</p><div class="bar"><button id="install-load">Aggiorna elenco</button><button id="install-edit">Correggi funzioni e stanze</button></div><p id="install-status" role="status"></p><div id="install-list"></div><label class="row"><input type="checkbox" id="install-verified" style="width:auto"> Ho verificato indirizzi e tipi in ETS e il backup HA</label><div class="bar" style="position:sticky;bottom:0;background:var(--panel,#10203b);padding:12px;z-index:2"><button id="install-create" class="primary" disabled>Crea selezionate</button><button id="install-areas">Sincronizza stanze in Home Assistant</button><button id="install-next" hidden>Continua alla dashboard</button></div><pre id="install-results" style="white-space:pre-wrap" aria-live="polite"></pre></section>`;}
 
 function installBlocker(device){
  if(!['light','dimmer','cover'].includes(device.type))return 'Tipo da configurare negli strumenti avanzati';
@@ -28,6 +28,14 @@ function wireBulkInstall(){
  const selected=()=>rows.filter(row=>row.checked&&row.dataset.blocked!=='true').map(row=>source.devices.find(d=>d.index===Number(row.dataset.installIndex)));
  function gate(){const n=source?selected().length:0;$('install-create').textContent=`Crea ${n} funzioni selezionate`;$('install-create').disabled=busy||!n||!$('install-verified').checked||!capability?.available||!capability?.connected;}
  async function run(work){if(busy||pilotBusy)return;busy=true;pilotBusy=true;gate();document.querySelectorAll('#bulk-install input,#bulk-install button').forEach(el=>el.disabled=true);try{await work();}catch(e){status('Interrotto: '+e.message+' Le entità già confermate restano salvate.');source=null;}finally{busy=false;pilotBusy=false;document.querySelectorAll('#bulk-install button').forEach(el=>el.disabled=false);$('install-verified').disabled=false;rows.forEach(row=>row.disabled=!source||row.dataset.blocked==='true');gate();}}
+ if($('install-areas'))$('install-areas').onclick=()=>run(async()=>{
+  if(widgetDirty||structureDirty)throw Error('Salva prima funzioni e stanze.');
+  const current=await api('dashboard/missing-ha');
+  if(etsData?.project_key&&current.project!==etsData.project_key)throw Error('Salva prima il progetto aperto.');
+  if(!confirm('Creare le stanze e i piani mancanti in Home Assistant e assegnare le entità collegate? Le assegnazioni HA già presenti saranno conservate.'))return;
+  const result=await post('native/areas-sync',{confirm:true,source_fingerprint:current.source_fingerprint});
+  status(`${result.rooms} stanze HA, ${result.assigned} nuove assegnazioni. ${result.notices.join(' · ')}`);
+ });
  $('install-edit').onclick=()=>{if(!busy&&!pilotBusy)setPage('widgets');};
  $('install-next').onclick=()=>{if(!busy&&!pilotBusy)setPage('dashboard-export');};
  $('install-verified').onchange=gate;

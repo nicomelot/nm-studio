@@ -6,7 +6,7 @@ const vm=require('node:vm');
 test('all inline application scripts remain valid JavaScript',()=>{
  const html=fs.readFileSync('nm_bridge/index.html','utf8');
  for(const match of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))new vm.Script(match[1]);
- assert.match(html,/<script src="lab_ui.js"><\/script>/);
+ assert.doesNotMatch(html,/<script src="lab_ui.js"><\/script>/);
  new vm.Script(fs.readFileSync('nm_bridge/project_ui.js','utf8'));
  assert.match(html,/<script src="project_ui.js"><\/script>/);
  assert.match(fs.readFileSync('nm_bridge/Dockerfile','utf8'),/COPY lab_ui.js \/app\/lab_ui.js/);
@@ -116,9 +116,9 @@ test('empty selection cannot advance the guided workflow',()=>{
 
 test('technical panels are moved without losing their elements or handlers',()=>{
  function element(id){return {id,children:[],appendChild(child){if(child.parent){child.parent.children=child.parent.children.filter(c=>c!==child);}this.children.push(child);child.parent=this;}};}
- const content=element('content'),lab=element('lab-wizard'),importer=element('importer'),technical=element('technical');
+ const content=element('content'),lab=element('import-summary'),importer=element('importer'),technical=element('technical');
  technical.onclick=()=>42;content.appendChild(importer);content.appendChild(lab);content.appendChild(technical);
- const context={document:{createElement:()=>element('details')},$:id=>id==='content'?content:id==='lab-wizard'?lab:{closest:()=>importer}};
+ const context={document:{createElement:()=>element('details')},$:id=>id==='content'?content:id==='import-summary'?lab:{closest:()=>importer}};
  vm.createContext(context);vm.runInContext(fs.readFileSync('nm_bridge/project_ui.js','utf8'),context);
  context.organizeInstallerPage();
  assert.equal(content.children[0],lab);assert.equal(content.children.length,3);

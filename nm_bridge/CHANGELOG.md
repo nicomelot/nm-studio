@@ -1,3 +1,13 @@
+## 5.17.0
+
+- Import descriptive ETS dimmer and cover functions with typed, linked roles.
+- Preserve rooms directly under buildings; synchronize native HA areas and entity assignments on request.
+- Separate cover position command/state from legacy ambiguous fields.
+- Recover dimmers in saved drafts without overwriting names, rooms or HA links.
+- Three-step real installation flow; virtual wizard removed from the UI.
+- NM Control visible branding. Existing IDs and data formats remain compatible.
+- Conflicting stop DPTs require review; existing HA entities are not automatically reconfigured.
+
 ## 5.16.0 - Creazione multipla guidata
 
 - Salva e continua porta direttamente alla creazione delle funzioni selezionate; associazioni esistenti e collaudo singolo restano disponibili.

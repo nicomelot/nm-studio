@@ -111,3 +111,16 @@ test('changing preview or cancelling confirmation prevents update',async()=>{
  await h.ids['real-update-apply'].onclick();assert.equal(h.calls.length,1);
  assert.equal(h.ids['real-update-apply'].disabled,true);
 });
+
+test('dimmer recovery preserves customer labels, rooms, links and filled fields',()=>{
+ const c=fixture();
+ c.etsData.suggestions.push({kind:'dimmer',command:'1/1/1',brightness:'1/1/9'});
+ assert.equal(c.recoverableUpgrades(c.etsData,c.widgetDrafts).length,1);
+ assert.equal(c.upgradeRecoveredDimmer(0),true);
+ assert.equal(c.widgetDrafts[0].kind,'dimmer');
+ assert.equal(c.widgetDrafts[0].name,'Nome personalizzato');
+ assert.equal(c.widgetDrafts[0].entity_id,'light.l1');
+ assert.equal(c.widgetDrafts[0].room,'Studio');
+ assert.equal(c.widgetDrafts[0].fields.brightness,'1/1/9');
+ assert.equal(c.upgradeRecoveredDimmer(0),false);
+});

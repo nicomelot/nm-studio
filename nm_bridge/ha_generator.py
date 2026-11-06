@@ -131,6 +131,12 @@ def generate(layout=None, evidence=None):
                                      "message": "Regolazione relativa non inclusa: richiede verifica separata"})
         else:
             entry["move_long_address"] = command
+            for field, target in (("position_command", "position_address"),
+                                  ("position_feedback", "position_state_address")):
+                if fields.get(field):
+                    entry[target] = fields[field]
+                    warnings.append({"index": index, "name": name, "code": "check_" + field,
+                                     "message": "Verificare direzione e DPT 5.001 di " + field})
             if fields.get("stop"):
                 entry["stop_address"] = fields["stop"]
                 warnings.append({"index": index, "name": name, "code": "check_stop_dpt",
@@ -148,7 +154,7 @@ def generate(layout=None, evidence=None):
                              "message": "Verificare DPT 1 di movimento e stop e direzione Su/Giù"})
         entries[platform].append(entry)
 
-    lines = ["# NM Studio - bozza da verificare in ETS prima di applicare",
+    lines = ["# NM Control - bozza da verificare in ETS prima di applicare",
              "# Non applicata automaticamente. L'uso in HA abilita possibili comandi sul bus.",
              "# Integrare nella chiave knx: esistente, senza duplicarla.", "knx:"]
     for platform in ("light", "cover", "climate"):
@@ -216,3 +222,4 @@ def generate(layout=None, evidence=None):
             "warnings": warnings, "checks_confirmed": confirmed, "checks_compatible": compatible,
             "checks_pending": pending,
             "evidence_used": evidence is not None, "yaml": "\n".join(lines) + "\n"}
+

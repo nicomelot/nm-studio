@@ -18,3 +18,13 @@ test('floor renames compose aliases so original imported paths still resolve',()
  old=new Map(c.structureDraft.map(n=>[n.id,c.nodePath(n.id)]));c.structureDraft[1].name='Ingresso';c.refreshEditableRooms(old);
  assert.equal(c.structureAliases['Casa / Terra / Ufficio'],'Casa / Ingresso / Studio');assert.equal(c.etsData.lab_candidates[0].room,'Casa / Ingresso / Studio');
 });
+
+test('ETS rooms directly under building retain their path without fictitious floor',()=>{
+ const c={};vm.createContext(c);
+ vm.runInContext(get('nodePath','structureRooms')+get('buildEditableStructure','syncGuidedRooms'),c);
+ const nodes=c.buildEditableStructure([{type:'Building',name:'Casa',path:'Casa'},
+  {type:'Room',name:'Sala',path:'Casa / Sala'},
+  {type:'DistributionBoard',name:'Quadro',path:'Casa / Sala / Quadro'}]);
+ assert.equal(nodes.length,2);
+ assert.equal(c.nodePath(nodes[1].id,nodes),'Casa / Sala');
+});
