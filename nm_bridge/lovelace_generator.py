@@ -27,7 +27,7 @@ def generate(layout, entities):
     Unlinked or unknown devices remain in the audit report, not on the live
     dashboard: an inert mock card should never look like a working control.
     """
-    widgets = layout.get("widgets", [])
+    widgets = [w for w in layout.get("widgets", []) if w.get('visible', True)]
     nodes = layout.get("structure", [])
     available = {e["entity_id"] for e in entities if isinstance(e, dict) and isinstance(e.get("entity_id"), str)}
     by_id = {n["id"]: n for n in nodes}

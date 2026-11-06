@@ -1,3 +1,11 @@
+## 5.17.1
+
+- Automatically add unambiguous linked ETS functions to the draft, including on reimport.
+- Automatically complete recognized dimmers while preserving names, rooms and HA links.
+- Stop scrolling to the last card after adding a function.
+- Add per-function visibility for generated dashboards; hiding preserves entities and configuration.
+- Retain explicit installation confirmation and manual review of ambiguous or incomplete functions.
+
 ## 5.17.0
 
 - Import descriptive ETS dimmer and cover functions with typed, linked roles.

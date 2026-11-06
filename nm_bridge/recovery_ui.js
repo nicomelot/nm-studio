@@ -1,4 +1,4 @@
-// Compare the imported evidence with the current draft; never modify existing widgets.
+// Compare ETS evidence with drafts; import prepares configuration, never HA entities.
 function recoveryReport(data, drafts){
  const supported=new Set(['light','dimmer','cover','climate']);
  const commands=new Set(drafts.map(w=>w.fields?.command).filter(Boolean));
@@ -43,7 +43,7 @@ function addRecoveredWidget(command, kind, automatic=true){
  const room=resolveRoomAlias(match?.room||'Da assegnare');
  const known=structureRooms(false);
  widgetDrafts.push(newWidget(kind,candidate?.name||address.name||command,fields,
-  automatic?'Recuperata da ETS · verifica comando e feedback':'Aggiunta manuale da indirizzo ETS · verifica funzione e DPT',
+  automatic?'Riconosciuta da ETS · '+(candidate.reason||'verifica comando e feedback'):'Aggiunta manuale da indirizzo ETS · verifica funzione e DPT',
   known.includes(room)?room:'Da assegnare'));
  widgetDirty=true;
  return true;
@@ -52,7 +52,9 @@ function addRecoveredWidget(command, kind, automatic=true){
 function recoverableUpgrades(data,drafts){
  return drafts.flatMap((w,index)=>{
   const found=(data?.suggestions||[]).filter(s=>s.command===w.fields.command&&s.kind==='dimmer');
-  return w.kind==='light'&&found.length===1&&found[0].brightness?[{index,candidate:found[0]}]:[];
+  const all=(data?.suggestions||[]).filter(s=>s.command===w.fields.command);
+  const linked=ga=>(data?.addresses||[]).some(a=>a.address===ga&&a.linked);
+  return w.kind==='light'&&all.length===1&&found.length===1&&linked(found[0].command)&&linked(found[0].brightness)?[{index,candidate:found[0]}]:[];
  });
 }
 function upgradeRecoveredDimmer(index){
@@ -64,11 +66,22 @@ function upgradeRecoveredDimmer(index){
  w.kind='dimmer';w.source='Dimmer riconosciuto da ETS; verificare le capacità della eventuale entità HA già collegata';
  widgetDirty=true;return true;
 }
+function reconcileRecognizedFunctions(){
+ let upgraded=0,added=0;
+ for(const u of recoverableUpgrades(etsData,widgetDrafts))if(upgradeRecoveredDimmer(u.index))upgraded++;
+ for(const s of recoveryReport(etsData,widgetDrafts).missing)
+  if(addRecoveredWidget(s.command,s.kind))added++;
+ return {added,upgraded};
+}
+function renderKeepingScroll(){
+ const top=window.scrollY,left=window.scrollX;
+ render();window.scrollTo({top,left,behavior:'instant'});
+}
 function recoveryPanel(){
  if(!etsData)return '';
  const report=recoveryReport(etsData,widgetDrafts);
  const row=(s,manual=false)=>`<div class="row recovery-row" data-search="${escapeHTML((s.name+' '+(s.command||s.address)).toLowerCase())}" style="margin:8px 0"><div class="grow"><b>${escapeHTML(s.name)}</b><p class="small muted">${escapeHTML(s.command||s.address)} · ${escapeHTML(s.kind||s.dpt||'Tipo da verificare')}${!s.linked?' · Nessun collegamento ETS rilevato':''}${s.shared?' · Indirizzo già usato in un altro campo':''}${s.ambiguous?' · Proposte discordanti':''}</p></div>${!manual&&!s.ambiguous&&!s.shared&&s.linked?`<button data-recover="${escapeHTML(s.command)}" data-kind="${s.kind}">Aggiungi ${escapeHTML(s.name)} alle funzioni</button>`:`<select class="recovery-kind" aria-label="Tipo funzione per ${escapeHTML(s.name)}" style="max-width:180px"><option value="">Scegli tipo…</option><option value="light">Luce</option><option value="dimmer">Dimmer</option><option value="cover">Tapparella</option><option value="climate">Termostato</option></select><button data-recover-manual="${escapeHTML(s.command||s.address)}">Prepara manualmente</button>`}</div>`;
- return `<section class="card" id="recovery-panel"><div class="workspace-label">Confronto con il progetto ETS aperto</div><h2>Recupera funzioni mancanti</h2><p>${report.missing.length} proposte assenti dalla bozza · ${report.other.length} altri indirizzi da esaminare. Gli indirizzi possono essere comandi, feedback o funzioni ausiliarie: non corrispondono necessariamente a dispositivi mancanti.</p><input id="recovery-search" placeholder="Cerca L5, nome o indirizzo di gruppo" aria-label="Cerca funzioni mancanti"><div style="max-height:360px;overflow:auto">${report.missing.map(s=>row(s)).join('')||'<p>Nessuna proposta riconosciuta da aggiungere.</p>'}<details><summary>Avanzato: indirizzi non classificati (${report.other.length})</summary>${report.other.map(a=>row(a,true)).join('')}</details></div>${report.stale.length?`<p class="warning">${report.stale.length} widget hanno un comando assente dal progetto importato: ${report.stale.map(w=>escapeHTML(w.name+' ('+w.fields.command+')')).join(', ')}. Sono stati conservati: verifica prima di modificarli.</p>`:''}<p class="small muted">Aggiungere prepara una bozza senza entità HA. Controlla tipo, indirizzi e stanza, poi salva. Le associazioni esistenti vengono conservate.</p><p id="recovery-status" aria-live="polite"></p></section>`;
+ return `<section class="card" id="recovery-panel"><div class="workspace-label">Confronto con il progetto ETS aperto</div><h2>Riconoscimento automatico</h2><p>${widgetDrafts.length} funzioni nel riepilogo · ${report.missing.length} proposte da verificare · ${report.other.length} altri indirizzi da esaminare. Gli indirizzi possono essere comandi, feedback o funzioni ausiliarie: non corrispondono necessariamente a dispositivi mancanti.</p><input id="recovery-search" placeholder="Cerca L5, nome o indirizzo di gruppo" aria-label="Cerca funzioni mancanti"><div style="max-height:360px;overflow:auto">${report.missing.map(s=>row(s)).join('')||'<p>Le funzioni riconosciute sono già inserite nel riepilogo.</p>'}<details><summary>Avanzato: indirizzi non classificati (${report.other.length})</summary>${report.other.map(a=>row(a,true)).join('')}</details></div>${report.stale.length?`<p class="warning">${report.stale.length} widget hanno un comando assente dal progetto importato: ${report.stale.map(w=>escapeHTML(w.name+' ('+w.fields.command+')')).join(', ')}. Sono stati conservati: verifica prima di modificarli.</p>`:''}<p class="small muted">Le funzioni vengono inserite nella bozza senza creare entità HA. Controlla il riepilogo, poi salva e continua. Le associazioni esistenti vengono conservate.</p><p id="recovery-status" aria-live="polite"></p></section>`;
 }
 
 function wireRecovery(){
@@ -83,12 +96,12 @@ function wireRecovery(){
   if(e.target.value&&row.closest('details'))row.closest('details').open=true;
  });
  document.querySelectorAll('[data-recover]').forEach(b=>b.onclick=()=>{
-  if(addRecoveredWidget(b.dataset.recover,b.dataset.kind)){render();focusWidget(widgetDrafts.length-1);message('Aggiunta '+widgetDrafts[widgetDrafts.length-1].name+'. Scegli la stanza, poi premi Salva e continua.');}
+  if(addRecoveredWidget(b.dataset.recover,b.dataset.kind)){renderKeepingScroll();message('Aggiunta '+widgetDrafts[widgetDrafts.length-1].name+'. Scegli la stanza, poi premi Salva e continua.');}
  });
  document.querySelectorAll('[data-recover-manual]').forEach(b=>b.onclick=()=>{
   const kind=b.closest('.recovery-row').querySelector('.recovery-kind').value;
   if(!kind){$('recovery-status').textContent='Scegli il tipo di funzione da preparare.';return;}
-  if(addRecoveredWidget(b.dataset.recoverManual,kind,false)){render();focusWidget(widgetDrafts.length-1);message('Aggiunta manualmente '+widgetDrafts[widgetDrafts.length-1].name+'. Verifica la funzione: un comando generale non è una singola luce.');}
+  if(addRecoveredWidget(b.dataset.recoverManual,kind,false)){renderKeepingScroll();message('Aggiunta manualmente '+widgetDrafts[widgetDrafts.length-1].name+'. Verifica la funzione: un comando generale non è una singola luce.');}
  });
 }
 

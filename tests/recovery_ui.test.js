@@ -124,3 +124,26 @@ test('dimmer recovery preserves customer labels, rooms, links and filled fields'
  assert.equal(c.widgetDrafts[0].fields.brightness,'1/1/9');
  assert.equal(c.upgradeRecoveredDimmer(0),false);
 });
+
+test('import automatically adds recognized functions and upgrades dimmers without duplicates',()=>{
+ const c=fixture();c.widgetDrafts[0].visible=false;
+ c.etsData.suggestions.push({kind:'dimmer',command:'1/1/1',brightness:'1/1/9'});
+ const first=c.reconcileRecognizedFunctions();
+ assert.equal(first.added,1);assert.equal(first.upgraded,1);
+ assert.equal(c.widgetDrafts.length,2);assert.equal(c.widgetDrafts[0].visible,false);
+ assert.equal(c.widgetDrafts[0].entity_id,'light.l1');assert.equal(c.widgetDrafts[0].name,'Nome personalizzato');
+ const next=c.reconcileRecognizedFunctions();assert.equal(next.added,0);assert.equal(next.upgraded,0);
+});
+test('automatic import leaves ambiguous and unlinked proposals for review',()=>{
+ const c=fixture();c.etsData.suggestions.push({kind:'cover',command:'1/1/8'});
+ c.etsData.addresses.find(a=>a.address==='1/1/9').linked=false;
+ c.etsData.suggestions.push({kind:'light',command:'1/1/9'});
+ assert.equal(c.reconcileRecognizedFunctions().added,0);
+ assert.equal(c.widgetDrafts.length,1);
+});
+test('manual addition rerender preserves window scroll instead of focusing final card',()=>{
+ const c=fixture();let scrolled=null,rendered=0;
+ c.window={scrollY:245,scrollX:0,scrollTo:opts=>scrolled=opts};c.render=()=>rendered++;
+ c.renderKeepingScroll();assert.equal(rendered,1);assert.equal(scrolled.top,245);
+ assert.doesNotMatch(source,/render\(\);focusWidget\(widgetDrafts.length-1\)/);
+});
