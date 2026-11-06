@@ -5,6 +5,10 @@ contracts, which remain installer-confirmed and purely provisional.
 """
 
 import re
+try:
+    from .ets_named_functions import application_stop
+except ImportError:
+    from ets_named_functions import application_stop
 
 
 FUNCTION_FIELDS = {
@@ -107,6 +111,8 @@ def review_suggestions(addresses, suggestions):
                 expected_bits = {_expected_bits(value) for value in allowed}
                 if assigned:
                     status = "verified_dpt" if assigned in allowed else "conflict_dpt"
+                    if kind == 'cover' and field == 'stop' and assigned == '1.008' and application_stop(item):
+                        status = 'compatible_object'
                 elif known and None not in expected_bits and all(bit in expected_bits for bit in known):
                     status = "compatible_size"
                 elif known and None not in expected_bits:
@@ -115,6 +121,8 @@ def review_suggestions(addresses, suggestions):
                     status = "dpt_unknown"
                 if status.startswith("conflict"):
                     questions.append("Verifica DPT e oggetti di " + field + " (" + group + ")")
+                elif status == 'compatible_object':
+                    questions.append('Stop ' + group + ': DPT 1.008 confermato dall’oggetto applicativo; collaudare l’arresto')
                 elif status in ("dpt_unknown", "compatible_size"):
                     questions.append("Conferma DPT " + expected_label + " per " + field + " (" + group + ")")
             checks.append({"field": field, "address": group, "expected_dpt": expected_label, "status": status})
@@ -122,7 +130,7 @@ def review_suggestions(addresses, suggestions):
         # A high score is an evidence grade, NEVER permission to create or control entities.
         confidence = ("bassa" if any(s in ("unlinked", "missing", "conflict_dpt", "conflict_size") for s in strength)
                       else "alta" if strength and all(s == "verified_dpt" for s in strength) and not questions
-                      else "media" if strength and all(s in ("verified_dpt", "compatible_size") for s in strength)
+                      else "media" if strength and all(s in ("verified_dpt", "compatible_size", "compatible_object") for s in strength)
                       else "bassa")
         output.append({"name": candidate.get("name", "")[:80], "kind": kind,
                        "command": candidate.get("command"), "confidence": confidence,

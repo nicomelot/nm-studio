@@ -3,6 +3,9 @@ from nm_bridge.ets_named_functions import descriptive_suggestions
 from nm_bridge.widget_layout import validate_structure
 from nm_bridge.knx_entity_plan import build
 from nm_bridge.missing_ha_generator import fingerprint
+from nm_bridge.ets_import import catalog_key, catalog_objects
+import io
+import zipfile
 
 
 def address(name, dpt, number, linked=True):
@@ -10,6 +13,26 @@ def address(name, dpt, number, linked=True):
 
 
 class DescriptiveImportTests(unittest.TestCase):
+    def test_module_catalog_keeps_namespaces_and_reference_overrides(self):
+        data = io.BytesIO()
+        xml = '''<Root><ComObject Id="APP_MD-1_O-2-32" ObjectSize="1 Bit" FunctionText="Switch" WriteFlag="Enabled" DatapointType="DPST-1-1"/>
+        <ComObject Id="APP_MD-2_O-2-32" ObjectSize="1 Bit" FunctionText="Stop" WriteFlag="Enabled" DatapointType="DPST-1-7"/>
+        <ComObjectRef Id="APP_MD-2_O-2-32_R-2" RefId="APP_MD-2_O-2-32" FunctionText="Short term operation/Stop" DatapointType="DPST-1-8"/>
+        <ComObject Id="APP_MD-3_O-2-32" ObjectSize="1 Bit" FunctionText="Alarm" WriteFlag="Disabled" DatapointType="DPST-1-5"/></Root>'''
+        with zipfile.ZipFile(data, 'w') as z:
+            z.writestr('app.xml', xml)
+        with zipfile.ZipFile(data) as z:
+            catalog = catalog_objects(z, 'app.xml', {}, [0])
+        key = catalog_key('MD-2_M-62_MI-1_O-2-32_R-2')
+        self.assertEqual(key, 'MD-2_O-2-32_R-2')
+        self.assertEqual(catalog[key]['dpt'], 'DPST-1-8')
+        stop = address('TAPPARELLA SALA OPERAZIONE BREVE/STOP', 'DPST-1-8', 1)
+        stop['connections'] = [catalog[key]]
+        items = [address("TAPPARELLA SALA SU/GIU'", 'DPST-1-8', 0), stop]
+        self.assertEqual(descriptive_suggestions(items)[0][0]['stop'], '3/1/1')
+        stop['connections'] = [catalog['MD-3_O-2-32']]
+        self.assertNotIn('stop', descriptive_suggestions(items)[0][0])
+
     def test_dimmer_roles_without_numbered_names(self):
         items = [address('Sala punti luce ' + role, dpt, i) for i, (role, dpt) in enumerate([
             ('ON/OFF', 'DPST-1-1'), ('DIMMING RELATIVO', 'DPST-3-7'),

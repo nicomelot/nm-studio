@@ -26,6 +26,19 @@ ROLES = (
 )
 
 
+def application_stop(item):
+    """A manufacturer's explicit writable stop object can use DPT 1.008."""
+    connections = item.get('connections', [])
+    if any(c.get('size') and normalized(c['size']).replace(' ', '') not in ('1bit', '1bits')
+           for c in connections):
+        return False
+    return any(c.get('flags', {}).get('WriteFlag') is True
+               and normalized(c.get('size', '')).replace(' ', '') in ('1bit', '1bits')
+               and c.get('dpt') in ('DPST-1-8', 'DPT-1.008')
+               and re.search(r'\bstop\b|\barresto\b', normalized(c.get('function', '')))
+               for c in connections)
+
+
 def descriptive_suggestions(items):
     groups = {}
     for item in items:
@@ -43,7 +56,8 @@ def descriptive_suggestions(items):
             raw = str(item.get('dpt', '')).upper()
             dpt = re.fullmatch(r'(?:DPST-|DPT-)?(\d+)[.-](\d+)', raw)
             value = f'{int(dpt[1])}.{int(dpt[2]):03d}' if dpt else ''
-            groups.setdefault(stem, {}).setdefault(role, []).append((item, value in allowed))
+            compatible = value in allowed or (role == 'stop' and value == '1.008' and application_stop(item))
+            groups.setdefault(stem, {}).setdefault(role, []).append((item, compatible))
             break
     proposals, consumed = [], set()
     for stem, roles in groups.items():

@@ -444,6 +444,11 @@ def application_file(device):
     return f"{maker}/{maker}_A-{program}.xml"
 
 
+def catalog_key(reference):
+    """Keep module definitions; remove only application and instance prefixes."""
+    return '_'.join(p for p in reference.split('_') if p.startswith(('MD-', 'O-', 'R-')))
+
+
 def catalog_objects(archive, filename, cache, budget):
     if not filename:
         return {}
@@ -467,12 +472,13 @@ def catalog_objects(archive, filename, cache, budget):
     for node in root.iter():
         if name_of(node.tag) != "ComObject":
             continue
-        obj_id = (node.get("Id") or "").rsplit("_", 1)[-1]
-        if obj_id.startswith("O-") and len(objects) < MAX_OBJECT_LINKS:
+        obj_id = catalog_key(node.get("Id") or "")
+        if obj_id and len(objects) < MAX_OBJECT_LINKS:
             objects[obj_id] = {"name": (node.get("Name") or "")[:120],
                                "function": (node.get("FunctionText") or "")[:100],
                                "number": node.get("Number"),
                                "size": (node.get("ObjectSize") or "")[:32],
+                               "dpt": (node.get("DatapointType") or "")[:100],
                                "flags": {k: node.get(k) == "Enabled" for k in (
                                    "CommunicationFlag", "ReadFlag", "WriteFlag", "TransmitFlag", "UpdateFlag")}}
     # Parameter-specific ComObjectRef values override generic ComObject
@@ -483,12 +489,16 @@ def catalog_objects(archive, filename, cache, budget):
         ref_key = (node.get("Id") or "").split("_O-", 1)
         if len(ref_key) != 2 or "_R-" not in ref_key[1]:
             continue
-        key = "O-" + ref_key[1]
+        key = catalog_key(node.get("Id") or "")
         base = objects.get(key.split("_R-", 1)[0], {})
         objects[key] = {**base,
                         "name": (node.get("Text") or node.get("Name") or base.get("name") or "")[:120],
                         "function": (node.get("FunctionText") or base.get("function") or "")[:100],
                         "size": (node.get("ObjectSize") or base.get("size") or "")[:32],
+                        "dpt": (node.get("DatapointType") or base.get("dpt") or "")[:100],
+                        "flags": {**base.get('flags', {}), **{k: node.get(k) == 'Enabled'
+                                  for k in ('CommunicationFlag', 'ReadFlag', 'WriteFlag', 'TransmitFlag', 'UpdateFlag')
+                                  if node.get(k) is not None}},
                         "source": "riferimento applicativo"}
     cache[filename] = objects
     return objects
@@ -598,7 +608,7 @@ def preview(raw, password=""):
                 for obj in device.iter():
                     if name_of(obj.tag) != "ComObjectInstanceRef":
                         continue
-                    instance_refs.add((obj.get("RefId") or "").split("_R-", 1)[0])
+                    instance_refs.add(catalog_key(obj.get("RefId") or "").split("_R-", 1)[0])
                     refs = (obj.get("Links") or "").split()
                     if refs:
                         device_inventory[-1]["connected_objects"] += 1
@@ -606,7 +616,7 @@ def preview(raw, password=""):
                         device_inventory[-1]["unlinked_count"] += 1
                         if len(device_inventory[-1]["unlinked_objects"]) < MAX_UNLINKED_PER_DEVICE:
                             ref_id = (obj.get("RefId") or "")[:100]
-                            details = objects.get(ref_id, {})
+                            details = objects.get(catalog_key(ref_id), {})
                             device_inventory[-1]["unlinked_objects"].append({"object_ref": ref_id, **details})
                     link_count += len(refs)
                     if link_count > MAX_OBJECT_LINKS:
@@ -618,7 +628,7 @@ def preview(raw, password=""):
                             device_inventory[-1]["linked_addresses"] += 1
                             if len(record["connections"]) < 12:
                                 ref_id = (obj.get("RefId") or "")[:100]
-                                details = objects.get(ref_id, {})
+                                details = objects.get(catalog_key(ref_id), {})
                                 record["connections"].append({"device_id": device_id, "device": dev_label,
                                                               "object_ref": ref_id, **details})
                 # The manufacturer's catalogue can contain objects disabled by

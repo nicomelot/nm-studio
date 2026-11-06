@@ -69,6 +69,14 @@ function upgradeRecoveredDimmer(index){
 function reconcileRecognizedFunctions(){
  let upgraded=0,added=0;
  for(const u of recoverableUpgrades(etsData,widgetDrafts))if(upgradeRecoveredDimmer(u.index))upgraded++;
+ for(const w of widgetDrafts){
+  const found=(etsData?.suggestions||[]).filter(s=>s.command===w.fields.command);
+  if(found.length!==1||found[0].kind!==w.kind)continue;
+  for(const [key] of widgetFields[w.kind]||[]){
+   if(w.kind==='cover'&&['feedback','position'].includes(key))continue;
+   if(!w.fields[key]&&linkedGA(found[0][key])){w.fields[key]=found[0][key];widgetDirty=true;}
+  }
+ }
  for(const s of recoveryReport(etsData,widgetDrafts).missing)
   if(addRecoveredWidget(s.command,s.kind))added++;
  return {added,upgraded};

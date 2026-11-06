@@ -1,3 +1,9 @@
+## 5.17.2
+
+- Resolve modular ETS communication objects without mixing module definitions.
+- Recover DPT 1.008 stops only when the linked application object explicitly confirms writable one-bit stop semantics.
+- Fill missing fields in previously saved functions on reimport while preserving installer overrides.
+
 ## 5.17.1
 
 - Automatically add unambiguous linked ETS functions to the draft, including on reimport.

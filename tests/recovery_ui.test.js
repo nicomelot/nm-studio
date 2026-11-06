@@ -147,3 +147,12 @@ test('manual addition rerender preserves window scroll instead of focusing final
  c.renderKeepingScroll();assert.equal(rendered,1);assert.equal(scrolled.top,245);
  assert.doesNotMatch(source,/render\(\);focusWidget\(widgetDrafts.length-1\)/);
 });
+
+test('reimport fills verified missing cover stop but preserves existing override and identity',()=>{
+ const c=fixture();c.widgetDrafts[0].kind='cover';c.widgetDrafts[0].visible=false;
+ c.etsData.suggestions=[{kind:'cover',command:'1/1/1',stop:'1/1/9'}];
+ c.reconcileRecognizedFunctions();assert.equal(c.widgetDrafts[0].fields.stop,'1/1/9');
+ assert.equal(c.widgetDrafts[0].entity_id,'light.l1');assert.equal(c.widgetDrafts[0].visible,false);
+ c.widgetDrafts[0].fields.stop='2/1/20';c.reconcileRecognizedFunctions();
+ assert.equal(c.widgetDrafts[0].fields.stop,'2/1/20');
+});
