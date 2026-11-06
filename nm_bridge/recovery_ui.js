@@ -120,15 +120,17 @@ function wireClearWidgetFlow(){
  content.append(actions);
  const save=$('widget-save'),next=$('widget-save-next');
  save.classList.remove('primary');save.textContent='Salva bozza';
- next.classList.add('primary');next.textContent='Salva e continua → Associa entità';
+ next.classList.add('primary');next.textContent='Salva e continua alla creazione';
+ next.onclick=async()=>{if(await save.onclick()===true)setPage('real');};
  actions.append(save,next);
+ const associate=document.createElement('button');associate.textContent='Usa entità già esistenti';associate.onclick=async()=>{if(await save.onclick()===true)setPage('matches');};tools.append(associate);
  $('widget-flow-back').onclick=()=>setPage('live');
  function update(){
   const issues=widgetFlowIssues(widgetDrafts);
-  $('widget-flow-status').textContent=(widgetDirty?'Modifiche da salvare. ':'Configurazione salvata. ')+widgetDrafts.length+' funzioni. '+(issues.length?issues[0].message+' Puoi salvare una bozza e completarla dopo.':'Pronto per associare le entità Home Assistant.');
+  $('widget-flow-status').textContent=(widgetDirty?'Modifiche da salvare. ':'Configurazione salvata. ')+widgetDrafts.length+' funzioni. '+(issues.length?issues[0].message+' Puoi continuare con le funzioni pronte e rifinire questa dopo.':'Pronto per creare le funzioni selezionate.');
  }
  content.addEventListener('input',update);content.addEventListener('change',update);update();
- const note=controls.querySelector('.warning');if(note)note.textContent='Scegli nome e stanza per ogni funzione. Salva bozza conserva anche il lavoro incompleto; Salva e continua controlla i campi necessari. Nessuna entità HA viene creata in questo passaggio.';
+ const note=controls.querySelector('.warning');if(note)note.textContent='Controlla le funzioni riconosciute e continua alla creazione. Puoi completare le stanze e le funzioni incomplete in seguito. Nessuna entità HA viene creata in questo passaggio.';
 }
 
 

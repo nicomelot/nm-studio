@@ -5,6 +5,18 @@ import os
 import re
 import tempfile
 from pathlib import Path
+from threading import RLock
+from functools import wraps
+
+LAYOUT_LOCK = RLock()
+
+
+def locked(function):
+    @wraps(function)
+    def wrapped(*args, **kwargs):
+        with LAYOUT_LOCK:
+            return function(*args, **kwargs)
+    return wrapped
 
 
 WIDGET_PATH = Path(os.getenv("NM_WIDGET_LAYOUT_PATH", "/data/nm_knx_widget_layout.json"))
@@ -112,12 +124,14 @@ def validate(payload):
             "structure": structure, "widgets": clean, **({"room_aliases": aliases} if aliases else {})}
 
 
+@locked
 def read_layout():
     if not WIDGET_PATH.exists():
         return {"version": 1, "project": "", "rooms": [], "structure": [], "widgets": []}
     return validate(json.loads(WIDGET_PATH.read_text(encoding="utf-8")))
 
 
+@locked
 def save_layout(payload):
     if not isinstance(payload, dict) or payload.get("confirm") is not True:
         raise ValueError("Explicit save confirmation required")

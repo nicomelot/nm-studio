@@ -31,6 +31,7 @@ COPY knx_entity_audit.py /app/knx_entity_audit.py
 COPY knx_yaml_audit.py /app/knx_yaml_audit.py
 COPY knx_entity_plan.py /app/knx_entity_plan.py
 COPY knx_panel_apply.py /app/knx_panel_apply.py
+COPY knx_install.py /app/knx_install.py
 COPY migration_bundle.py /app/migration_bundle.py
 COPY intelligence.py /app/intelligence.py
 COPY module_plan.py /app/module_plan.py

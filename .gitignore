@@ -8,3 +8,5 @@ venv/
 *.knxproj
 *.json.bak
 nm-studio-backup-*.json
+private-analysis/
+

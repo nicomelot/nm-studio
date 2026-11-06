@@ -138,9 +138,9 @@ def structured_suggestions(items):
     groups = {}
     for item in items:
         parts = [p.strip() for p in item.get("name", "").split(" - ")]
-        if len(parts) < 3 or not item.get("linked"):
+        if len(parts) < 2 or not item.get("linked"):
             continue
-        space, circuit, role = parts[0], parts[1], " - ".join(parts[2:]).casefold()
+        space, circuit, role = (parts[0], parts[1], " - ".join(parts[2:]).casefold()) if len(parts) >= 3 else ("Da assegnare", parts[0], parts[1].casefold())
         if not space or not circuit or not role:
             continue
         groups.setdefault((space, circuit), []).append((item, role))
@@ -148,7 +148,7 @@ def structured_suggestions(items):
     proposals, consumed = [], set()
     def dpt(item):
         raw = (item.get("dpt") or "").upper()
-        m = re.fullmatch(r"(?:DPST-|DPT-)(\d+)[.-](\d+)", raw)
+        m = re.fullmatch(r"(?:DPST-|DPT-)?(\d+)[.-](\d+)", raw)
         return f"{int(m[1])}.{int(m[2]):03d}" if m else ""
 
     for (space, circuit), entries in groups.items():
@@ -157,16 +157,16 @@ def structured_suggestions(items):
                        if re.search(pattern, role) and dpt(item) in types]
             return matches[0]["address"] if len(matches) == 1 else None
 
-        light_on = one(r"\bon\s*/\s*off\s+comando\b", {"1.001"})
-        light_fb = one(r"\bon\s*/\s*off\s+feedback\b", {"1.001", "1.011"})
+        light_on = one(r"^(?:comando\s+)?on\s*/\s*off(?:\s+comando)?$", {"1.001"})
+        light_fb = one(r"^(?:on\s*/\s*off\s+(?:feedback|stato)|(?:stato|feedback)(?:\s+on\s*/\s*off)?)$", {"1.001", "1.011"})
         brightness = one(r"luminosit[aà]\s+comando", {"5.001"})
         brightness_fb = one(r"luminosit[aà]\s+feedback", {"5.001"})
         relative = one(r"dimmer\s+relativ|regolazione\s+relativ", {"3.007"})
         cct = one(r"temperatura\s+colore\s+comando", {"7.600"})
         cct_fb = one(r"temperatura\s+colore\s+feedback", {"7.600"})
 
-        move = one(r"movimento\s+comando", {"1.008"})
-        stop = one(r"(?:step\s*/?\s*stop|stop)\s+comando", {"1.007", "1.017"})
+        move = one(r"^(?:movimento(?:\s+comando)?|(?:comando\s+)?(?:su\s*/\s*gi[uù]|salita\s*/\s*discesa)(?:\s+comando)?)$", {"1.008"})
+        stop = one(r"^(?:comando\s+)?(?:step\s*/?\s*stop|stop|arresto)(?:\s+comando)?$", {"1.007", "1.017"})
         position = one(r"^posizione\s+comando$", {"5.001"})
         position_fb = one(r"^posizione\s+feedback$", {"5.001"})
         slats = one(r"lamelle\s+comando", {"5.001"})
@@ -183,8 +183,8 @@ def structured_suggestions(items):
 
         fields = {}
         kind = None
-        if light_on and light_fb and not (move or ambient or setpoint):
-            kind = "dimmer" if brightness and brightness_fb else "light"
+        if light_on and not (move or ambient or setpoint):
+            kind = "dimmer" if brightness or relative else "light"
             fields = {"command": light_on, "feedback": light_fb}
             if kind == "dimmer":
                 fields.update({"brightness": brightness, "brightness_feedback": brightness_fb})
@@ -211,7 +211,7 @@ def structured_suggestions(items):
         if not kind:
             continue
         fields = {k: v for k, v in fields.items() if v}
-        proposals.append({"name": f"{space} - {circuit}", "kind": kind, **fields,
+        proposals.append({"name": circuit if space == "Da assegnare" else f"{space} - {circuit}", "kind": kind, **fields,
                           "room": space, "confidence": "media",
                           "reason": "Ruoli di circuito e DPT coerenti; verificare direzione e oggetti ETS"})
         consumed.update(fields.values())
