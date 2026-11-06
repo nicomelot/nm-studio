@@ -68,3 +68,14 @@ class CommissioningTests(unittest.TestCase):
             self.assertEqual(request('/knx/commission-command', {}, address='192.168.1.20')['status'], 403)
             handler.assert_not_called()
             self.assertEqual(request('/knx/commission-command', {})['status'], 400)
+
+    def test_off_button_repeated_presses_never_turn_on_even_without_state(self):
+        self.layout['widgets'][0].update(type='light', command_mode='off_only', fields={'command': '1/1/1'})
+        self.ws.states[0]['state'] = 'unknown'
+        for action in ('on', 'toggle', 'brightness'):
+            with self.assertRaisesRegex(ValueError, 'solo lo spegnimento'):
+                self.execute({**self.payload(), 'action': action})
+        self.assertEqual(self.writes(), [])
+        for _ in range(2):
+            self.execute({**self.payload(), 'action': 'off'})
+        self.assertEqual([c['service'] for c in self.writes()], ['turn_off', 'turn_off'])

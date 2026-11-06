@@ -57,6 +57,16 @@ class FakeSocket:
 
 
 class DashboardPublisherTests(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        context = patch('nm_bridge.dashboard_publisher.BACKUP_DIR', Path(directory.name))
+        context.start()
+        self.addCleanup(context.stop)
+
     def test_websocket_uses_matching_message_ids(self):
         fake = FakeSocket([{"type": "auth_ok"},
                            {"id": 999, "type": "event"},
@@ -196,3 +206,76 @@ class DashboardUpdateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, self.assertRaisesRegex(PublishError, 'durante il backup'):
             update_existing(payload, LAYOUT, ENTITIES, lambda: fake, directory)
         self.assertNotIn('lovelace/config/save', [c[0] for c in fake.calls])
+
+
+class DashboardMergeTests(unittest.TestCase):
+    def test_home_manual_buttons_order_edits_and_deletions_survive_regeneration(self):
+        from copy import deepcopy
+        from nm_bridge.dashboard_publisher import _merge_dashboard
+        base = {'title': 'NM', 'views': [{'path': 'home', 'sections': [{'type': 'grid', 'cards': [
+            {'type': 'tile', 'entity': 'light.a', 'name': 'A'},
+            {'type': 'tile', 'entity': 'light.b', 'name': 'B'}]}]}]}
+        current = deepcopy(base)
+        manual = {'type': 'button', 'name': 'Chiudi tutto', 'tap_action': {'action': 'perform-action', 'perform_action': 'cover.close_cover', 'target': {'entity_id': 'cover.all'}}}
+        cards = current['views'][0]['sections'][0]['cards']
+        cards.pop(1)
+        cards[0]['name'] = 'Nome cliente'
+        cards.insert(0, manual)
+        new = deepcopy(base)
+        new['views'][0]['sections'][0]['cards'][0]['icon'] = 'mdi:lamp'
+        new['views'][0]['sections'][0]['cards'].append({'type': 'tile', 'entity': 'light.c'})
+        merged = _merge_dashboard(base, current, new)
+        result = merged['views'][0]['sections'][0]['cards']
+        self.assertEqual(result[0], manual)
+        self.assertEqual(result[1]['name'], 'Nome cliente')
+        self.assertEqual(result[1]['icon'], 'mdi:lamp')
+        self.assertEqual([c.get('entity') for c in result], [None, 'light.a', 'light.c'])
+        self.assertEqual(_merge_dashboard(new, merged, new), merged)
+        self.assertEqual(base['views'][0]['sections'][0]['cards'][0]['name'], 'A')
+
+    def test_legacy_dashboard_keeps_home_buttons_custom_views_and_edited_cards(self):
+        from nm_bridge.dashboard_publisher import _merge_dashboard
+        current = {'views': [{'path': 'home', 'sections': [{'type': 'grid', 'cards': [
+            {'type': 'button', 'name': 'OFF generale', 'entity': 'light.off_generale', 'tap_action': {'action': 'none'}}]}]},
+            {'path': 'custom', 'cards': [{'type': 'markdown', 'content': 'Mia pagina'}]}]}
+        new = {'views': [{'path': 'home', 'sections': [{'type': 'grid', 'cards': [
+            {'type': 'tile', 'entity': 'light.off_generale'}, {'type': 'tile', 'entity': 'light.new'}]}]}]}
+        merged = _merge_dashboard({}, current, new)
+        self.assertEqual(merged['views'][0]['sections'][0]['cards'][0], current['views'][0]['sections'][0]['cards'][0])
+        self.assertEqual(merged['views'][1], current['views'][1])
+        self.assertEqual(len(merged['views'][0]['sections'][0]['cards']), 2)
+
+    def test_baseline_persists_only_verified_update_and_second_update_is_idempotent(self):
+        import tempfile
+        from pathlib import Path
+        from copy import deepcopy
+        from nm_bridge.dashboard_publisher import preview_update, update_existing
+        generated = generate(LAYOUT, ENTITIES)
+        fake = FakeClient(existing=[generated['url_path']])
+        fake.saved = deepcopy(generated['dashboard'])
+        manual = {'type': 'button', 'name': 'OFF generale', 'tap_action': {'action': 'none'}}
+        fake.saved['views'][0]['sections'][0]['cards'].append(manual)
+        with tempfile.TemporaryDirectory() as directory:
+            for _ in range(2):
+                preview = preview_update({'url_path': generated['url_path']}, LAYOUT, ENTITIES, lambda: fake, directory)
+                payload = {**preview, 'confirm': True}
+                update_existing(payload, LAYOUT, ENTITIES, lambda: fake, directory)
+                self.assertIn(manual, fake.saved['views'][0]['sections'][0]['cards'])
+            self.assertTrue(list((Path(directory)/'baselines').glob('*.json')))
+            self.assertEqual(len([c for c in fake.calls if c[0]=='lovelace/config/save']),0)
+
+    def test_explicit_off_mode_converts_existing_native_home_shortcut_without_moving_it(self):
+        import tempfile
+        from nm_bridge.dashboard_publisher import _replacement
+        layout = json.loads(json.dumps(LAYOUT))
+        layout['widgets'][0]['command_mode'] = 'off_only'
+        generated = generate(layout, ENTITIES)
+        current = {'views': [{'path': 'panoramica', 'sections': [{'type': 'grid', 'cards': [
+            {'type': 'tile', 'entity': 'light.l1', 'name': 'Mio spegni tutto', 'tap_action': {'action': 'toggle'}}]}]}]}
+        with tempfile.TemporaryDirectory() as directory:
+            result = _replacement(generated, current, directory)
+        card = result['views'][0]['sections'][0]['cards'][0]
+        self.assertEqual(card['name'], 'Mio spegni tutto')
+        self.assertEqual(card['tap_action']['perform_action'], 'light.turn_off')
+        self.assertNotIn('entity', card)
+        self.assertEqual(card['hold_action'], {'action': 'none'})

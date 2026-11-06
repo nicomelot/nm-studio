@@ -1,3 +1,10 @@
+## 5.20.0
+- Avvio guidato: verifica automatica in sola lettura della connessione KNX e collegamento alla configurazione nativa di Home Assistant quando necessaria. IP, interfaccia e credenziali vengono scelti nella procedura ufficiale; nessuna configurazione del bus viene inventata.
+- Pulsanti di solo spegnimento: conversione delle luci esistenti, dashboard con azione OFF esplicita e collaudo senza ON/toggle. L’entità HA sottostante resta una luce utilizzabile da altre viste.
+- Ricerca per nome o GA nelle funzioni e nei selettori; aggiunta o conversione di un pulsante senza duplicare la funzione.
+- Aggiornamento della plancia con conservazione delle personalizzazioni, confronto a tre versioni e backup. Le plance precedenti senza riferimento conservano prioritariamente le schede esistenti; i conflitti manuali non vengono sovrascritti.
+- Una conversione esplicita a solo spegnimento aggiorna anche le scorciatoie native già presenti, conservandone posizione, nome e icona. Le schede personalizzate di terze parti richiedono verifica manuale.
+
 ## 5.19.0
 
 - Compact installer cards grouped by room with labelled readiness badges and collapsible KNX details.

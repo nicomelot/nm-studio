@@ -132,6 +132,8 @@ def publish_generated(payload, generated, client_factory=HAWebSocket):
         stored = client.call("lovelace/config", url_path=url_path)
         if not isinstance(stored, dict) or stored.get("views") != config["views"]:
             raise PublishError("Dashboard creata, ma verifica contenuto non riuscita: " + url_path)
+    if url_path == generated.get('url_path') and url_path.startswith('nm-studio-reale-'):
+        _save_baseline(url_path, config)
     return {"created": True, "url_path": url_path, "title": title.strip(),
             "summary": generated["summary"], "warnings": generated["warnings"]}
 
@@ -172,27 +174,144 @@ def _read_current(client, path):
     return current
 
 
-def _replacement(generated, current):
-    config = json.loads(json.dumps(generated['dashboard']))
+def _item_key(item, index):
+    """Use native Lovelace identities; never add private fields to HA cards."""
+    if not isinstance(item, dict):
+        return ('value', json.dumps(item, sort_keys=True))
+    for key in ('path', 'entity', 'heading'):
+        if key in item:
+            return (key, str(item[key]))
+    action = item.get('tap_action', {})
+    target = action.get('target', {}).get('entity_id')
+    if isinstance(target, str):
+        return ('entity', target)
+    if action.get('navigation_path'):
+        return ('navigation', action['navigation_path'])
+    if item.get('name') or item.get('title'):
+        return ('name', item.get('name', item.get('title')))
+    if item.get('cards') and item['cards'][0].get('heading'):
+        return ('section', item['cards'][0]['heading'])
+    return ('position', index)
+
+
+def _merge_dashboard(base, current, new):
+    """Three-way merge. A manual edit or deletion wins a conflicting change."""
+    if current == base:
+        return new
+    if new == base or current == new:
+        return current
+    if all(isinstance(v, dict) for v in (base, current, new)):
+        result = dict(current)
+        for key, value in new.items():
+            if key not in current:
+                if key not in base:
+                    result[key] = value
+            elif key in base:
+                result[key] = _merge_dashboard(base[key], current[key], value)
+            elif isinstance(value, list) and isinstance(current[key], list):
+                result[key] = _merge_dashboard([], current[key], value)
+        for key in base.keys() - new.keys():
+            if key in current and current[key] == base[key]:
+                result.pop(key)
+        return result
+    if all(isinstance(v, list) for v in (base, current, new)):
+        def keyed(items):
+            pairs = [(_item_key(item, i), item) for i, item in enumerate(items)]
+            return dict(pairs) if len(dict(pairs)) == len(pairs) else None
+        b, c, n = keyed(base), keyed(current), keyed(new)
+        # Ambiguous duplicate cards: preserve the whole manually edited list.
+        if any(v is None for v in (b, c, n)):
+            return current
+        result = []
+        for key, item in c.items():
+            if key in b and key not in n and item == b[key]:
+                continue
+            if key in b and key in n:
+                item = _merge_dashboard(b[key], item, n[key])
+            elif key in n and isinstance(item, dict) and any(k in item for k in ('cards', 'sections')):
+                # Legacy dashboard without a baseline: keep existing values,
+                # but discover additions inside views and sections.
+                item = _merge_dashboard({}, item, n[key])
+            result.append(item)
+        result.extend(item for key, item in n.items() if key not in c and key not in b)
+        return result
+    return current
+
+
+def _baseline_file(path, backup_dir=None):
+    return (Path(backup_dir) if backup_dir is not None else BACKUP_DIR) / 'baselines' / (path + '.json')
+
+
+def _read_baseline(path, backup_dir=None):
+    try:
+        value = json.loads(_baseline_file(path, backup_dir).read_text(encoding='utf-8'))
+        return value if isinstance(value, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _save_baseline(path, config, backup_dir=None):
+    target = _baseline_file(path, backup_dir)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=target.parent, delete=False) as stream:
+        json.dump(config, stream, ensure_ascii=False)
+        stream.flush()
+        os.fsync(stream.fileno())
+        temporary = stream.name
+    os.replace(temporary, target)
+
+
+def _replacement(generated, current, backup_dir=None):
+    config = _merge_dashboard(_read_baseline(generated['url_path'], backup_dir), current,
+                              generated['dashboard'])
+    config = json.loads(json.dumps(config))
+    # An explicit off-only conversion also applies to native shortcuts already
+    # placed by the installer. Keep their position, label and icon, not a toggle.
+    off_controls = {}
+    def collect(value):
+        if isinstance(value, dict):
+            action = value.get('tap_action', {})
+            if value.get('type') == 'button' and action.get('perform_action') in ('light.turn_off', 'switch.turn_off'):
+                off_controls[action['target']['entity_id']] = value
+            for child in value.values():
+                collect(child)
+        elif isinstance(value, list):
+            for child in value:
+                collect(child)
+    collect(generated['dashboard'])
+    def constrain(value):
+        if isinstance(value, dict):
+            ident = value.get('entity') or value.get('tap_action', {}).get('target', {}).get('entity_id')
+            if value.get('type') in ('tile', 'button') and isinstance(ident, str) and ident in off_controls:
+                appearance = {k: value[k] for k in ('name', 'icon', 'grid_options') if k in value}
+                value.clear()
+                value.update(json.loads(json.dumps(off_controls[ident])))
+                value.update(appearance)
+            for child in value.values():
+                constrain(child)
+        elif isinstance(value, list):
+            for child in value:
+                constrain(child)
+    constrain(config)
     # Keep the existing dashboard title; its sidebar metadata is not changed.
     if 'title' in current:
         config['title'] = current['title']
     return config
 
 
-def preview_update(payload, layout, entities, client_factory=HAWebSocket):
+def preview_update(payload, layout, entities, client_factory=HAWebSocket, backup_dir=None):
     generated = generate(layout, entities)
     path = _update_target(payload, generated)
     with client_factory() as client:
         current = _read_current(client, path)
-    config = _replacement(generated, current)
+    config = _replacement(generated, current, backup_dir)
     return {'url_path': path, 'expected_current': _digest(current),
             'expected_fingerprint': generated['fingerprint'],
             'dashboard': config, 'previous_dashboard': current,
             'changed': current != config, 'old_views': len(current['views']),
             'new_views': len(config['views']), 'summary': generated['summary'],
             'warnings': generated['warnings'],
-            'notice': 'La configurazione sarà sostituita. Le personalizzazioni manuali saranno conservate nel backup, non unite automaticamente.'}
+            'notice': 'Le personalizzazioni manuali vengono conservate, anche in caso di conflitto. Le funzioni non personalizzate vengono aggiornate quando è disponibile una versione precedente di riferimento. Controlla il confronto; viene salvato anche un backup.'}
 
 
 def update_existing(payload, layout, entities, client_factory=HAWebSocket, backup_dir=None):
@@ -206,8 +325,9 @@ def update_existing(payload, layout, entities, client_factory=HAWebSocket, backu
         current = _read_current(client, path)
         if payload.get('expected_current') != _digest(current):
             raise PublishError('Dashboard modificata dopo il confronto: ripeti anteprima')
-        config = _replacement(generated, current)
+        config = _replacement(generated, current, backup_dir)
         if current == config:
+            _save_baseline(path, generated['dashboard'], backup_dir)
             return {'updated': False, 'unchanged': True, 'url_path': path}
         directory = Path(backup_dir) if backup_dir is not None else BACKUP_DIR
         directory.mkdir(parents=True, exist_ok=True)
@@ -227,6 +347,7 @@ def update_existing(payload, layout, entities, client_factory=HAWebSocket, backu
             stored = client.call('lovelace/config', url_path=path)
             if stored != config:
                 raise PublishError('Il contenuto riletto non coincide con la configurazione inviata')
+            _save_baseline(path, generated['dashboard'], backup_dir)
         except Exception as exc:
             raise PublishError('Aggiornamento non verificato. Backup disponibile: '+backup+
                                '. Controlla la dashboard prima di riprovare. '+str(exc)[:140]) from exc

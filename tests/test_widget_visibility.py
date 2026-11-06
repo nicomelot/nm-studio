@@ -36,3 +36,31 @@ class WidgetVisibilityTests(unittest.TestCase):
         layout['widgets'][0]['visible'] = 'false'
         with self.assertRaises(ValueError):
             validate(layout)
+
+    def test_off_button_mode_roundtrip_and_invalid_feedback(self):
+        layout = self.layout()
+        layout['widgets'][0]['command_mode'] = 'off_only'
+        checked = validate(layout)
+        self.assertEqual(validate(checked), checked)
+        self.assertEqual(checked['widgets'][0]['command_mode'], 'off_only')
+        layout['widgets'][0]['fields']['feedback'] = '1/1/1'
+        with self.assertRaises(ValueError): validate(layout)
+        layout['widgets'][0]['fields'].pop('feedback')
+        for mode in ('invalid', None, True):
+            layout['widgets'][0]['command_mode'] = mode
+            with self.assertRaises(ValueError): validate(layout)
+
+    def test_off_button_has_only_explicit_off_action_no_state_or_toggle(self):
+        layout = self.layout()
+        layout['widgets'][0].update(visible=True, command_mode='off_only')
+        result = generate(validate(layout), [{'entity_id': 'light.lampada'}])
+        cards = [c for v in result['dashboard']['views'] for s in v['sections'] for c in s['cards']]
+        controls = [c for c in cards if c.get('name') == 'Lampada']
+        self.assertTrue(controls)
+        for card in controls:
+            self.assertEqual(card['type'], 'button')
+            self.assertNotIn('entity', card)
+            self.assertFalse(card['show_state'])
+            self.assertEqual(card['tap_action']['perform_action'], 'light.turn_off')
+            self.assertEqual(card['hold_action'], {'action': 'none'})
+        self.assertFalse(any(c['type'] == 'entity-filter' for c in cards))

@@ -54,7 +54,7 @@ function recoverableUpgrades(data,drafts){
   const found=(data?.suggestions||[]).filter(s=>s.command===w.fields.command&&s.kind==='dimmer');
   const all=(data?.suggestions||[]).filter(s=>s.command===w.fields.command);
   const linked=ga=>(data?.addresses||[]).some(a=>a.address===ga&&a.linked);
-  return w.kind==='light'&&all.length===1&&found.length===1&&linked(found[0].command)&&linked(found[0].brightness)?[{index,candidate:found[0]}]:[];
+  return w.kind==='light'&&w.command_mode!=='off_only'&&all.length===1&&found.length===1&&linked(found[0].command)&&linked(found[0].brightness)?[{index,candidate:found[0]}]:[];
  });
 }
 function upgradeRecoveredDimmer(index){
@@ -70,6 +70,7 @@ function reconcileRecognizedFunctions(){
  let upgraded=0,added=0;
  for(const u of recoverableUpgrades(etsData,widgetDrafts))if(upgradeRecoveredDimmer(u.index))upgraded++;
  for(const w of widgetDrafts){
+  if(w.command_mode==='off_only')continue;
   const found=(etsData?.suggestions||[]).filter(s=>s.command===w.fields.command);
   if(found.length!==1||found[0].kind!==w.kind)continue;
   for(const [key] of widgetFields[w.kind]||[]){
@@ -177,7 +178,7 @@ function wireClearWidgetFlow(){
 
 function wireRealDashboardUpdate(){
  const section=document.createElement('section');section.className='card';
- section.innerHTML='<h3>Aggiorna la dashboard reale esistente</h3><p>Genera l’anteprima reale, poi confrontala con la dashboard di questo progetto. Le personalizzazioni manuali saranno sostituite e conservate nel backup.</p><div class="bar"><button id="real-update-preview">1 · Confronta dashboard esistente</button><button id="real-update-backup" disabled>Scarica copia precedente</button><button id="real-update-apply" class="primary" disabled>2 · Aggiorna con backup</button></div><p id="real-update-status" role="status" aria-live="polite">Nessun confronto eseguito.</p><details><summary>Confronta le configurazioni complete</summary><h4>Prima</h4><pre id="real-update-before" style="max-height:300px;overflow:auto"></pre><h4>Dopo</h4><pre id="real-update-after" style="max-height:300px;overflow:auto"></pre></details>';
+ section.innerHTML='<h3>Aggiorna la dashboard reale esistente</h3><p>Genera l’anteprima reale, poi confrontala con la dashboard di questo progetto. Le personalizzazioni manuali vengono conservate. Controlla il confronto prima di aggiornare.</p><div class="bar"><button id="real-update-preview">1 · Confronta dashboard esistente</button><button id="real-update-backup" disabled>Scarica copia precedente</button><button id="real-update-apply" class="primary" disabled>2 · Aggiorna con backup</button></div><p id="real-update-status" role="status" aria-live="polite">Nessun confronto eseguito.</p><details><summary>Confronta le configurazioni complete</summary><h4>Prima</h4><pre id="real-update-before" style="max-height:300px;overflow:auto"></pre><h4>Dopo</h4><pre id="real-update-after" style="max-height:300px;overflow:auto"></pre></details>';
  $('dash-status').before(section);
  let preview=null,busy=false;
  const status=$('real-update-status'),apply=$('real-update-apply'),compare=$('real-update-preview'),download=$('real-update-backup');
@@ -235,4 +236,100 @@ function busQuery(action){
  for(const key of ['start','end'])if($('bus-'+key)?.value)query.set(key,new Date($('bus-'+key).value).toISOString());
  if(action==='next'&&busNextCursor)query.set('before',busNextCursor);
  return query.toString();
+}
+
+
+let functionSearch='';
+function searchFunctionAddresses(data,query){
+ const words=query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+ if(!words.length)return [];
+ return (data?.addresses||[]).filter(a=>words.every(word=>(a.address+' '+a.name).toLocaleLowerCase().includes(word))).slice(0,30);
+}
+function offAddressCompatible(a){return !!a&&(!a.dpt||['DPST-1-1','DPT-1.001','1.001'].includes(a.dpt));}
+function prepareOffButton(command){
+ const a=etsData?.addresses?.find(a=>a.address===command);
+ if(!offAddressCompatible(a))return false;
+ const matches=widgetDrafts.filter(w=>w.fields.command===command);
+ if(matches.length>1||matches.some(w=>w.kind!=='light'))return false;
+ if(!matches.length){
+  if(!addRecoveredWidget(command,'light',false))return false;
+ }
+ const w=widgetDrafts.find(w=>w.fields.command===command);
+ w.command_mode='off_only';w.fields.feedback='';widgetDirty=true;
+ return true;
+}
+function wireOffButtons(){
+ if(!etsData)return;
+ const panel=document.createElement('section');panel.className='card';
+ panel.innerHTML='<h2>Cerca funzioni e aggiungi pulsanti</h2><label for="function-search">Nome, stanza o indirizzo di gruppo</label><input id="function-search" type="search" placeholder="Es. OFF, generale, 2/1/0"><p id="function-search-count" class="small muted" role="status"></p><div id="function-search-results" style="max-height:300px;overflow:auto"></div><p class="small muted">I pulsanti di solo spegnimento riutilizzano una funzione luce e inviano solo OFF dalla dashboard generata. L’entità HA sottostante resta disponibile nelle altre viste. Verifica che il GA sia un comando DPT 1.001.</p>';
+ $('content').prepend(panel);
+ $('function-search').value=functionSearch;
+ function filter(){
+  functionSearch=$('function-search').value;
+  const query=functionSearch.trim().toLocaleLowerCase();let shown=0;
+  document.querySelectorAll('.widget-proposal').forEach(row=>{
+   const w=widgetDrafts[Number(row.dataset.index)];
+   const text=[w.name,w.room,...Object.values(w.fields)].join(' ').toLocaleLowerCase();
+   row.hidden=!query.split(/\s+/).every(part=>text.includes(part));if(!row.hidden)shown++;
+  });
+  $('function-search-count').textContent=shown+' funzioni visibili su '+widgetDrafts.length;
+  const found=searchFunctionAddresses(etsData,functionSearch);
+  $('function-search-results').innerHTML=found.map(a=>{
+   const existing=widgetDrafts.filter(w=>w.fields.command===a.address);
+   const allowed=offAddressCompatible(a)&&existing.length<=1&&existing.every(w=>w.kind==='light');
+   const already=existing[0]?.command_mode==='off_only';
+   return `<div class="row" style="padding:10px 0;border-bottom:1px solid #304963"><div class="grow"><b>${escapeHTML(a.name)}</b><div class="small muted">${escapeHTML(a.address)} · ${escapeHTML(a.dpt||'DPT da verificare')}</div></div><button data-off-ga="${escapeHTML(a.address)}" ${!allowed||already?'disabled':''}>${already?'Solo spegnimento configurato':!allowed?'Tipo da verificare':existing.length?'Usa come solo spegnimento':'+ Pulsante solo spegnimento'}</button></div>`;
+  }).join('')||(query?'<p class="small muted">Nessun GA corrispondente nel progetto ETS.</p>':'');
+  if(found.length===30)$('function-search-count').textContent+=' · primi 30 GA: affina la ricerca';
+  document.querySelectorAll('[data-off-ga]').forEach(b=>b.onclick=()=>{
+   if(prepareOffButton(b.dataset.offGa)){renderKeepingScroll();message('Pulsante preparato. Salva la configurazione e aggiorna la dashboard generata.');}
+  });
+ }
+ $('function-search').oninput=filter;
+ document.querySelectorAll('.widget-proposal').forEach(row=>{
+  const w=widgetDrafts[Number(row.dataset.index)];
+  if(w.kind==='light'){
+   const selector=document.createElement('label');selector.className='small';
+   selector.innerHTML='<span>Comportamento del comando</span><select class="widget-command-mode"><option value="toggle">Luce ON/OFF</option><option value="off_only">Pulsante solo spegnimento</option></select>';
+   row.querySelector('.widget-name').after(selector);
+   const input=selector.querySelector('select');input.value=w.command_mode||'toggle';
+   input.onchange=()=>{w.command_mode=input.value;if(w.command_mode==='off_only')w.fields.feedback='';widgetDirty=true;renderKeepingScroll();};
+   if(w.command_mode==='off_only'){
+    row.querySelector('.widget-ga[data-field="feedback"]').closest('label').hidden=true;
+    row.querySelector('.widget-preview .smart-state').textContent='Spegni';
+    row.querySelector('.widget-preview .smart-meta').textContent='Invia sempre OFF · nessuno stato aggregato';
+   }
+  }
+  row.querySelectorAll('.widget-ga').forEach(select=>{
+   const options=[...select.options].map(o=>({value:o.value,text:o.textContent}));
+   const search=document.createElement('input');search.type='search';search.placeholder='Cerca nome o GA…';search.setAttribute('aria-label','Filtra indirizzi di gruppo');search.style.marginTop='8px';
+   select.before(search);search.oninput=e=>{
+    e.stopPropagation();
+    const selected=select.value,q=search.value.toLocaleLowerCase().trim();
+    select.innerHTML=options.filter(o=>!o.value||o.value===selected||o.text.toLocaleLowerCase().includes(q)).map(o=>`<option value="${escapeHTML(o.value)}">${escapeHTML(o.text)}</option>`).join('');select.value=selected;
+   };
+  });
+ });
+ filter();
+}
+
+
+function knxPrerequisitePanel(){
+ return `<section class="card" id="knx-prerequisite"><div class="workspace-label">Collegamento impianto</div><h2>KNX in Home Assistant</h2><p id="knx-prerequisite-status" role="status">Verifica della connessione in corso…</p><p class="small muted">L’integrazione ufficiale KNX è già inclusa in Home Assistant. Per il primo collegamento scegli l’interfaccia KNX/IP rilevata oppure inserisci IP e credenziali richiesti. L’importazione ETS può essere preparata anche prima del collegamento.</p><div class="bar"><a id="knx-prerequisite-setup" href="https://my.home-assistant.io/redirect/config_flow/?domain=knx" target="_blank" rel="noopener noreferrer">Configura KNX in Home Assistant</a><a href="/config/integrations/integration/knx" target="_blank" rel="noopener noreferrer">Gestisci connessione KNX</a><button id="knx-prerequisite-refresh">Ricontrolla connessione</button></div></section>`;
+}
+async function checkKnxPrerequisite(){
+ const status=$('knx-prerequisite-status'),button=$('knx-prerequisite-refresh'),setup=$('knx-prerequisite-setup');
+ if(!status||!button||!setup)return;
+ button.disabled=true;setup.hidden=true;
+ try{
+  const result=await api('knx/panel-capability');
+  if(result.available){status.textContent=result.connected?'KNX configurato e connesso: puoi procedere con il progetto.':'KNX configurato, ma non connesso. Apri Gestisci connessione KNX e verifica l’interfaccia.';}
+  else{status.textContent=result.message+' Se non hai ancora configurato KNX, apri la configurazione guidata; altrimenti verifica connessione e autorizzazioni.';setup.hidden=false;}
+ }catch(e){status.textContent='Verifica non riuscita: '+e.message+'. Controlla la connessione e riprova.';}
+ finally{button.disabled=false;}
+}
+function wireKnxPrerequisite(){
+ if(!$('knx-prerequisite-refresh'))return;
+ $('knx-prerequisite-refresh').onclick=checkKnxPrerequisite;
+ checkKnxPrerequisite();
 }

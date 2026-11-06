@@ -6,9 +6,9 @@ function bulkInstallPage(){return `<style>${installationStyles}</style><section 
 
 function commissioningControls(d){
  if(d.status!=='present'||!d.entity_id||!['light','dimmer','cover'].includes(d.type))return '';
- const actions=d.type==='cover'?[['open','↑ Salita'],['stop','■ Stop'],['close','↓ Discesa']]:[['on','Accendi'],['off','Spegni']];
+ const actions=d.command_mode==='off_only'?[['off','Spegni']]:d.type==='cover'?[['open','↑ Salita'],['stop','■ Stop'],['close','↓ Discesa']]:[['on','Accendi'],['off','Spegni']];
  const button=(action,label)=>`<button type="button" data-commission-index="${d.index}" data-commission-action="${action}" disabled>${label}</button>`;
- return `<div class="commission-controls">${actions.map(([a,l])=>button(a,l)).join('')}${d.type==='dimmer'?`<div class="commission-level"><label for="commission-level-${d.index}">Luminosità %</label><input id="commission-level-${d.index}" type="number" min="0" max="100" step="1" value="50">${button('brightness','Imposta')}</div>`:''}<div class="commission-state" id="commission-state-${d.index}" role="status">Stato non ancora letto</div></div>`;
+ return `<div class="commission-controls">${actions.map(([a,l])=>button(a,l)).join('')}${d.type==='dimmer'?`<div class="commission-level"><label for="commission-level-${d.index}">Luminosità %</label><input id="commission-level-${d.index}" type="number" min="0" max="100" step="1" value="50">${button('brightness','Imposta')}</div>`:''}<div class="commission-state" id="commission-state-${d.index}" role="status">${d.command_mode==='off_only'?'Comando di solo spegnimento · nessuno stato aggregato':'Stato non ancora letto'}</div></div>`;
 }
 function installListMarkup(data,access){
  const groups=new Map();for(const d of data.devices){const room=d.room||'Da assegnare';if(!groups.has(room))groups.set(room,[]);groups.get(room).push(d);}
@@ -61,7 +61,7 @@ function wireBulkInstall(){
  if($('commission-enabled'))$('commission-enabled').onchange=gateTests;
  if($('commission-refresh'))$('commission-refresh').onclick=async()=>{
   if(!source)return;
-  try{const data=await api('entities');for(const d of source.devices){const el=$('commission-state-'+d.index);if(!el)continue;const e=data.entities.find(e=>e.entity_id===d.entity_id);el.textContent=formatCommissionState(e);}}
+  try{const data=await api('entities');for(const d of source.devices){const el=$('commission-state-'+d.index);if(!el)continue;const e=data.entities.find(e=>e.entity_id===d.entity_id);el.textContent=d.command_mode==='off_only'?'Comando di solo spegnimento · nessuno stato aggregato':formatCommissionState(e);}}
   catch(e){status('Lettura stati non riuscita: '+e.message);}
  };
  async function sendTest(button){

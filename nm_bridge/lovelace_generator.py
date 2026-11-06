@@ -73,12 +73,21 @@ def generate(layout, entities):
                     card["features"] = [{"type": "cover-open-close"}]
                 elif ident.startswith("climate."):
                     card["features"] = [{"type": "climate-hvac-modes"}]
+                if w.get('command_mode') == 'off_only':
+                    card = {'type': 'button', 'name': w['name'], 'icon': 'mdi:power',
+                            'show_state': False, 'grid_options': {'columns': 12},
+                            'tap_action': {'action': 'perform-action',
+                                           'perform_action': ident.split('.')[0] + '.turn_off',
+                                           'target': {'entity_id': ident}},
+                            'hold_action': {'action': 'none'}, 'double_tap_action': {'action': 'none'}}
                 parts = [p.strip() for p in room.split(" / ") if p.strip()]
                 floor = parts[-2] if len(parts) >= 3 else "Da assegnare"
                 zone = parts[-1] if len(parts) >= 3 else room
                 category = {"light": "Illuminazione", "dimmer": "Illuminazione",
                             "cover": "Schermature", "climate": "Climatizzazione",
                             "sensor": "Sensori", "fan": "Ventilazione", "switch": "Altri carichi"}.get(kind, "Altri carichi")
+                if w.get('command_mode') == 'off_only':
+                    category = 'Comandi'
                 approved.append({"card": card, "room": room, "floor": floor,
                                  "zone": zone, "category": category})
             else:

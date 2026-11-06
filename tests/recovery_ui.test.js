@@ -156,3 +156,36 @@ test('reimport fills verified missing cover stop but preserves existing override
  c.widgetDrafts[0].fields.stop='2/1/20';c.reconcileRecognizedFunctions();
  assert.equal(c.widgetDrafts[0].fields.stop,'2/1/20');
 });
+
+test('search converts an existing light to off-only preserving identity without duplicates',()=>{
+ const c=fixture(),w=c.widgetDrafts[0];w.fields.feedback='1/1/1';w.visible=false;
+ assert.equal(c.searchFunctionAddresses(c.etsData,'1/1/1')[0].name,'L1');
+ assert.equal(c.searchFunctionAddresses(c.etsData,'feedback l5')[0].address,'1/6/8');
+ assert.equal(c.prepareOffButton('1/1/1'),true);
+ assert.equal(w.command_mode,'off_only');assert.equal(w.fields.feedback,'');
+ assert.equal(w.entity_id,'light.l1');assert.equal(w.name,'Nome personalizzato');
+ assert.equal(w.room,'Studio');assert.equal(w.visible,false);
+ assert.equal(c.prepareOffButton('1/1/1'),true);assert.equal(c.widgetDrafts.length,1);
+ c.etsData.suggestions.push({kind:'dimmer',name:'L1',command:'1/1/1',feedback:'1/1/1'});
+ c.reconcileRecognizedFunctions();assert.equal(w.kind,'light');assert.equal(w.fields.feedback,'');
+});
+test('off-button search rejects known incompatible DPT and creates unknown GA only explicitly',()=>{
+ const c=fixture();c.etsData.addresses[3].dpt='DPST-5-1';
+ assert.equal(c.prepareOffButton('1/1/9'),false);
+ assert.equal(c.prepareOffButton('1/1/8'),true);
+ assert.equal(c.widgetDrafts[1].command_mode,'off_only');assert.equal(c.widgetDrafts[1].fields.feedback,'');
+ assert.equal(c.prepareOffButton('9/9/9'),false);
+});
+
+test('KNX onboarding reads capabilities only and does not reconfigure an existing connection',async()=>{
+ const c=fixture(),nodes=Object.fromEntries(['knx-prerequisite-status','knx-prerequisite-refresh','knx-prerequisite-setup'].map(k=>[k,{hidden:false,disabled:false,textContent:''}]));
+ c.$=id=>nodes[id];const calls=[];let state={available:true,connected:true};
+ c.api=async(path,options)=>{calls.push({path,options});return state;};
+ await c.checkKnxPrerequisite();assert.equal(nodes['knx-prerequisite-setup'].hidden,true);
+ assert.match(nodes['knx-prerequisite-status'].textContent,/connesso/);
+ state={available:false,message:'Integrazione non disponibile'};
+ await c.checkKnxPrerequisite();assert.equal(nodes['knx-prerequisite-setup'].hidden,false);
+ assert.equal(nodes['knx-prerequisite-refresh'].disabled,false);
+ assert.ok(calls.every(c=>c.path==='knx/panel-capability'&&!c.options));
+ assert.match(c.knxPrerequisitePanel(),/config_flow\/[?]domain=knx/);
+});

@@ -97,6 +97,11 @@ def validate(payload):
             raise ValueError("Invalid widget fields")
         if not isinstance(item.get('visible', True), bool):
             raise ValueError('Invalid dashboard visibility')
+        mode = item.get('command_mode', 'toggle')
+        if mode not in ('toggle', 'off_only') or (mode == 'off_only' and item['type'] != 'light'):
+            raise ValueError('Invalid command mode')
+        if mode == 'off_only' and fields.get('feedback'):
+            raise ValueError('Un pulsante solo spegnimento non usa un feedback ON/OFF')
         entity_id = item.get("entity_id", "")
         if not isinstance(entity_id, str) or (entity_id and not HA_ENTITY.fullmatch(entity_id)):
             raise ValueError("Invalid Home Assistant entity link")
@@ -107,7 +112,8 @@ def validate(payload):
                 raise ValueError("Invalid widget group address")
             checked[key] = value
         clean.append({"type": item["type"], "name": name.strip(), "room": room.strip(), "fields": checked,
-                      "entity_id": entity_id, **({'visible': False} if item.get('visible') is False else {})})
+                      "entity_id": entity_id, **({'command_mode': 'off_only'} if mode == 'off_only' else {}),
+                      **({'visible': False} if item.get('visible') is False else {})})
     aliases = payload.get('room_aliases', {})
     if not isinstance(aliases, dict) or len(aliases) > 1500:
         raise ValueError('Invalid room aliases')
