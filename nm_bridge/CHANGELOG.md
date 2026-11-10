@@ -1,3 +1,10 @@
+## 5.20.1
+
+- Riconoscimento dimmer tramite DPT, flag e oggetti collegati alla stessa istanza modulo, anche senza nomi convenzionali degli indirizzi di gruppo.
+- Supporto delle diciture DIMMER, VALORE, VALORE STATO e STATO; distinzione dei feedback binari e percentuali tramite DPT.
+- Lettura dei cataloghi applicativi con suffisso OEM e rispetto delle impostazioni degli oggetti nel progetto ETS.
+- Associazioni ambigue e conflitti restano da verificare; nessuna installazione o scrittura sul bus automatica.
+
 ## 5.20.0
 - Avvio guidato: verifica automatica in sola lettura della connessione KNX e collegamento alla configurazione nativa di Home Assistant quando necessaria. IP, interfaccia e credenziali vengono scelti nella procedura ufficiale; nessuna configurazione del bus viene inventata.
 - Pulsanti di solo spegnimento: conversione delle luci esistenti, dashboard con azione OFF esplicita e collaudo senza ON/toggle. L’entità HA sottostante resta una luce utilizzabile da altre viste.

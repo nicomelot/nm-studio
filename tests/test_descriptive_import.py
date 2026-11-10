@@ -13,6 +13,44 @@ def address(name, dpt, number, linked=True):
 
 
 class DescriptiveImportTests(unittest.TestCase):
+    def test_short_dimmer_names_and_repeated_switch_suffix(self):
+        for prefix in ('Sala', 'Sala ON/OFF'):
+            with self.subTest(prefix=prefix):
+                items = [address('Sala ON/OFF', 'DPST-1-1', 0)] + [
+                    address(prefix + ' ' + role, dpt, i + 1)
+                    for i, (role, dpt) in enumerate([
+                        ('DIMMER', 'DPST-3-7'), ('VALORE', 'DPST-5-1'),
+                        ('STATO', 'DPST-1-1'), ('VALORE STATO', 'DPST-5-1')])]
+                result, consumed = descriptive_suggestions(items)
+                self.assertEqual(len(result), 1)
+                self.assertEqual(result[0]['kind'], 'dimmer')
+                self.assertEqual(result[0]['brightness'], '3/1/2')
+                self.assertEqual(result[0]['feedback'], '3/1/3')
+                self.assertEqual(result[0]['brightness_feedback'], '3/1/4')
+                self.assertEqual(len(consumed), 5)
+
+    def test_short_state_uses_dpt_and_alias_conflicts_remain_unresolved(self):
+        items = [address('Sala ' + role, dpt, i) for i, (role, dpt) in enumerate([
+            ('ON/OFF', 'DPST-1-1'), ('DIMMER', 'DPST-3-7'),
+            ('VALORE', 'DPST-5-1'), ('STATO', 'DPST-1-1'),
+            ('STATO', 'DPST-5-1')])]
+        result = descriptive_suggestions(items)[0][0]
+        self.assertEqual(result['feedback'], '3/1/3')
+        self.assertEqual(result['brightness_feedback'], '3/1/4')
+        items.append(address('Sala DIMMING ASSOLUTO', 'DPST-5-1', 30))
+        result = descriptive_suggestions(items)[0][0]
+        self.assertNotIn('brightness', result)
+        self.assertEqual(result['confidence'], 'bassa')
+
+    def test_short_names_require_linked_compatible_roles(self):
+        for dpt, linked in [('DPST-9-1', True), ('DPST-5-1', False)]:
+            self.assertFalse(descriptive_suggestions([
+                address('Sala ON/OFF', 'DPST-1-1', 0),
+                address('Sala VALORE', dpt, 1, linked)])[0])
+        items = [address('Gruppo 1 ON/OFF', 'DPST-1-1', 0),
+                 address('Gruppo 2 VALORE', 'DPST-5-1', 1)]
+        self.assertFalse(descriptive_suggestions(items)[0])
+
     def test_module_catalog_keeps_namespaces_and_reference_overrides(self):
         data = io.BytesIO()
         xml = '''<Root><ComObject Id="APP_MD-1_O-2-32" ObjectSize="1 Bit" FunctionText="Switch" WriteFlag="Enabled" DatapointType="DPST-1-1"/>

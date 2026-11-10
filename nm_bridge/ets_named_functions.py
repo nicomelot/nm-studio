@@ -14,15 +14,16 @@ def normalized(value):
 
 # Longest/more specific suffixes precede shorter ones.
 ROLES = (
-    ('brightness_feedback', r'(?:stato|sato) valore', {'5.001'}),
-    ('brightness', r'dimming assoluto', {'5.001'}),
-    ('relative', r'dimming relativo', {'3.007'}),
+    ('brightness_feedback', r'(?:(?:stato|sato) valore|valore (?:stato|sato))', {'5.001'}),
+    ('brightness', r'(?:dimming assoluto|valore)', {'5.001'}),
+    ('relative', r'(?:dimming relativo|dimmer)', {'3.007'}),
     ('feedback', r'(?:stato|sato) on\s*/\s*off', {'1.001', '1.011'}),
     ('position_feedback', r'(?:stato|sato) posizione attuale', {'5.001'}),
     ('position_command', r'posizione assoluta', {'5.001'}),
     ('stop', r'operazione breve\s*/\s*stop', {'1.007', '1.017'}),
     ('move', r'su\s*/\s*giu[\x27\u2019]?', {'1.008'}),
     ('command', r'on\s*/\s*off', {'1.001'}),
+    ('feedback', r'(?:stato|sato)', {'1.001', '1.011'}),
 )
 
 
@@ -56,6 +57,11 @@ def descriptive_suggestions(items):
             raw = str(item.get('dpt', '')).upper()
             dpt = re.fullmatch(r'(?:DPST-|DPT-)?(\d+)[.-](\d+)', raw)
             value = f'{int(dpt[1])}.{int(dpt[2]):03d}' if dpt else ''
+            # A short state suffix describes either switching or level feedback.
+            if pattern == r'(?:stato|sato)' and value == '5.001':
+                role, allowed = 'brightness_feedback', {'5.001'}
+            if role in ('brightness', 'relative', 'feedback', 'brightness_feedback'):
+                stem = re.sub(r'\s+on\s*/\s*off$', '', stem)
             compatible = value in allowed or (role == 'stop' and value == '1.008' and application_stop(item))
             groups.setdefault(stem, {}).setdefault(role, []).append((item, compatible))
             break

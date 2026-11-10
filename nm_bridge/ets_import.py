@@ -10,11 +10,13 @@ try:
     from .ets_rooms import extract_functions, room_matches
     from .recognition import review_suggestions, hvac_address_inventory
     from .ets_named_functions import descriptive_suggestions
+    from .ets_object_functions import enrich_suggestions
 except ImportError:  # The add-on runs the modules directly from /app.
     from ets_archive import open_project
     from ets_rooms import extract_functions, room_matches
     from recognition import review_suggestions, hvac_address_inventory
     from ets_named_functions import descriptive_suggestions
+    from ets_object_functions import enrich_suggestions
 
 MAX_ARCHIVE = 16 * 1024 * 1024
 MAX_XML = 12 * 1024 * 1024
@@ -439,7 +441,7 @@ def application_file(device):
         return None
     maker, program = ref.split("_HP-", 1)
     maker = maker.split("_", 1)[0]
-    if not re.fullmatch(r"M-[0-9A-Fa-f]{4}", maker) or not re.fullmatch(r"[0-9A-Fa-f-]{3,90}", program):
+    if not re.fullmatch(r"M-[0-9A-Fa-f]{4}", maker) or not re.fullmatch(r"[0-9A-Fa-f-]{3,90}(?:-O[0-9A-Fa-f]{4})?", program):
         return None
     return f"{maker}/{maker}_A-{program}.xml"
 
@@ -480,7 +482,8 @@ def catalog_objects(archive, filename, cache, budget):
                                "size": (node.get("ObjectSize") or "")[:32],
                                "dpt": (node.get("DatapointType") or "")[:100],
                                "flags": {k: node.get(k) == "Enabled" for k in (
-                                   "CommunicationFlag", "ReadFlag", "WriteFlag", "TransmitFlag", "UpdateFlag")}}
+                                     "CommunicationFlag", "ReadFlag", "WriteFlag", "TransmitFlag", "UpdateFlag")
+                                           if node.get(k) in ('Enabled', 'Disabled')}}
     # Parameter-specific ComObjectRef values override generic ComObject
     # metadata (critical for multi-function input channels).
     for node in root.iter():
@@ -498,10 +501,23 @@ def catalog_objects(archive, filename, cache, budget):
                         "dpt": (node.get("DatapointType") or base.get("dpt") or "")[:100],
                         "flags": {**base.get('flags', {}), **{k: node.get(k) == 'Enabled'
                                   for k in ('CommunicationFlag', 'ReadFlag', 'WriteFlag', 'TransmitFlag', 'UpdateFlag')
-                                  if node.get(k) is not None}},
+                                    if node.get(k) in ('Enabled', 'Disabled')}},
                         "source": "riferimento applicativo"}
     cache[filename] = objects
     return objects
+
+
+def instance_details(details, node):
+    """Project instance overrides take precedence over catalogue defaults."""
+    result = dict(details)
+    result['flags'] = {**details.get('flags', {}), **{
+        key: node.get(key) == 'Enabled'
+        for key in ('CommunicationFlag', 'ReadFlag', 'WriteFlag', 'TransmitFlag', 'UpdateFlag')
+        if node.get(key) in ('Enabled', 'Disabled')}}
+    for source, target in (('DatapointType', 'dpt'), ('ObjectSize', 'size')):
+        if node.get(source):
+            result[target] = node.get(source)[:100]
+    return result
 
 
 def preview(raw, password=""):
@@ -616,7 +632,7 @@ def preview(raw, password=""):
                         device_inventory[-1]["unlinked_count"] += 1
                         if len(device_inventory[-1]["unlinked_objects"]) < MAX_UNLINKED_PER_DEVICE:
                             ref_id = (obj.get("RefId") or "")[:100]
-                            details = objects.get(catalog_key(ref_id), {})
+                            details = instance_details(objects.get(catalog_key(ref_id), {}), obj)
                             device_inventory[-1]["unlinked_objects"].append({"object_ref": ref_id, **details})
                     link_count += len(refs)
                     if link_count > MAX_OBJECT_LINKS:
@@ -628,7 +644,7 @@ def preview(raw, password=""):
                             device_inventory[-1]["linked_addresses"] += 1
                             if len(record["connections"]) < 12:
                                 ref_id = (obj.get("RefId") or "")[:100]
-                                details = objects.get(catalog_key(ref_id), {})
+                                details = instance_details(objects.get(catalog_key(ref_id), {}), obj)
                                 record["connections"].append({"device_id": device_id, "device": dev_label,
                                                               "object_ref": ref_id, **details})
                 # The manufacturer's catalogue can contain objects disabled by
@@ -674,6 +690,7 @@ def preview(raw, password=""):
         descriptive, covered_addresses = descriptive_suggestions(items)
         suggestions = [s for s in suggestions if s['command'] not in covered_addresses]
         suggestions.extend(descriptive)
+        suggestions = enrich_suggestions(items, suggestions)
         suggestions.sort(key=lambda x: tuple(map(int, x["command"].split("/"))))
         functions = [{"name": item["name"], "space": item["space"],
                       "addresses": list(dict.fromkeys(address_refs[ref] for ref in item["refs"] if ref in address_refs))}

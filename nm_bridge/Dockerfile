@@ -10,6 +10,7 @@ COPY index.html /app/index.html
 COPY lab_ui.js /app/lab_ui.js
 COPY ets_import.py /app/ets_import.py
 COPY ets_named_functions.py /app/ets_named_functions.py
+COPY ets_object_functions.py /app/ets_object_functions.py
 COPY ets_archive.py /app/ets_archive.py
 COPY recognition.py /app/recognition.py
 COPY knx_devices.py /app/knx_devices.py
