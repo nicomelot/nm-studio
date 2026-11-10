@@ -13,6 +13,53 @@ def address(name, dpt, number, linked=True):
 
 
 class DescriptiveImportTests(unittest.TestCase):
+    def test_short_shutter_roles_and_direction_state(self):
+        items = [address('SERRANDA UFFICIO ' + role, dpt, i) for i, (role, dpt) in enumerate([
+            ('SU/GIU', 'DPST-1-8'), ('STOP', 'DPST-1-17'),
+            ('SU/GIU STATO', 'DPST-1-8'), ('POSIZIONE', 'DPST-5-1'),
+            ('POSIZIONE STATO', 'DPST-5-1')])]
+        result = descriptive_suggestions(items)[0][0]
+        self.assertEqual(result['stop'], '3/1/1')
+        self.assertEqual(result['position_command'], '3/1/3')
+        self.assertEqual(result['position_feedback'], '3/1/4')
+        self.assertNotIn('feedback', result)
+        self.assertEqual(result['confidence'], 'media')
+        items.append(address('SERRANDA UFFICIO STOP', 'DPST-1-17', 10))
+        self.assertNotIn('stop', descriptive_suggestions(items)[0][0])
+
+    def test_collective_cover_does_not_claim_aggregate_position(self):
+        items = [address('TAPPARELLE TUTTE ' + role, dpt, i) for i, (role, dpt) in enumerate([
+            ('SU/GIU', 'DPST-1-8'), ('STOP', 'DPST-1-17'),
+            ('POSIZIONE', 'DPST-5-1'), ('POSIZIONE STATO', 'DPST-5-1')])]
+        result = descriptive_suggestions(items)[0][0]
+        self.assertTrue(result['collective'])
+        self.assertEqual(result['position_command'], '3/1/2')
+        self.assertNotIn('position_feedback', result)
+        self.assertIn('stato collettivo da verificare', result['reason'])
+
+    def test_general_switch_requires_receiver_and_preserves_off_only(self):
+        item = address('OFF GENERALE', 'DPST-1-1', 0)
+        self.assertFalse(descriptive_suggestions([item])[0])
+        obj = dict(function='On/Off', dpt='DPST-1-1',
+                   flags=dict(WriteFlag=True, TransmitFlag=False, CommunicationFlag=True))
+        item['connections'] = [obj]
+        result = descriptive_suggestions([item])[0][0]
+        self.assertEqual(result['command_mode'], 'off_only')
+        self.assertTrue(result['collective'])
+        self.assertNotIn('feedback', result)
+        for name in ('ON/OFF GENERALE', 'GENERALE LUCI ON/OFF'):
+            item['name'] = name
+            self.assertEqual(descriptive_suggestions([item])[0][0]['command_mode'], 'toggle')
+        for name in ('CAMPANELLO ON', 'APRI PORTA ON', 'ON GENERALE'):
+            item['name'] = name
+            self.assertFalse(descriptive_suggestions([item])[0])
+        item['name'] = 'OFF GENERALE'
+        obj['flags']['WriteFlag'] = False
+        self.assertFalse(descriptive_suggestions([item])[0])
+        obj['flags']['WriteFlag'] = True
+        item['dpt'] = 'DPST-1-8'
+        self.assertFalse(descriptive_suggestions([item])[0])
+
     def test_short_dimmer_names_and_repeated_switch_suffix(self):
         for prefix in ('Sala', 'Sala ON/OFF'):
             with self.subTest(prefix=prefix):

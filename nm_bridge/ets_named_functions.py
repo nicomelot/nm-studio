@@ -18,13 +18,45 @@ ROLES = (
     ('brightness', r'(?:dimming assoluto|valore)', {'5.001'}),
     ('relative', r'(?:dimming relativo|dimmer)', {'3.007'}),
     ('feedback', r'(?:stato|sato) on\s*/\s*off', {'1.001', '1.011'}),
-    ('position_feedback', r'(?:stato|sato) posizione attuale', {'5.001'}),
-    ('position_command', r'posizione assoluta', {'5.001'}),
-    ('stop', r'operazione breve\s*/\s*stop', {'1.007', '1.017'}),
+    ('position_feedback', r'(?:(?:stato|sato) posizione(?: attuale)?|posizione (?:stato|sato))', {'5.001'}),
+    ('position_command', r'posizione(?: assoluta)?', {'5.001'}),
+    ('stop', r'(?:operazione breve\s*/\s*)?stop', {'1.007', '1.017'}),
+    ('direction_feedback', r'su\s*/\s*giu[\x27\u2019]? (?:stato|sato)', {'1.008'}),
     ('move', r'su\s*/\s*giu[\x27\u2019]?', {'1.008'}),
     ('command', r'on\s*/\s*off', {'1.001'}),
     ('feedback', r'(?:stato|sato)', {'1.001', '1.011'}),
 )
+
+
+def general_switch(item):
+    """Explicit general light controls, with writable switching-object evidence.
+
+    DPT 1.001 alone also describes unrelated equipment. Never infer a toggle
+    from OFF, nor a common feedback from multiple actuator states.
+    """
+    label = normalized(item.get('name', ''))
+    match = re.fullmatch(r'(off|on\s*/\s*off)\s+(?:generale|generali)(?:\s+luci)?|'
+                         r'(?:generale|generali)(?:\s+luci)?\s+(off|on\s*/\s*off)', label)
+    if not item.get('linked') or not match:
+        return None
+    if not re.fullmatch(r'(?:DPST-1-1|DPT-1\.001|1\.001)', str(item.get('dpt', '')).upper()):
+        return None
+    objects = item.get('connections', [])
+    # Require explicit actuator evidence, not merely a sending pushbutton.
+    receivers = [o for o in objects if o.get('flags', {}).get('WriteFlag') is True]
+    if not receivers or any(
+        o.get('flags', {}).get('CommunicationFlag') is not True
+        or o.get('flags', {}).get('TransmitFlag') is not False
+        or normalized(o.get('function', '')).replace(' ', '') not in ('on/off', 'switch', 'switching')
+        or str(o.get('dpt', '')).upper() not in ('DPST-1-1', 'DPT-1.001', '1.001')
+        for o in receivers
+    ):
+        return None
+    mode = 'off_only' if (match[1] or match[2]) == 'off' else 'toggle'
+    return dict(name=item['name'], kind='light', command=item['address'],
+                command_mode=mode, collective=True, room='Da assegnare', confidence='media',
+                reason='Comando generale da nome, DPT e oggetti di commutazione; verificare in ETS'
+                       + ('; solo spegnimento, senza feedback aggregato' if mode == 'off_only' else '; senza feedback aggregato'))
 
 
 def application_stop(item):
@@ -65,7 +97,8 @@ def descriptive_suggestions(items):
             compatible = value in allowed or (role == 'stop' and value == '1.008' and application_stop(item))
             groups.setdefault(stem, {}).setdefault(role, []).append((item, compatible))
             break
-    proposals, consumed = [], set()
+    proposals = [s for item in items if (s := general_switch(item))]
+    consumed = {s['command'] for s in proposals}
     for stem, roles in groups.items():
         def one(role):
             entries = roles.get(role, [])
@@ -84,7 +117,9 @@ def descriptive_suggestions(items):
         issues = [f'{role}: GA ambiguo o DPT non compatibile; verificare in ETS'
                   for role, entries in roles.items() if len(entries) != 1 or not entries[0][1]]
         fields = {key: value for key, value in fields.items() if value}
-        collective = bool(re.search(r'\bgeneral[ei]\b|\bsx\s*/\s*dx\b', stem))
+        collective = bool(re.search(r'\b(?:general[ei]|tutt[ei])\b|\bsx\s*/\s*dx\b', stem))
+        if collective and kind == 'cover' and fields.pop('position_feedback', None):
+            issues.append('position_feedback: stato collettivo da verificare; non equivale alla posizione di tutte le serrande')
         proposals.append({'name': stem.upper(), 'kind': kind, **fields,
                           'room': 'Da assegnare', 'confidence': 'bassa' if issues else 'media',
                           'collective': collective,

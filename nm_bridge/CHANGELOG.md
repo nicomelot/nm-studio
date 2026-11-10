@@ -1,3 +1,9 @@
+## 5.20.2
+
+- Serrande: riconoscimento di STOP, POSIZIONE e POSIZIONE STATO con verifica DPT; lo stato direzione non viene usato come posizione.
+- Riconoscimento dei comandi generali OFF e ON/OFF con conferma dagli oggetti di commutazione; OFF resta solo spegnimento anche dopo la reimportazione.
+- TAPPARELLE TUTTE riconosciuto come collettivo, senza attribuire un feedback di posizione comune non verificato.
+
 ## 5.20.1
 
 - Riconoscimento dimmer tramite DPT, flag e oggetti collegati alla stessa istanza modulo, anche senza nomi convenzionali degli indirizzi di gruppo.

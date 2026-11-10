@@ -12,7 +12,7 @@ function recoveryReport(data, drafts){
  }
  const missing=[];
  for(const [command,list] of groups){
-  const signatures=new Set(list.map(s=>JSON.stringify([s.kind,...['feedback','relative','stop','brightness','brightness_feedback','position','position_command','position_feedback','temperature','target_temperature_state','heat_cool','heat_cool_state','operation_mode','operation_mode_state'].map(k=>s[k]||'')])));
+  const signatures=new Set(list.map(s=>JSON.stringify([s.kind,s.command_mode||'toggle',...['feedback','relative','stop','brightness','brightness_feedback','position','position_command','position_feedback','temperature','target_temperature_state','heat_cool','heat_cool_state','operation_mode','operation_mode_state'].map(k=>s[k]||'')])));
   const s=list[0],a=addresses.get(command);
   missing.push({...s,command,linked:!!a?.linked,ambiguous:signatures.size>1,
    shared:referenced.has(command)});
@@ -37,6 +37,7 @@ function addRecoveredWidget(command, kind, automatic=true){
  if(candidate)for(const [key] of widgetFields[kind]){
   if(key==='command')continue;
   if(kind==='cover'&&key==='feedback')continue;
+  if(candidate.command_mode==='off_only'&&key==='feedback')continue;
   fields[key]=linkedGA(candidate[key])||'';
  }
  const match=(etsData.room_matches||[]).find(m=>m.command===command);
@@ -44,7 +45,7 @@ function addRecoveredWidget(command, kind, automatic=true){
  const known=structureRooms(false);
  widgetDrafts.push(newWidget(kind,candidate?.name||address.name||command,fields,
   automatic?'Riconosciuta da ETS · '+(candidate.reason||'verifica comando e feedback'):'Aggiunta manuale da indirizzo ETS · verifica funzione e DPT',
-  known.includes(room)?room:'Da assegnare'));
+  known.includes(room)?room:'Da assegnare','',true,candidate?.command_mode||'toggle'));
  widgetDirty=true;
  return true;
 }

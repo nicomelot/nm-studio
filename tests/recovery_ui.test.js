@@ -13,11 +13,25 @@ function fixture(){
   widgetDrafts:[{kind:'light',name:'Nome personalizzato',room:'Studio',fields:{command:'1/1/1'},entity_id:'light.l1'}],
   widgetFields:{light:[['command'],['feedback']],dimmer:[['command'],['brightness']],cover:[['command'],['stop'],['position'],['feedback']]},
   widgetDirty:false,structureRooms:()=>['Casa / Terra / Ufficio'],resolveRoomAlias:s=>s,
-  newWidget:(kind,name,fields,source,room)=>({kind,name,fields,source,room,entity_id:''})
+  newWidget:(kind,name,fields,source,room,entity_id='',visible=true,command_mode='toggle')=>({kind,name,fields,source,room,entity_id,visible,command_mode})
  };
  context.linkedGA=ga=>context.etsData.addresses.some(a=>a.address===ga&&a.linked)?ga:'';
  vm.createContext(context);vm.runInContext(source,context);return context;
 }
+test('general OFF stays off-only through import and reimport',()=>{
+ const c=fixture();c.etsData.suggestions[0].command_mode='off_only';
+ c.reconcileRecognizedFunctions();
+ assert.equal(c.widgetDrafts[1].command_mode,'off_only');
+ assert.equal(c.widgetDrafts[1].fields.feedback,undefined);
+ c.reconcileRecognizedFunctions();
+ assert.equal(c.widgetDrafts.length,2);
+ assert.equal(c.widgetDrafts[1].command_mode,'off_only');
+ assert.equal(c.widgetDrafts[1].fields.feedback,undefined);
+});
+test('conflicting general OFF and toggle modes require review',()=>{
+ const c=fixture();c.etsData.suggestions.push({...c.etsData.suggestions[0],command_mode:'off_only'});
+ assert.equal(c.addRecoveredWidget('1/1/8','light'),false);
+});
 test('saved project exposes missing L5 and preserves existing real bindings',()=>{
  const c=fixture(),before=JSON.stringify(c.widgetDrafts[0]);
  const r=c.recoveryReport(c.etsData,c.widgetDrafts);
