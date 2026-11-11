@@ -1,3 +1,9 @@
+## 5.21.0
+
+- Creazione della stanza direttamente dal widget, con scelta di edificio/piano e assegnazione immediata nella gerarchia condivisa. Stanze omonime nello stesso contenitore vengono riutilizzate; annullare conserva l’assegnazione precedente.
+- Aggiunta widget sempre visibile; apertura della nuova scheda con ricerca azzerata e campi KNX espansi.
+- Inserimento manuale di GA con verifica dei limiti KNX e conservazione nei selettori dopo salvataggio e riapertura. Le associazioni manuali non modificano il file ETS né programmano dispositivi.
+
 ## 5.20.2
 
 - Serrande: riconoscimento di STOP, POSIZIONE e POSIZIONE STATO con verifica DPT; lo stato direzione non viene usato come posizione.

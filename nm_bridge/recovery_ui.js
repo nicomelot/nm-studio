@@ -150,7 +150,7 @@ function wireClearWidgetFlow(){
  const controls=$('widget-export').closest('.card');
  const tools=document.createElement('details');tools.innerHTML='<summary>Aggiunta manuale e strumenti avanzati</summary><p class="small">Per funzioni già riconosciute usa i pulsanti Aggiungi nel confronto ETS. Qui puoi preparare funzioni personalizzate.</p>';
  controls.prepend(tools);
- const bar=$('widget-export').closest('.bar');tools.append(bar);
+ tools.append($('widget-export')); // Keep widget creation visible outside advanced tools.
  $('widget-export').classList.remove('primary');
  const bulk=$('widget-bulk-room')?.closest('.card');if(bulk)tools.append(bulk);
  document.querySelectorAll('.widget-proposal').forEach(row=>{
@@ -333,4 +333,68 @@ function wireKnxPrerequisite(){
  if(!$('knx-prerequisite-refresh'))return;
  $('knx-prerequisite-refresh').onclick=checkKnxPrerequisite;
  checkKnxPrerequisite();
+}
+
+
+function createWidgetRoom(widget, name, parentId, buildingName='') {
+ name=name.trim();buildingName=buildingName.trim();
+ if(!name||name.length>80||name.includes('/')||name==='Da assegnare')throw Error('Inserisci un nome stanza di 1–80 caratteri, senza /.');
+ let parent=structureDraft.find(n=>n.id===parentId),pending=[];
+ const newId=()=>{let i=1;while([...structureDraft,...pending].some(n=>n.id==='manual_room_'+i))i++;return 'manual_room_'+i;};
+ if(!structureDraft.length){
+  if(!buildingName||buildingName.length>80||buildingName.includes('/'))throw Error('Inserisci il nome dell’edificio (massimo 80 caratteri, senza /).');
+  parent={id:newId(),parent:null,type:'building',name:buildingName,active:true,source:'manual'};pending.push(parent);
+ }else if(!parent||!['building','floor'].includes(parent.type)||!structureAncestorsActive(parent.id))throw Error('Scegli un edificio o piano attivo.');
+ const existing=structureDraft.find(n=>n.parent===parent.id&&n.name.toLocaleLowerCase()===name.toLocaleLowerCase());
+ if(existing&&(existing.type!=='room'||!structureAncestorsActive(existing.id)))throw Error('Questo nome è già usato da un elemento diverso o nascosto.');
+ if(!existing){
+  if(structureDraft.length+pending.length+1>250||structureDraft.filter(n=>n.type==='room').length>=200)throw Error('Limite di stanze o elementi edificio raggiunto.');
+  pending.push({id:newId(),parent:parent.id,type:'room',name,active:true,source:'manual'});
+ }
+ const room=existing||pending.at(-1),path=nodePath(room.id,[...structureDraft,...pending]);
+ if(path.length>240)throw Error('Percorso stanza troppo lungo: abbrevia il nome.');
+ structureDraft.push(...pending);widget.room=path;refreshEditableRooms();return path;
+}
+function assignManualWidgetGA(widget, field, value){
+ const ga=value.trim();
+ if(!/^(?:[0-9]|[12][0-9]|3[01])\/[0-7]\/(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$/.test(ga))throw Error('GA non valido. Usa principale 0–31 / intermedio 0–7 / gruppo 0–255, per esempio 1/2/3.');
+ if(!widgetFields[widget.kind]?.some(f=>f[0]===field))throw Error('Campo widget non valido.');
+ widget.fields[field]=ga;widgetDirty=true;return ga;
+}
+function revealWidgetEditor(index){
+ functionSearch='';renderKeepingScroll();
+ const row=document.querySelector(`.widget-proposal[data-index="${index}"]`);
+ if(!row)return;row.hidden=false;const details=row.querySelector('details');if(details)details.open=true;
+ row.scrollIntoView({block:'center'});row.querySelector('.widget-name')?.focus({preventScroll:true});
+}
+function wireInlineWidgetEditor(){
+ if(!etsData)return;
+ document.querySelectorAll('.widget-add').forEach(button=>button.onclick=()=>{
+  if(widgetDrafts.length>=200)return message('Massimo 200 widget KNX',true);
+  widgetDrafts.push(newWidget(button.dataset.kind));widgetDirty=true;revealWidgetEditor(widgetDrafts.length-1);
+ });
+ document.querySelectorAll('.widget-proposal').forEach(row=>{
+  const index=Number(row.dataset.index),widget=widgetDrafts[index];
+  const select=row.querySelector('.widget-room'),box=row.querySelector('.widget-custom-row');
+  select.querySelector('option[value="__custom__"]').textContent='+ Crea stanza nell’edificio…';
+  const parents=structureDraft.filter(n=>['building','floor'].includes(n.type)&&structureAncestorsActive(n.id));
+  // Replace the legacy text-only custom room with a shared building node.
+  const editor=document.createElement('div');editor.className='widget-custom-row';editor.hidden=true;
+  editor.innerHTML=`${structureDraft.length?`<label>Edificio o piano<select class="new-room-parent"><option value="">Scegli collocazione…</option>${parents.map(n=>`<option value="${escapeHTML(n.id)}">${escapeHTML(nodePath(n.id))}</option>`).join('')}</select></label>`:'<label>Nome edificio<input class="new-room-building" maxlength="80" placeholder="Es. Negozio"></label>'}<label>Nome stanza<input class="new-room-name" maxlength="80" placeholder="Es. Ripostiglio"></label><div class="bar"><button class="new-room-create">Crea stanza e assegna</button><button class="new-room-cancel">Annulla</button></div><p class="small new-room-status" role="status">La stanza sarà disponibile anche in Edificio ETS e negli altri widget. Premi Salva bozza per conservarla.</p>`;
+  box.replaceWith(editor);
+  select.onchange=()=>{if(select.value==='__custom__'){editor.hidden=false;editor.querySelector('.new-room-name').focus();}else{editor.hidden=true;widget.room=select.value;widgetDirty=true;row.querySelector('.widget-room-status').textContent='Ambiente: '+widget.room;}};
+  const parentSelect=editor.querySelector('.new-room-parent');
+  if(parentSelect){const current=structureDraft.find(n=>n.type==='room'&&nodePath(n.id)===widget.room);parentSelect.value=current?.parent||(parents.length===1?parents[0].id:'');}
+  editor.querySelector('.new-room-cancel').onclick=()=>{editor.hidden=true;select.value=widget.room;};
+  editor.querySelector('.new-room-create').onclick=()=>{
+   try{const path=createWidgetRoom(widget,editor.querySelector('.new-room-name').value,parentSelect?.value,editor.querySelector('.new-room-building')?.value||'');renderKeepingScroll();message('Stanza '+path+' creata e assegnata. Salva bozza per conservarla.');}
+   catch(e){editor.querySelector('.new-room-status').textContent=e.message;}
+  };
+  row.querySelectorAll('.widget-ga').forEach(gaSelect=>{
+   const manual=document.createElement('details');
+   manual.innerHTML='<summary>Inserisci GA manualmente</summary><label>Indirizzo di gruppo<input class="manual-ga-value" placeholder="1/2/3" maxlength="8"></label><button class="manual-ga-assign">Associa GA</button><p class="small manual-ga-status" role="status">Salva l’associazione in NM Control. Il GA e i collegamenti ai dispositivi devono essere configurati anche in ETS; nessun telegramma viene inviato.</p>';
+   gaSelect.after(manual);
+   manual.querySelector('button').onclick=()=>{try{assignManualWidgetGA(widget,gaSelect.dataset.field,manual.querySelector('input').value);revealWidgetEditor(index);message('GA associato in bozza. Verifica DPT e collegamenti in ETS prima della creazione delle entità.');}catch(e){manual.querySelector('.manual-ga-status').textContent=e.message;}};
+  });
+ });
 }
