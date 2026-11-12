@@ -13,7 +13,7 @@ function fixture(){
   widgetDrafts:[{kind:'light',name:'Nome personalizzato',room:'Studio',fields:{command:'1/1/1'},entity_id:'light.l1'}],
   widgetFields:{light:[['command'],['feedback']],dimmer:[['command'],['brightness']],cover:[['command'],['stop'],['position'],['feedback']]},
   widgetDirty:false,structureRooms:()=>['Casa / Terra / Ufficio'],resolveRoomAlias:s=>s,
-  newWidget:(kind,name,fields,source,room,entity_id='',visible=true,command_mode='toggle')=>({kind,name,fields,source,room,entity_id,visible,command_mode})
+  newWidget:(kind,name,fields,source,room,entity_id='',visible=true,command_mode='toggle',profile='')=>({kind,name,fields,source,room,entity_id,visible,command_mode,profile})
  };
  context.linkedGA=ga=>context.etsData.addresses.some(a=>a.address===ga&&a.linked)?ga:'';
  vm.createContext(context);vm.runInContext(source,context);return context;
@@ -27,6 +27,20 @@ test('general OFF stays off-only through import and reimport',()=>{
  assert.equal(c.widgetDrafts.length,2);
  assert.equal(c.widgetDrafts[1].command_mode,'off_only');
  assert.equal(c.widgetDrafts[1].fields.feedback,undefined);
+});
+test('gateway accessories keep their profile and the saved climate room',()=>{
+ const c=fixture();
+ c.widgetFields.switch=[['command'],['feedback']];
+ c.widgetDrafts[0]={kind:'climate',name:'Clima',room:'Casa / Terra / Ufficio',fields:{command:'1/1/1'},entity_id:'climate.ufficio'};
+ c.etsData.suggestions=[{name:'Ventola automatica',kind:'switch',profile:'fan_auto_inverted',
+  climate_command:'1/1/1',command:'1/1/8',feedback:'1/6/8'}];
+ c.etsData.room_matches=[];
+ assert.equal(c.reconcileRecognizedFunctions().added,1);
+ const fan=c.widgetDrafts[1];
+ assert.equal(fan.profile,'fan_auto_inverted');
+ assert.equal(fan.fields.feedback,'1/6/8');
+ assert.equal(fan.room,c.widgetDrafts[0].room);
+ assert.equal(c.reconcileRecognizedFunctions().added,0);
 });
 test('conflicting general OFF and toggle modes require review',()=>{
  const c=fixture();c.etsData.suggestions.push({...c.etsData.suggestions[0],command_mode:'off_only'});

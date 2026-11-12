@@ -42,6 +42,31 @@ class ObjectImportTests(unittest.TestCase):
         items[4]['connections'][0]['device_id'] = 'other gateway'
         self.assertEqual(object_climates(items), [])
 
+    def test_ac_accessories_require_matching_polarity_and_gateway(self):
+        entries = [
+            ('On/Off', '1.001', True, ''),
+            ('On/Off (Status)', '1.001', False, ''),
+            ('Temperature Setpoint', '9.001', True, ''),
+            ('Temperature Setpoint (Status)', '9.001', False, ''),
+            ('Indoor Unit Temperature (Status)', '9.001', False, ''),
+            ('Speed: Automatic', '1.003', True, '0 = Automatic On; 1 = Automatic Off (Speed 1)'),
+            ('Speed: Automatic (Status)', '1.003', False, '0 = Automatic On; 1 = Automatic Off'),
+            ('Filter: Reset', '1.017', True, ''),
+            ('Filter (Status)', '1.002', False, '0 = No Alarm; 1 = Alarm'),
+        ]
+        items = [
+            dict(address=f'4/0/{i}', name=f'Arbitrary {i}', linked=True, dpt=dpt,
+                 connections=[dict(device_id='gateway', object_ref=f'O-{i}_R-{i}', text='[AC] '+label,
+                                   dpt=dpt, function=function,
+                                   flags=dict(CommunicationFlag=True, WriteFlag=write, TransmitFlag=not write))])
+            for i, (label, dpt, write, function) in enumerate(entries)
+        ]
+        self.assertEqual([x['profile'] for x in object_climates(items)[0]['accessories']],
+                         ['fan_auto_inverted', 'filter_reset', 'filter_alarm'])
+        items[6]['connections'][0]['function'] = '0 = Automatic Off; 1 = Automatic On'
+        items[7]['connections'][0]['device_id'] = 'another gateway'
+        self.assertEqual([x['profile'] for x in object_climates(items)[0]['accessories']], ['filter_alarm'])
+
     def test_names_are_irrelevant_and_channels_stay_separate(self):
         items = circuit() + circuit(2, 10)
         result = object_dimmers(items)

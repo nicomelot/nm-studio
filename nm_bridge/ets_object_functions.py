@@ -18,12 +18,68 @@ AC_ROLES = {
     'mode': ('20.105', 'controller_mode', 'controller_mode_state'),
     'speed: percentage control': ('5.001', 'fan_speed', 'fan_speed_state'),
     'flaps: swing': ('1.001', 'swing', 'swing_state'),
+    'speed: automatic': ('1.003', 'fan_auto', 'fan_auto_state'),
+    'flaps: percentage control': ('5.001', 'flap_position', 'flap_position_state'),
+    'automatic off': ('1.001', 'suspend', 'suspend_state'),
+    'automatic off: delay': ('7.005', 'suspend_delay', None),
+    'filter: reset': ('1.017', 'filter_reset', None),
+    'filter': ('1.002', None, 'filter_alarm'),
 }
+
+
+AC_ACCESSORIES = {
+    'fan_auto': ('switch', 'Ventola automatica', 'fan_auto_state'),
+    'flap_position': ('number', 'Posizione lamelle (0% = swing)', 'flap_position_state'),
+    'suspend': ('switch', 'Sospensione temporanea', 'suspend_state'),
+    'suspend_delay': ('number', 'Ritardo sospensione (s)', None),
+    'filter_reset': ('button', 'Reset filtro', None),
+    'filter_alarm': ('binary_sensor', 'Filtro da pulire', None),
+}
+
+AC_POLARITIES = {
+    'fan_auto': ('automatic on', r'automatic off(?: \(speed 1\))?'),
+    'fan_auto_state': ('automatic on', 'automatic off'),
+    'suspend': ('activate', 'deactivate'),
+    'suspend_state': ('activated', 'deactivated'),
+    'filter_alarm': ('alarm', 'no alarm'),
+}
+
+
+def ac_polarity(role, function):
+    active, inactive = AC_POLARITIES[role]
+    text = ' '.join(function.casefold().split())
+    if re.fullmatch(fr'0 = {inactive}; 1 = {active}', text):
+        return 'normal'
+    if re.fullmatch(fr'0 = {active}; 1 = {inactive}', text):
+        return 'inverted'
+    return ''
+
+
+def ac_accessories(fields, polarities, name):
+    accessories = []
+    for role, (kind, label, feedback) in AC_ACCESSORIES.items():
+        if role not in fields or (feedback and feedback not in fields):
+            continue
+        profile = role
+        if role in AC_POLARITIES:
+            values = polarities.get(role)
+            if feedback and values != polarities.get(feedback):
+                continue
+            if values == {'inverted'} and kind == 'switch':
+                profile += '_inverted'
+            elif values != {'normal'}:
+                continue
+        item = dict(kind=kind, profile=profile, name=f'{label} · {name}'[:80], command=fields[role],
+                    confidence='alta', reason='Funzione ausiliaria verificata dagli oggetti del gateway ETS')
+        if feedback:
+            item['feedback'] = fields[feedback]
+        accessories.append(item)
+    return accessories
 
 
 def object_climates(items):
     """Recognize an AC gateway by explicit application roles and direction."""
-    devices = {}
+    devices, polarities = {}, {}
     labels = {item['address']: item['name'] for item in items}
     for item in items:
         if not item.get('linked'):
@@ -49,17 +105,30 @@ def object_climates(items):
                     or flags.get('WriteFlag') is not (not reporting)
                     or flags.get('TransmitFlag') is not reporting):
                 continue
-            devices.setdefault(obj['device_id'], {}).setdefault(role, set()).add(item['address'])
+            device = obj['device_id']
+            devices.setdefault(device, {}).setdefault(role, set()).add(item['address'])
+            if role in AC_POLARITIES:
+                polarities.setdefault(device, {}).setdefault(role, set()).add(
+                    ac_polarity(role, obj.get('function', '')))
 
     candidates = []
     required = {'command', 'target_temperature_state', 'temperature', 'on_off', 'on_off_state'}
-    for roles in devices.values():
+    core_roles = {role for entry in AC_ROLES.values() for role in entry[1:] if role}
+    core_roles -= AC_ACCESSORIES.keys() | {entry[2] for entry in AC_ACCESSORIES.values()}
+    for device, roles in devices.items():
         fields = {role: next(iter(addresses)) for role, addresses in roles.items() if len(addresses) == 1}
-        if not required.issubset(fields) or len(set(fields.values())) != len(fields):
+        core = {role: fields[role] for role in core_roles if role in fields}
+        if not required.issubset(core) or len(set(core.values())) != len(core):
             continue
-        name = re.sub(r'\s+on\s*/\s*off\s*$', '', labels[fields['on_off']], flags=re.I).strip()
-        candidates.append(dict(name=f"CLIMA {name}", kind='climate', **fields, room='Da assegnare',
-                               confidence='media', reason='Ruoli AC e DPT dagli oggetti di uno stesso gateway ETS'))
+        name = re.sub(r'\s+on\s*/\s*off\s*$', '', labels[core['on_off']], flags=re.I).strip()
+        available = {role: address for role, address in fields.items()
+                     if role not in core and list(fields.values()).count(address) == 1}
+        accessories = ac_accessories(available, polarities.get(device, {}), name)
+        candidate = dict(name=f"CLIMA {name}", kind='climate', **core, room='Da assegnare',
+                         confidence='media', reason='Ruoli AC e DPT dagli oggetti di uno stesso gateway ETS')
+        if accessories:
+            candidate['accessories'] = accessories
+        candidates.append(candidate)
     # A shared primary command does not identify a single unit.
     return [c for c in candidates if not any(
         other is not c and (other['command'] == c['command'] or other['on_off'] == c['on_off'])

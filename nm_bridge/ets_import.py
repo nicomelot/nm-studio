@@ -1,5 +1,6 @@
 """Bounded, read-only ETS group-address preview. No project data persisted."""
 
+from collections import Counter
 import io
 import hashlib
 import re
@@ -718,18 +719,43 @@ def preview(raw, password=""):
         suggestions.extend(descriptive)
         suggestions = enrich_suggestions(items, suggestions)
         climates = object_climates(items)
+        accessory_candidates = []
         for candidate in climates:
+            accessories = candidate.pop('accessories', [])
             addresses_used = {candidate.get(field) for field in ("command", "on_off")}
             previous = [s for s in suggestions if s["command"] in addresses_used]
             if any(s["kind"] not in ("binary", "unknown") for s in previous):
                 continue
             suggestions = [s for s in suggestions if s not in previous]
             suggestions.append(candidate)
+            accessory_candidates.extend({**entry, 'climate_command': candidate['command']} for entry in accessories)
+        # Do not replace a recognized function or claim a GA shared with another
+        # climate accessory. Feedback addresses belong to their own control.
+        occupied = {value for entry in suggestions if entry['kind'] not in ('unknown', 'binary')
+                    for value in entry.values() if isinstance(value, str)}
+        accessory_addresses = Counter(value for entry in accessory_candidates
+                                      for value in (entry['command'], entry.get('feedback')) if value)
+        added_accessories = []
+        for entry in accessory_candidates:
+            addresses_used = {entry['command'], entry.get('feedback')} - {None}
+            if addresses_used.intersection(occupied) or any(accessory_addresses[ga] > 1 for ga in addresses_used):
+                continue
+            suggestions = [s for s in suggestions if s['command'] not in addresses_used]
+            suggestions.append(entry)
+            added_accessories.append(entry)
         suggestions.sort(key=lambda x: tuple(map(int, x["command"].split("/"))))
         functions = [{"name": item["name"], "space": item["space"],
                       "addresses": list(dict.fromkeys(address_refs[ref] for ref in item["refs"] if ref in address_refs))}
                      for item in function_refs]
         matches = room_matches(suggestions[:300], items, building_spaces, functions)
+        room_by_command = {match['command']: match for match in matches}
+        for accessory in added_accessories:
+            match = room_by_command.get(accessory['command'])
+            climate_match = room_by_command.get(accessory['climate_command'])
+            if (match and climate_match and not match.get('room')
+                    and match.get('confidence') != 'ambiguous' and climate_match.get('room')):
+                match.update(room=climate_match['room'], confidence=climate_match['confidence'],
+                             reason='Stesso gateway ETS del climatizzatore')
         return {"project_key": project_key, "addresses": items, "devices": device_inventory, "suggestions": suggestions[:300],
                 "recognition_reviews": review_suggestions(items, suggestions),
                 "hvac_inventory": hvac_address_inventory(items),

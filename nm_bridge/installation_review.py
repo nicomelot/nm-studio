@@ -49,11 +49,13 @@ def compare(layout, index, ws):
             raise ValueError('Configurazione KNX non verificabile')
         merged = deepcopy(data)
         changes = []
+        platform = target['platform']
         primary = {'cover': ('ga_up_down',), 'button': ('ga_send',),
-                   'climate': ('target_temperature', 'ga_temperature_target')}.get(
-                       target['platform'], ('ga_switch',))
+                   'climate': ('target_temperature', 'ga_temperature_target'),
+                   'number': ('ga_sensor',), 'binary_sensor': ('ga_sensor',)}.get(platform, ('ga_switch',))
         current_groups = dict(group_addresses(data['knx']))
-        if current_groups.get(primary, {}).get('write') != w['fields'].get('command'):
+        primary_role = 'state' if platform == 'binary_sensor' else 'write'
+        if current_groups.get(primary, {}).get(primary_role) != w['fields'].get('command'):
             raise ValueError('Il comando principale HA non coincide: verifica l’associazione')
         used = ws.call('knx/get_entities_by_group')
         if not isinstance(used, dict):
@@ -61,6 +63,9 @@ def compare(layout, index, ws):
         current_ga = configured_addresses(data['knx'])
         if target['platform'] == 'button' and data['knx'].get('data') != target['data']['knx'].get('data'):
             raise ValueError('Valore del pulsante diverso in HA: verifica la configurazione KNX')
+        if platform == 'switch' and w.get('profile') and (
+                data['knx'].get('invert', False) != target['data']['knx']['invert']):
+            raise ValueError('Polarità diversa in HA: verifica la configurazione KNX')
         # Keep HA name, device, options and all configured GA; fill empty roles only.
         for path, roles in group_addresses(target['data']['knx']):
             container = merged['knx']

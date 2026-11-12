@@ -60,7 +60,8 @@ def generate(layout, entities):
             expected = {"light": {"light", "switch"}, "dimmer": {"light"},
                         "cover": {"cover"}, "sensor": {"sensor", "binary_sensor"},
                         "climate": {"climate"}, "fan": {"fan"},
-                        "switch": {"switch"}, "button": {"button"}}.get(kind, set())
+                        "switch": {"switch"}, "button": {"button"},
+                        "binary_sensor": {"binary_sensor"}, "number": {"number"}}.get(kind, set())
             compatible = bool(ident and ident.split(".", 1)[0] in expected)
             confirmed = compatible and ident in available and not is_lab_entity(ident)
             if confirmed:
@@ -84,13 +85,25 @@ def generate(layout, entities):
                                            'perform_action': action,
                                            'target': {'entity_id': ident}},
                             'hold_action': {'action': 'none'}, 'double_tap_action': {'action': 'none'}}
+                profile = w.get('profile')
+                if profile == 'filter_alarm':
+                    card['icon'] = 'mdi:air-filter'
+                    card['color'] = 'amber'
+                elif profile == 'filter_reset':
+                    card['icon'] = 'mdi:air-filter'
+                    card['tap_action']['confirmation'] = {
+                        'text': 'Confermi il reset dopo la pulizia o sostituzione del filtro?'}
+                elif profile == 'flap_position':
+                    card['features'] = [{'type': 'numeric-input', 'style': 'slider'}]
                 parts = [p.strip() for p in room.split(" / ") if p.strip()]
                 floor = parts[-2] if len(parts) >= 3 else "Da assegnare"
                 zone = parts[-1] if len(parts) >= 3 else room
                 category = {"light": "Illuminazione", "dimmer": "Illuminazione",
                             "cover": "Schermature", "climate": "Climatizzazione",
                             "sensor": "Sensori", "fan": "Ventilazione", "switch": "Altri carichi"}.get(kind, "Altri carichi")
-                if kind == 'button' or w.get('command_mode') == 'off_only':
+                if profile:
+                    category = 'Climatizzazione'
+                elif kind == 'button' or w.get('command_mode') == 'off_only':
                     category = 'Comandi'
                 approved.append({"card": card, "room": room, "floor": floor,
                                  "zone": zone, "category": category})

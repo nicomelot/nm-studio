@@ -24,6 +24,8 @@ PROJECT = re.compile(r"^[0-9a-f]{64}$")
 ADDRESS = re.compile(r"^(?:[0-9]|[12][0-9]|3[01])/[0-7]/(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$")
 FIELDS = {
     "button": {"command"},
+    "binary_sensor": {"command"},
+    "number": {"command", "feedback"},
     "switch": {"command", "feedback"},
     "light": {"command", "feedback"},
     "dimmer": {"command", "feedback", "relative", "brightness", "brightness_feedback"},
@@ -33,7 +35,12 @@ FIELDS = {
                 "controller_mode", "controller_mode_state", "fan_speed", "fan_speed_state",
                 "swing", "swing_state"},
 }
-HA_ENTITY = re.compile(r"^(?:light|switch|button|cover|sensor|binary_sensor|climate)\.[a-z0-9_]{1,240}$")
+CLIMATE_PROFILES = {
+    'fan_auto': 'switch', 'fan_auto_inverted': 'switch',
+    'flap_position': 'number', 'suspend': 'switch', 'suspend_inverted': 'switch',
+    'suspend_delay': 'number', 'filter_reset': 'button', 'filter_alarm': 'binary_sensor',
+}
+HA_ENTITY = re.compile(r"^(?:light|switch|button|cover|sensor|binary_sensor|number|climate)\.[a-z0-9_]{1,240}$")
 MAX_WIDGETS = 200
 MAX_ROOMS = 200
 MAX_NODES = 250
@@ -111,7 +118,14 @@ def validate(payload):
         entity_id = item.get("entity_id", "")
         if not isinstance(entity_id, str) or (entity_id and not HA_ENTITY.fullmatch(entity_id)):
             raise ValueError("Invalid Home Assistant entity link")
-        if entity_id and item["type"] in ("button", "switch") and entity_id.split(".", 1)[0] != item["type"]:
+        profile = item.get('profile', '')
+        if not isinstance(profile, str) or (profile and CLIMATE_PROFILES.get(profile) != item['type']):
+            raise ValueError('Profilo funzione clima incompatibile')
+        if item['type'] == 'number' and not profile:
+            raise ValueError('Selezionare il profilo del comando numerico')
+        if profile == 'filter_reset' and mode != 'on_only':
+            raise ValueError('Il reset filtro usa il valore 1')
+        if entity_id and item["type"] in ("button", "switch", "binary_sensor", "number") and entity_id.split(".", 1)[0] != item["type"]:
             raise ValueError("Entità Home Assistant incompatibile con il tipo di comando")
         checked = {}
         for key in FIELDS[item["type"]]:
@@ -121,7 +135,8 @@ def validate(payload):
             checked[key] = value
         clean.append({"type": item["type"], "name": name.strip(), "room": room.strip(), "fields": checked,
                       "entity_id": entity_id, **({'command_mode': mode} if mode != 'toggle' else {}),
-                      **({'visible': False} if item.get('visible') is False else {})})
+                      **({'visible': False} if item.get('visible') is False else {}),
+                      **({'profile': profile} if profile else {})})
     aliases = payload.get('room_aliases', {})
     if not isinstance(aliases, dict) or len(aliases) > 1500:
         raise ValueError('Invalid room aliases')

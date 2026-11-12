@@ -9,7 +9,7 @@ from homeassistant.components.knx.storage.entity_store_validation import (
 from nm_bridge.knx_entity_plan import build
 from nm_bridge.missing_ha_generator import fingerprint
 
-for kind, fields in (
+for kind, fields, *profiles in (
     ("light", {"command": "1/1/0", "feedback": "1/1/1"}),
     ("light", {"command": "1/1/0"}),
     ("dimmer", {"command": "1/1/0", "feedback": "1/1/1", "brightness": "1/1/2", "brightness_feedback": "1/1/3"}),
@@ -17,13 +17,19 @@ for kind, fields in (
     ("cover", {"command": "1/2/0", "stop": "1/2/1", "position_command": "1/2/2", "position_feedback": "1/2/3"}),
     ("switch", {"command": "1/3/0", "feedback": "1/3/1"}),
     ("button", {"command": "1/3/2"}),
+    ("binary_sensor", {"command": "4/1/0"}, "filter_alarm"),
+    ("button", {"command": "4/1/1"}, "filter_reset"),
+    ("switch", {"command": "4/1/2", "feedback": "4/1/3"}, "fan_auto_inverted"),
+    ("number", {"command": "4/1/4", "feedback": "4/1/5"}, "flap_position"),
+    ("number", {"command": "4/1/6"}, "suspend_delay"),
     ("climate", {"command": "4/0/2", "target_temperature_state": "4/0/3", "temperature": "4/0/4",
                  "on_off": "4/0/0", "on_off_state": "4/0/1", "controller_mode": "4/0/5",
                  "controller_mode_state": "4/0/6", "fan_speed": "4/0/7", "fan_speed_state": "4/0/8",
                  "swing": "4/0/9", "swing_state": "4/0/10"}),
 ):
     layout = {"version": 1, "project": "a" * 64, "rooms": [], "structure": [],
-              "widgets": [{"name": "Synthetic", "room": "Test", "type": kind, "fields": fields}]}
+              "widgets": [{"name": "Synthetic", "room": "Test", "type": kind, "fields": fields,
+                           **({"profile": profiles[0]} if profiles else {})}]}
     request = {"source_fingerprint": fingerprint(layout), "devices": [
         {"index": 0, "approved": True, "name": "Synthetic", "fields": fields}]}
     call = build(layout, request)["calls"][0]

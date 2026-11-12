@@ -1,3 +1,8 @@
+## 5.21.0-beta.2
+
+- L'import ETS propone stato e reset filtro, ventola automatica con la polarità del gateway, posizione lamelle, sospensione e ritardo quando gli oggetti sono verificabili.
+- La scheda di installazione del clima apre il modello Home Assistant per la programmazione settimanale. Il modello supporta setpoint per fascia, spegnimento o risparmio fuori fascia e controllo manuale fino al prossimo cambio.
+
 ## 5.21.0-beta.1
 
 - Import ETS con lettura progressiva dei cataloghi applicativi fino a 24 MiB ciascuno e 96 MiB complessivi. I cataloghi vengono letti una volta per applicativo.

@@ -30,6 +30,13 @@ FUNCTION_FIELDS = {
 }
 
 
+PROFILE_DPTS = {
+    'fan_auto': '1.003', 'fan_auto_inverted': '1.003',
+    'flap_position': '5.001', 'suspend': '1.001', 'suspend_inverted': '1.001',
+    'suspend_delay': '7.005', 'filter_reset': '1.017', 'filter_alarm': '1.002',
+}
+
+
 def _dpt(value):
     raw = str(value or "").upper().replace(" ", "")
     match = re.fullmatch(r"(?:DPST-|DPT-)(\d+)[.-](\d+)", raw)
@@ -42,7 +49,7 @@ def _size(connection):
 
 
 def _expected_bits(dpt):
-    return {"1": 1, "3": 4, "5": 8, "9": 16, "20": 8}.get(dpt.split(".", 1)[0])
+    return {"1": 1, "3": 4, "5": 8, "7": 16, "9": 16, "20": 8}.get(dpt.split(".", 1)[0])
 
 
 HVAC_ROLES = (
@@ -94,7 +101,11 @@ def review_suggestions(addresses, suggestions):
         checks = []
         questions = []
         strength = []
-        for field, expected in FUNCTION_FIELDS.get(kind, {"command": ""}).items():
+        fields = FUNCTION_FIELDS.get(kind, {"command": ""})
+        profile_dpt = PROFILE_DPTS.get(candidate.get('profile'))
+        if profile_dpt:
+            fields = {"command": profile_dpt, "feedback": profile_dpt}
+        for field, expected in fields.items():
             allowed = (expected,) if isinstance(expected, str) else expected
             expected_label = " / ".join(allowed)
             group = candidate.get(field)

@@ -103,7 +103,7 @@ def get_entities():
     items = []
     for entry in raw:
         entity_id = entry.get("entity_id", "")
-        if entity_id.split(".", 1)[0] not in DOMAINS:
+        if entity_id.split(".", 1)[0] not in DOMAINS | {'button', 'number'}:
             continue
         attrs = entry.get("attributes") or {}
         items.append({

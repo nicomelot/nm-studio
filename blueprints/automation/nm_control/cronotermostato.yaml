@@ -1,0 +1,159 @@
+blueprint:
+  name: NM Control · Cronotermostato settimanale
+  description: >-
+    Usa una Programmazione e un Interruttore virtuale di Home Assistant per
+    controllare un climatizzatore. L'interruttore acceso mantiene il controllo
+    manuale fino al prossimo cambio di fascia. Per personalizzare una fascia,
+    inserisci il dato aggiuntivo temperature con il valore in gradi.
+  domain: automation
+  input:
+    thermostat:
+      name: Climatizzatore
+      selector:
+        entity:
+          filter:
+            - domain: climate
+    weekly_schedule:
+      name: Programmazione settimanale
+      selector:
+        entity:
+          filter:
+            - domain: schedule
+    manual_override:
+      name: Interruttore virtuale per il controllo manuale
+      selector:
+        entity:
+          filter:
+            - domain: input_boolean
+    operating_mode:
+      name: Modalità di funzionamento
+      selector:
+        select:
+          options:
+            - label: Riscaldamento
+              value: heat
+            - label: Raffrescamento
+              value: cool
+    comfort_temperature:
+      name: Temperatura durante le fasce
+      description: Le fasce con il dato temperature usano il loro setpoint.
+      selector:
+        number:
+          min: 7
+          max: 40
+          step: 0.5
+          unit_of_measurement: °C
+          mode: box
+    outside_schedule:
+      name: Fuori fascia
+      default: 'off'
+      selector:
+        select:
+          options:
+            - label: Spegni
+              value: 'off'
+            - label: Usa un setpoint di risparmio
+              value: eco
+    eco_temperature:
+      name: Temperatura di risparmio
+      description: Usata fuori fascia quando è selezionato il setpoint di risparmio.
+      default: 18
+      selector:
+        number:
+          min: 7
+          max: 40
+          step: 0.5
+          unit_of_measurement: °C
+          mode: box
+
+mode: single
+max_exceeded: silent
+
+variables:
+  climate_id: !input thermostat
+  schedule_id: !input weekly_schedule
+  override_id: !input manual_override
+  operating_mode: !input operating_mode
+  comfort: !input comfort_temperature
+  outside: !input outside_schedule
+  eco: !input eco_temperature
+  boundary: >-
+    {{ trigger is defined and trigger.id == 'schedule'
+       and trigger.from_state is not none and trigger.to_state is not none
+       and trigger.from_state.state in ['on', 'off']
+       and trigger.to_state.state in ['on', 'off']
+       and (trigger.from_state.state != trigger.to_state.state
+         or trigger.from_state.attributes.get('next_event') != trigger.to_state.attributes.get('next_event')
+         or trigger.from_state.attributes.get('temperature') != trigger.to_state.attributes.get('temperature')) }}
+
+triggers:
+  - trigger: state
+    entity_id: !input weekly_schedule
+    id: schedule
+  - trigger: state
+    entity_id: !input manual_override
+    from: 'on'
+    to: 'off'
+    id: release
+  - trigger: homeassistant
+    event: start
+    id: start
+  - trigger: state
+    entity_id: !input thermostat
+    from:
+      - unavailable
+      - unknown
+    id: available
+
+conditions:
+  - condition: template
+    value_template: >-
+      {{ states(schedule_id) in ['on', 'off'] and states(override_id) in ['on', 'off']
+         and (trigger is not defined or trigger.id != 'schedule' or boundary
+              or trigger.from_state is none or trigger.from_state.state not in ['on', 'off']) }}
+
+actions:
+  - if:
+      - condition: template
+        value_template: "{{ boundary and is_state(override_id, 'on') }}"
+    then:
+      - action: input_boolean.turn_off
+        target:
+          entity_id: !input manual_override
+  - condition: template
+    value_template: >-
+      {{ (boundary or is_state(override_id, 'off'))
+         and states(climate_id) not in ['unavailable', 'unknown'] }}
+  - variables:
+      requested_mode: "{{ 'off' if is_state(schedule_id, 'off') and outside == 'off' else operating_mode }}"
+      setpoint: >-
+        {% if is_state(schedule_id, 'on') %}
+          {{ state_attr(schedule_id, 'temperature') | default(comfort, true) | float(none) }}
+        {% else %}
+          {{ eco | float(none) }}
+        {% endif %}
+  - condition: template
+    value_template: >-
+      {{ requested_mode in (state_attr(climate_id, 'hvac_modes') or [])
+         and (requested_mode == 'off' or
+           (setpoint is number and
+            state_attr(climate_id, 'min_temp') | float(7) <= setpoint <= state_attr(climate_id, 'max_temp') | float(40))) }}
+  - if:
+      - condition: template
+        value_template: "{{ not is_state(climate_id, requested_mode) }}"
+    then:
+      - action: climate.set_hvac_mode
+        target:
+          entity_id: !input thermostat
+        data:
+          hvac_mode: "{{ requested_mode }}"
+  - if:
+      - condition: template
+        value_template: >-
+          {{ requested_mode != 'off' and state_attr(climate_id, 'temperature') | float(none) != setpoint }}
+    then:
+      - action: climate.set_temperature
+        target:
+          entity_id: !input thermostat
+        data:
+          temperature: "{{ setpoint }}"

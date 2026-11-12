@@ -63,7 +63,7 @@ def build(layout, request):
         kind = original["type"]
         if not fields.get("command"):
             raise ValueError("A selected device has no KNX command address")
-        if kind not in ('light', 'dimmer', 'cover', 'switch', 'button', 'climate'):
+        if kind not in ('light', 'dimmer', 'cover', 'switch', 'button', 'climate', 'number', 'binary_sensor'):
             raise ValueError('Tipo non supportato dalla creazione diretta')
         if kind == 'dimmer' and not fields.get('brightness'):
             raise ValueError('Dimmer: GA luminosità assoluta obbligatorio')
@@ -74,7 +74,18 @@ def build(layout, request):
             data["knx"] = climate_config(fields)
             calls.append({"type": "knx/create_entity", "platform": "climate", "data": data})
             continue
-        if kind == "button":
+        profile = original.get('profile', '')
+        if kind == "binary_sensor":
+            platform = kind
+            mapping = {"command": ("ga_sensor", "state")}
+        elif kind == "number":
+            platform = kind
+            mapping = {"command": ("ga_sensor", "write"), "feedback": ("ga_sensor", "state")}
+            if profile == 'flap_position':
+                data['knx'].update(ga_sensor={'dpt': '5.001'}, min=0, max=100, step=20, mode='slider')
+            else:
+                data['knx'].update(ga_sensor={'dpt': '7.005'}, min=0, max=3600, step=1, mode='box')
+        elif kind == "button":
             platform = "button"
             mapping = {"command": ("ga_send", "write")}
             # HA accepts raw short payloads with length 0 for 1-bit values.
@@ -85,6 +96,8 @@ def build(layout, request):
         elif kind == "switch":
             platform = "switch"
             mapping = {"command": ("ga_switch", "write"), "feedback": ("ga_switch", "state")}
+            if profile:
+                data['knx']['invert'] = profile.endswith('_inverted')
         elif kind in ("light", "dimmer"):
             platform = "light"
             mapping = {"command": ("ga_switch", "write"), "feedback": ("ga_switch", "state"),

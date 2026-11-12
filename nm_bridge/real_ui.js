@@ -6,9 +6,15 @@ function bulkInstallPage(){return `<style>${installationStyles}</style><section 
 
 function commissioningControls(d){
  if(d.status!=='present'||!d.entity_id||!['light','dimmer','cover','button','switch'].includes(d.type))return '';
- const actions=d.type==='button'?[['press','Premi']]:d.command_mode==='off_only'?[['off','Spegni']]:d.type==='cover'?[['open','↑ Salita'],['stop','■ Stop'],['close','↓ Discesa']]:[['on','Accendi'],['off','Spegni']];
+ const actions=d.type==='button'?[['press',d.profile==='filter_reset'?'Reset filtro':'Premi']]:d.command_mode==='off_only'?[['off','Spegni']]:d.type==='cover'?[['open','↑ Salita'],['stop','■ Stop'],['close','↓ Discesa']]:[['on','Accendi'],['off','Spegni']];
  const button=(action,label)=>`<button type="button" data-commission-index="${d.index}" data-commission-action="${action}" disabled>${label}</button>`;
  return `<div class="commission-controls">${actions.map(([a,l])=>button(a,l)).join('')}${d.type==='dimmer'?`<div class="commission-level"><label for="commission-level-${d.index}">Luminosità %</label><input id="commission-level-${d.index}" type="number" min="0" max="100" step="1" value="50">${button('brightness','Imposta')}</div>`:''}<div class="commission-state" id="commission-state-${d.index}" role="status">${d.type==='button'?'Invia '+(d.command_mode==='off_only'?'0 (OFF)':'1 (ON)'):d.command_mode==='off_only'?'Comando di solo spegnimento · nessuno stato aggregato':'Stato non ancora letto'}</div></div>`;
+}
+function climateScheduleLink(device){
+ if(device.type!=='climate'||device.status!=='present'||!device.entity_id)return '';
+ const source='https://github.com/nicomelot/nm-studio/blob/lab/blueprints/automation/nm_control/cronotermostato.yaml';
+ const href='https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url='+encodeURIComponent(source);
+ return `<details class="install-details"><summary>Programmazione settimanale</summary><p>Crea una Programmazione e un Interruttore virtuale in Home Assistant, poi importa il modello e seleziona questo clima.</p><a href="${href}" target="_blank" rel="noopener">Apri il modello cronotermostato</a></details>`;
 }
 function installListMarkup(data,access){
  const groups=new Map();for(const d of data.devices){const room=d.room||'Da assegnare';if(!groups.has(room))groups.set(room,[]);groups.get(room).push(d);}
@@ -16,13 +22,13 @@ function installListMarkup(data,access){
  return [...groups].map(([room,devices])=>`<details class="install-room" open><summary><span>${escapeHTML(room.split(' / ').at(-1))}</span><small>${devices.length} funzioni</small></summary><div class="install-cards">${devices.map(d=>{
   const reason=installBlocker(d)||(!access.supported_platforms?.includes(d.type==='dimmer'?'light':d.type)?'Piattaforma non disponibile':'');
   const state=reason?'review':d.status,blocked=!!reason||!['create','update'].includes(d.status);
-  return `<article class="install-device"><label class="install-device-top"><input type="checkbox" data-install-index="${d.index}" data-blocked="${blocked}" ${blocked?'disabled':'checked'}><span class="install-icon" aria-hidden="true">${d.type==='cover'?'▤':d.type==='dimmer'?'◐':'☼'}</span><strong>${escapeHTML(d.name)}</strong></label><span class="install-badge ${state}">${escapeHTML(labels[state]||'Da verificare')}</span>${state==='review'?`<p class="install-help">${escapeHTML(reason||d.reason)} · Usa “Modifica funzioni” per correggere.</p>`:''}<details class="install-details"><summary>Dettagli KNX</summary><p>${escapeHTML(room)}<br>${escapeHTML(d.reason||'')}<br>${escapeHTML(d.entity_id||'Entità da creare')}</p><p>${escapeHTML(Object.entries(d.fields||{}).filter(([,v])=>v).map(([k,v])=>k+': '+v).join(' · '))}</p></details>${commissioningControls({...d,status:state})}</article>`;
+  return `<article class="install-device"><label class="install-device-top"><input type="checkbox" data-install-index="${d.index}" data-blocked="${blocked}" ${blocked?'disabled':'checked'}><span class="install-icon" aria-hidden="true">${d.type==='cover'?'▤':d.type==='dimmer'?'◐':'☼'}</span><strong>${escapeHTML(d.name)}</strong></label><span class="install-badge ${state}">${escapeHTML(labels[state]||'Da verificare')}</span>${state==='review'?`<p class="install-help">${escapeHTML(reason||d.reason)} · Usa “Modifica funzioni” per correggere.</p>`:''}<details class="install-details"><summary>Dettagli KNX</summary><p>${escapeHTML(room)}<br>${escapeHTML(d.reason||'')}<br>${escapeHTML(d.entity_id||'Entità da creare')}</p><p>${escapeHTML(Object.entries(d.fields||{}).filter(([,v])=>v).map(([k,v])=>k+': '+v).join(' · '))}</p></details>${commissioningControls({...d,status:state})}${climateScheduleLink({...d,status:state})}</article>`;
  }).join('')}</div></details>`).join('');
 }
 
 function installBlocker(device){
- if(!['light','dimmer','cover','button','switch','climate'].includes(device.type))return 'Tipo da configurare negli strumenti avanzati';
- if(!device.fields.command)return 'Manca il comando';
+ if(!['light','dimmer','cover','button','switch','climate','binary_sensor','number'].includes(device.type))return 'Tipo da configurare negli strumenti avanzati';
+ if(!device.fields.command)return device.type==='binary_sensor'?'Manca l’indirizzo di stato':'Manca il comando';
  if(device.type==='climate'&&(!device.fields.temperature||!device.fields.target_temperature_state))return 'Manca la temperatura rilevata o lo stato setpoint';
  if(device.type==='dimmer'&&!device.fields.brightness)return 'Manca il comando luminosità assoluta';
  if(device.type==='cover'&&!device.fields.stop)return 'Manca il comando arresto';
@@ -69,6 +75,7 @@ function wireBulkInstall(){
   const action=button.dataset.commissionAction,index=Number(button.dataset.commissionIndex);
   if(!source||busy||!$('commission-enabled')?.checked||(testPending&&action!=='stop'))return;
   const d=source.devices.find(d=>d.index===index);if(!d||d.status!=='present')return;
+  if(d.profile==='filter_reset'&&!confirm('Confermi il reset dopo la pulizia o sostituzione del filtro?'))return;
   const target=$('commission-state-'+index),body={confirm:true,source_fingerprint:source.source_fingerprint,index,entity_id:d.entity_id,action};
   if(action==='brightness'){const raw=$('commission-level-'+index).value;const value=Number(raw);if(!raw.trim()||!Number.isInteger(value)||value<0||value>100){target.textContent='Inserisci una percentuale da 0 a 100.';return;}body.value=value;}
   testPending++;pilotBusy=true;gate();gateTests();target.textContent='Invio comando…';

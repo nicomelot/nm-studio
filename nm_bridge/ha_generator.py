@@ -61,7 +61,7 @@ def validate_evidence(payload, project):
 
 def generate(layout=None, evidence=None):
     layout = read_layout() if layout is None else layout
-    entries = {"light": [], "cover": [], "climate": [], "switch": []}
+    entries = {"light": [], "cover": [], "climate": [], "switch": [], "binary_sensor": [], "number": []}
     warnings = []
     seen = {}
     if evidence is not None and not isinstance(evidence, dict):
@@ -89,7 +89,7 @@ def generate(layout=None, evidence=None):
             warnings.append({"index": index, "name": name, "code": "button_panel_only",
                              "message": "Pulsante: usa Installazione e collaudo per creare l’entità dal pannello KNX."})
             continue
-        platform = kind if kind in ("cover", "climate", "switch") else "light"
+        platform = kind if kind in entries else "light"
         if platform == "climate" and (not fields.get("temperature") or not fields.get("target_temperature_state")):
             warnings.append({"index": index, "name": name, "code": "climate_missing_required",
                              "message": "Termostato escluso: temperatura ambiente e feedback setpoint obbligatori per HA KNX"})
@@ -101,7 +101,20 @@ def generate(layout=None, evidence=None):
             continue
         seen[key] = name
         entry = {"name": name}
-        if platform == "climate":
+        profile = widget.get('profile', '')
+        if platform == "binary_sensor":
+            entry["state_address"] = command
+            if profile == "filter_alarm":
+                entry["device_class"] = "problem"
+        elif platform == "number":
+            entry["address"] = command
+            if fields.get("feedback"):
+                entry["state_address"] = fields["feedback"]
+            if profile == "flap_position":
+                entry.update(type="percent", min=0, max=100, step=20, mode="slider")
+            else:
+                entry.update(type="time_period_sec", min=0, max=3600, step=1, mode="box")
+        elif platform == "climate":
             entry["temperature_address"] = fields["temperature"]
             entry["target_temperature_address"] = command
             entry["target_temperature_state_address"] = fields["target_temperature_state"]
@@ -114,12 +127,14 @@ def generate(layout=None, evidence=None):
                              "message": "Verificare setpoint e temperatura DPT 9.001, caldo/freddo DPT 1.100 e modalità DPT 20.102; modalità HVAC non presunte"})
         elif platform in ("light", "switch"):
             entry["address"] = command
+            if profile.endswith('_inverted'):
+                entry["invert"] = True
             warnings.append({"index": index, "name": name, "code": "check_switch_dpt",
-                             "message": "Verificare DPT 1.001 del comando in ETS"})
+                             "message": "Verificare DPT del comando in ETS"})
             if fields.get("feedback"):
                 entry["state_address"] = fields["feedback"]
                 warnings.append({"index": index, "name": name, "code": "check_switch_state_dpt",
-                                 "message": "Verificare DPT 1.001 del feedback in ETS"})
+                                 "message": "Verificare DPT del feedback in ETS"})
             else:
                 warnings.append({"index": index, "name": name, "code": "missing_feedback",
                                  "message": "Stato non collegato; nessun feedback inventato"})
@@ -224,7 +239,9 @@ def generate(layout=None, evidence=None):
     pending = sum(not w.get("verified", False) for w in warnings)
     return {"format": "nm-studio-ha-knx-preview", "version": 1, "read_only": True,
             "applied": False, "requires_installer_approval": True,
-            "project": layout["project"], "counts": {key: len(value) for key, value in entries.items()},
+            "project": layout["project"],
+            "counts": {key: len(value) for key, value in entries.items()
+                       if value or key not in ("binary_sensor", "number")},
             "warnings": warnings, "checks_confirmed": confirmed, "checks_compatible": compatible,
             "checks_pending": pending,
             "evidence_used": evidence is not None, "yaml": "\n".join(lines) + "\n"}

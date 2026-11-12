@@ -1,6 +1,6 @@
 // Compare ETS evidence with drafts; import prepares configuration, never HA entities.
 function recoveryReport(data, drafts){
- const supported=new Set(['light','dimmer','cover','climate']);
+ const supported=new Set(['light','dimmer','cover','climate','button','switch','binary_sensor','number']);
  const commands=new Set(drafts.map(w=>w.fields?.command).filter(Boolean));
  const referenced=new Set(drafts.flatMap(w=>Object.values(w.fields||{})).filter(Boolean));
  const addresses=new Map((data?.addresses||[]).map(a=>[a.address,a]));
@@ -12,7 +12,7 @@ function recoveryReport(data, drafts){
  }
  const missing=[];
  for(const [command,list] of groups){
-  const signatures=new Set(list.map(s=>JSON.stringify([s.kind,s.command_mode||'toggle',...['feedback','relative','stop','brightness','brightness_feedback','position','position_command','position_feedback','temperature','target_temperature_state','heat_cool','heat_cool_state','operation_mode','operation_mode_state','on_off','on_off_state','controller_mode','controller_mode_state','fan_speed','fan_speed_state','swing','swing_state'].map(k=>s[k]||'')])));
+  const signatures=new Set(list.map(s=>JSON.stringify([s.kind,s.profile||'',s.command_mode||'toggle',...['feedback','relative','stop','brightness','brightness_feedback','position','position_command','position_feedback','temperature','target_temperature_state','heat_cool','heat_cool_state','operation_mode','operation_mode_state','on_off','on_off_state','controller_mode','controller_mode_state','fan_speed','fan_speed_state','swing','swing_state'].map(k=>s[k]||'')])));
   const s=list[0],a=addresses.get(command);
   missing.push({...s,command,linked:!!a?.linked,ambiguous:signatures.size>1,
    shared:referenced.has(command)});
@@ -41,11 +41,12 @@ function addRecoveredWidget(command, kind, automatic=true){
   fields[key]=linkedGA(candidate[key])||'';
  }
  const match=(etsData.room_matches||[]).find(m=>m.command===command);
- const room=resolveRoomAlias(match?.room||'Da assegnare');
+ const parent=candidate?.climate_command&&widgetDrafts.find(w=>w.kind==='climate'&&w.fields.command===candidate.climate_command);
+ const room=resolveRoomAlias(parent?.room&&parent.room!=='Da assegnare'?parent.room:match?.room||'Da assegnare');
  const known=structureRooms(false);
  widgetDrafts.push(newWidget(kind,candidate?.name||address.name||command,fields,
   automatic?'Riconosciuta da ETS · '+(candidate.reason||'verifica comando e feedback'):'Aggiunta manuale da indirizzo ETS · verifica funzione e DPT',
-  known.includes(room)?room:'Da assegnare','',true,candidate?.command_mode));
+  known.includes(room)?room:'Da assegnare','',true,candidate?.command_mode,candidate?.profile));
  widgetDirty=true;
  return true;
 }
@@ -247,10 +248,12 @@ function searchFunctionAddresses(data,query){
  return (data?.addresses||[]).filter(a=>words.every(word=>(a.address+' '+a.name).toLocaleLowerCase().includes(word))).slice(0,30);
 }
 function offAddressCompatible(a){return !!a&&(!a.dpt||['DPST-1-1','DPT-1.001','1.001'].includes(a.dpt));}
-function widgetAddressCompatible(kind,field,address){
- if(kind==='climate'&&address?.dpt){
+function widgetAddressCompatible(kind,field,address,profile){
+ const profileDpt={fan_auto:'1.003',fan_auto_inverted:'1.003',flap_position:'5.001',
+  suspend:'1.001',suspend_inverted:'1.001',suspend_delay:'7.005',filter_reset:'1.017',filter_alarm:'1.002'};
+ if((kind==='climate'||profileDpt[profile])&&address?.dpt){
   const match=address.dpt.match(/^(?:DPST-|DPT-)?(\d+)[.-](\d+)$/i);
-  const hint=widgetFields.climate.find(f=>f[0]===field)?.[2];
+  const hint=profileDpt[profile]?'DPT '+profileDpt[profile]:widgetFields.climate.find(f=>f[0]===field)?.[2];
   return !match||!hint||hint==='DPT '+Number(match[1])+'.'+String(Number(match[2])).padStart(3,'0');
  }
  if(!['button','switch'].includes(kind)||!address?.dpt)return true;
@@ -299,7 +302,7 @@ function wireOffButtons(){
  $('function-search').oninput=filter;
  document.querySelectorAll('.widget-proposal').forEach(row=>{
   const w=widgetDrafts[Number(row.dataset.index)];
-  if(w.kind==='button'){
+  if(w.kind==='button'&&w.profile!=='filter_reset'){
    const selector=document.createElement('label');
    selector.className='small';
    selector.innerHTML='<span>Valore alla pressione</span><select class="widget-command-mode"><option value="on_only">1 (ON)</option><option value="off_only">0 (OFF)</option></select>';
