@@ -1,5 +1,6 @@
 ## 5.21.0
 
+- Widget manuali Pulsante e Interruttore con GA scelti da ETS o inseriti a mano. Il pulsante invia il valore 1 oppure 0 a ogni pressione. L’interruttore usa ON/OFF e un GA di stato facoltativo. Creazione, collaudo e plancia usano le entità KNX native di Home Assistant.
 - Creazione della stanza direttamente dal widget, con scelta di edificio/piano e assegnazione immediata nella gerarchia condivisa. Stanze omonime nello stesso contenitore vengono riutilizzate; annullare conserva l’assegnazione precedente.
 - Aggiunta widget sempre visibile; apertura della nuova scheda con ricerca azzerata e campi KNX espansi.
 - Inserimento manuale di GA con verifica dei limiti KNX e conservazione nei selettori dopo salvataggio e riapertura. Le associazioni manuali non modificano il file ETS né programmano dispositivi.

@@ -45,7 +45,7 @@ function addRecoveredWidget(command, kind, automatic=true){
  const known=structureRooms(false);
  widgetDrafts.push(newWidget(kind,candidate?.name||address.name||command,fields,
   automatic?'Riconosciuta da ETS · '+(candidate.reason||'verifica comando e feedback'):'Aggiunta manuale da indirizzo ETS · verifica funzione e DPT',
-  known.includes(room)?room:'Da assegnare','',true,candidate?.command_mode||'toggle'));
+  known.includes(room)?room:'Da assegnare','',true,candidate?.command_mode));
  widgetDirty=true;
  return true;
 }
@@ -247,6 +247,11 @@ function searchFunctionAddresses(data,query){
  return (data?.addresses||[]).filter(a=>words.every(word=>(a.address+' '+a.name).toLocaleLowerCase().includes(word))).slice(0,30);
 }
 function offAddressCompatible(a){return !!a&&(!a.dpt||['DPST-1-1','DPT-1.001','1.001'].includes(a.dpt));}
+function widgetAddressCompatible(kind,field,address){
+ if(!['button','switch'].includes(kind)||!address?.dpt)return true;
+ if(offAddressCompatible(address))return true;
+ return kind==='switch'&&field==='feedback'&&['DPST-1-11','DPT-1.011','1.011'].includes(address.dpt);
+}
 function prepareOffButton(command){
  const a=etsData?.addresses?.find(a=>a.address===command);
  if(!offAddressCompatible(a))return false;
@@ -289,6 +294,17 @@ function wireOffButtons(){
  $('function-search').oninput=filter;
  document.querySelectorAll('.widget-proposal').forEach(row=>{
   const w=widgetDrafts[Number(row.dataset.index)];
+  if(w.kind==='button'){
+   const selector=document.createElement('label');
+   selector.className='small';
+   selector.innerHTML='<span>Valore alla pressione</span><select class="widget-command-mode"><option value="on_only">1 (ON)</option><option value="off_only">0 (OFF)</option></select>';
+   row.querySelector('.widget-name').after(selector);
+   const input=selector.querySelector('select');
+   input.value=w.command_mode||'on_only';
+   input.onchange=()=>{w.command_mode=input.value;widgetDirty=true;renderKeepingScroll();};
+   row.querySelector('.widget-preview .smart-state').textContent='Premi';
+   row.querySelector('.widget-preview .smart-meta').textContent=input.value==='off_only'?'Invia 0 (OFF)':'Invia 1 (ON)';
+  }
   if(w.kind==='light'){
    const selector=document.createElement('label');selector.className='small';
    selector.innerHTML='<span>Comportamento del comando</span><select class="widget-command-mode"><option value="toggle">Luce ON/OFF</option><option value="off_only">Pulsante solo spegnimento</option></select>';
@@ -359,6 +375,8 @@ function assignManualWidgetGA(widget, field, value){
  const ga=value.trim();
  if(!/^(?:[0-9]|[12][0-9]|3[01])\/[0-7]\/(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$/.test(ga))throw Error('GA non valido. Usa principale 0–31 / intermedio 0–7 / gruppo 0–255, per esempio 1/2/3.');
  if(!widgetFields[widget.kind]?.some(f=>f[0]===field))throw Error('Campo widget non valido.');
+ const address=etsData?.addresses?.find(a=>a.address===ga);
+ if(!widgetAddressCompatible(widget.kind,field,address))throw Error('DPT incompatibile con questo campo.');
  widget.fields[field]=ga;widgetDirty=true;return ga;
 }
 function revealWidgetEditor(index){

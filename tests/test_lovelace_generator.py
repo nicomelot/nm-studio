@@ -66,6 +66,21 @@ class LovelaceGeneratorTests(unittest.TestCase):
         self.assertFalse(any("state" in c for c in all_cards))
         self.assertEqual(result["summary"]["placeholders"], 1)
 
+    def test_manual_controls_use_their_native_dashboard_actions(self):
+        sample = self.sample()
+        sample["widgets"] = [
+            {"type": "button", "name": "Campanello", "entity_id": "button.campanello",
+             "command_mode": "off_only"},
+            {"type": "switch", "name": "Aspiratore", "entity_id": "switch.aspiratore"},
+        ]
+        result = generate(sample, [{"entity_id": w["entity_id"]} for w in sample["widgets"]])
+        cards = [c for v in result["dashboard"]["views"] for s in v["sections"] for c in s["cards"]]
+        bell = next(c for c in cards if c.get("name") == "Campanello")
+        self.assertEqual(bell["tap_action"]["perform_action"], "button.press")
+        self.assertEqual(bell["tap_action"]["target"], {"entity_id": "button.campanello"})
+        switch = next(c for c in cards if c.get("entity") == "switch.aspiratore")
+        self.assertEqual(switch["icon_tap_action"], {"action": "toggle"})
+
 
 if __name__ == "__main__":
     unittest.main()

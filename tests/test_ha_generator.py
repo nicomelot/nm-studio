@@ -10,7 +10,7 @@ class HAGeneratorTests(unittest.TestCase):
         result = generate({"project": "a" * 64, "widgets": [
             {"type": "light", "name": "L1", "fields": {"command": "1/1/0", "feedback": "1/1/4"}},
             {"type": "dimmer", "name": 'Dimmer "L11"', "fields": {"command": "1/0/1", "brightness": "1/0/2", "brightness_feedback": "1/0/6", "relative": "1/0/3"}}]})
-        self.assertEqual(result["counts"], {"light": 2, "cover": 0, "climate": 0})
+        self.assertEqual(result["counts"], {"light": 2, "cover": 0, "climate": 0, "switch": 0})
         self.assertIn('state_address: "1/1/4"', result["yaml"])
         self.assertIn('brightness_address: "1/0/2"', result["yaml"])
         self.assertNotIn('1/0/3', result["yaml"])

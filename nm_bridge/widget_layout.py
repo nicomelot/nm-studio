@@ -23,13 +23,15 @@ WIDGET_PATH = Path(os.getenv("NM_WIDGET_LAYOUT_PATH", "/data/nm_knx_widget_layou
 PROJECT = re.compile(r"^[0-9a-f]{64}$")
 ADDRESS = re.compile(r"^(?:[0-9]|[12][0-9]|3[01])/[0-7]/(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$")
 FIELDS = {
+    "button": {"command"},
+    "switch": {"command", "feedback"},
     "light": {"command", "feedback"},
     "dimmer": {"command", "feedback", "relative", "brightness", "brightness_feedback"},
     "cover": {"command", "stop", "position", "feedback", "position_command", "position_feedback"},
     "climate": {"command", "temperature", "target_temperature_state", "heat_cool", "heat_cool_state",
                 "operation_mode", "operation_mode_state"},
 }
-HA_ENTITY = re.compile(r"^(?:light|switch|cover|sensor|binary_sensor|climate)\.[a-z0-9_]{1,240}$")
+HA_ENTITY = re.compile(r"^(?:light|switch|button|cover|sensor|binary_sensor|climate)\.[a-z0-9_]{1,240}$")
 MAX_WIDGETS = 200
 MAX_ROOMS = 200
 MAX_NODES = 250
@@ -97,14 +99,18 @@ def validate(payload):
             raise ValueError("Invalid widget fields")
         if not isinstance(item.get('visible', True), bool):
             raise ValueError('Invalid dashboard visibility')
-        mode = item.get('command_mode', 'toggle')
-        if mode not in ('toggle', 'off_only') or (mode == 'off_only' and item['type'] != 'light'):
+        modes = {'light': ('toggle', 'off_only'), 'button': ('on_only', 'off_only')}
+        allowed = modes.get(item['type'], ('toggle',))
+        mode = item.get('command_mode', allowed[0])
+        if mode not in allowed:
             raise ValueError('Invalid command mode')
         if mode == 'off_only' and fields.get('feedback'):
             raise ValueError('Un pulsante solo spegnimento non usa un feedback ON/OFF')
         entity_id = item.get("entity_id", "")
         if not isinstance(entity_id, str) or (entity_id and not HA_ENTITY.fullmatch(entity_id)):
             raise ValueError("Invalid Home Assistant entity link")
+        if entity_id and item["type"] in ("button", "switch") and entity_id.split(".", 1)[0] != item["type"]:
+            raise ValueError("Entità Home Assistant incompatibile con il tipo di comando")
         checked = {}
         for key in FIELDS[item["type"]]:
             value = fields.get(key, "")
@@ -112,7 +118,7 @@ def validate(payload):
                 raise ValueError("Invalid widget group address")
             checked[key] = value
         clean.append({"type": item["type"], "name": name.strip(), "room": room.strip(), "fields": checked,
-                      "entity_id": entity_id, **({'command_mode': 'off_only'} if mode == 'off_only' else {}),
+                      "entity_id": entity_id, **({'command_mode': mode} if mode != 'toggle' else {}),
                       **({'visible': False} if item.get('visible') is False else {})})
     aliases = payload.get('room_aliases', {})
     if not isinstance(aliases, dict) or len(aliases) > 1500:

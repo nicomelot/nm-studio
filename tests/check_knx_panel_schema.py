@@ -15,6 +15,8 @@ for kind, fields in (
     ("dimmer", {"command": "1/1/0", "feedback": "1/1/1", "brightness": "1/1/2", "brightness_feedback": "1/1/3"}),
     ("cover", {"command": "1/2/0", "stop": "1/2/1"}),
     ("cover", {"command": "1/2/0", "stop": "1/2/1", "position_command": "1/2/2", "position_feedback": "1/2/3"}),
+    ("switch", {"command": "1/3/0", "feedback": "1/3/1"}),
+    ("button", {"command": "1/3/2"}),
 ):
     layout = {"version": 1, "project": "a" * 64, "rooms": [], "structure": [],
               "widgets": [{"name": "Synthetic", "room": "Test", "type": kind, "fields": fields}]}

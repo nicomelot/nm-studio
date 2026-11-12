@@ -60,7 +60,7 @@ def generate(layout, entities):
             expected = {"light": {"light", "switch"}, "dimmer": {"light"},
                         "cover": {"cover"}, "sensor": {"sensor", "binary_sensor"},
                         "climate": {"climate"}, "fan": {"fan"},
-                        "switch": {"switch"}}.get(kind, set())
+                        "switch": {"switch"}, "button": {"button"}}.get(kind, set())
             compatible = bool(ident and ident.split(".", 1)[0] in expected)
             confirmed = compatible and ident in available and not is_lab_entity(ident)
             if confirmed:
@@ -73,11 +73,15 @@ def generate(layout, entities):
                     card["features"] = [{"type": "cover-open-close"}]
                 elif ident.startswith("climate."):
                     card["features"] = [{"type": "climate-hvac-modes"}]
-                if w.get('command_mode') == 'off_only':
-                    card = {'type': 'button', 'name': w['name'], 'icon': 'mdi:power',
+                if kind == 'switch':
+                    card['icon_tap_action'] = {'action': 'toggle'}
+                if kind == 'button' or w.get('command_mode') == 'off_only':
+                    action = 'button.press' if kind == 'button' else ident.split('.')[0] + '.turn_off'
+                    card = {'type': 'button', 'name': w['name'],
+                            'icon': 'mdi:gesture-tap-button' if kind == 'button' else 'mdi:power',
                             'show_state': False, 'grid_options': {'columns': 12},
                             'tap_action': {'action': 'perform-action',
-                                           'perform_action': ident.split('.')[0] + '.turn_off',
+                                           'perform_action': action,
                                            'target': {'entity_id': ident}},
                             'hold_action': {'action': 'none'}, 'double_tap_action': {'action': 'none'}}
                 parts = [p.strip() for p in room.split(" / ") if p.strip()]
@@ -86,7 +90,7 @@ def generate(layout, entities):
                 category = {"light": "Illuminazione", "dimmer": "Illuminazione",
                             "cover": "Schermature", "climate": "Climatizzazione",
                             "sensor": "Sensori", "fan": "Ventilazione", "switch": "Altri carichi"}.get(kind, "Altri carichi")
-                if w.get('command_mode') == 'off_only':
+                if kind == 'button' or w.get('command_mode') == 'off_only':
                     category = 'Comandi'
                 approved.append({"card": card, "room": room, "floor": floor,
                                  "zone": zone, "category": category})

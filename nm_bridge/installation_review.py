@@ -34,7 +34,8 @@ def compare(layout, index, ws):
             used = ws.call('knx/get_entities_by_group')
             if not isinstance(used, dict):
                 raise ValueError('Inventario indirizzi KNX non verificabile')
-            addresses = {v for g in target['data']['knx'].values() for v in g.values()}
+            addresses = {v for g in target['data']['knx'].values() if isinstance(g, dict)
+                         for k, v in g.items() if k in ('write', 'state') and isinstance(v, str)}
             if addresses.intersection(used):
                 raise ValueError('GA già configurati in HA: associa l’entità esistente')
             if sum(x.get('fields', {}).get('command') == w['fields'].get('command') for x in layout['widgets']) > 1:
@@ -49,7 +50,7 @@ def compare(layout, index, ws):
             raise ValueError('Configurazione KNX non verificabile')
         merged = deepcopy(data)
         changes = []
-        primary = 'ga_up_down' if target['platform'] == 'cover' else 'ga_switch'
+        primary = {'cover': 'ga_up_down', 'button': 'ga_send'}.get(target['platform'], 'ga_switch')
         if (data['knx'].get(primary) or {}).get('write') != w['fields'].get('command'):
             raise ValueError('Il comando principale HA non coincide: verifica l’associazione')
         used = ws.call('knx/get_entities_by_group')
@@ -59,6 +60,10 @@ def compare(layout, index, ws):
                       for k, v in g.items() if k in ('write', 'state') and isinstance(v, str)}
         # Keep HA name, device, options and all configured GA; fill empty roles only.
         for group, roles in target['data']['knx'].items():
+            if group == 'data':
+                if data['knx'].get(group) != roles:
+                    raise ValueError('Valore del pulsante diverso in HA: verifica la configurazione KNX')
+                continue
             existing = merged['knx'].get(group) or {}
             if not isinstance(existing, dict):
                 raise ValueError('Formato indirizzi KNX non verificabile')
