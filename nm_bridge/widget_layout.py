@@ -29,7 +29,9 @@ FIELDS = {
     "dimmer": {"command", "feedback", "relative", "brightness", "brightness_feedback"},
     "cover": {"command", "stop", "position", "feedback", "position_command", "position_feedback"},
     "climate": {"command", "temperature", "target_temperature_state", "heat_cool", "heat_cool_state",
-                "operation_mode", "operation_mode_state"},
+                "operation_mode", "operation_mode_state", "on_off", "on_off_state",
+                "controller_mode", "controller_mode_state", "fan_speed", "fan_speed_state",
+                "swing", "swing_state"},
 }
 HA_ENTITY = re.compile(r"^(?:light|switch|button|cover|sensor|binary_sensor|climate)\.[a-z0-9_]{1,240}$")
 MAX_WIDGETS = 200

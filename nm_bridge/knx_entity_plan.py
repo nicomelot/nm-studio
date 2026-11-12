@@ -6,6 +6,51 @@ except ImportError:
     from missing_ha_generator import review
 
 
+CLIMATE_GROUPS = {
+    "ga_heat_cool": ("heat_cool", "heat_cool_state"),
+    "ga_operation_mode": ("operation_mode", "operation_mode_state"),
+    "ga_on_off": ("on_off", "on_off_state"),
+    "ga_controller_mode": ("controller_mode", "controller_mode_state"),
+    "ga_fan_speed": ("fan_speed", "fan_speed_state"),
+    "ga_fan_swing": ("swing", "swing_state"),
+}
+
+
+def climate_config(fields):
+    if not fields.get("temperature") or not fields.get("target_temperature_state"):
+        raise ValueError("Clima: temperatura rilevata e stato setpoint obbligatori")
+    config = {
+        "ga_temperature_current": {"state": fields["temperature"]},
+        "target_temperature": {
+            "ga_temperature_target": {"write": fields["command"], "state": fields["target_temperature_state"]},
+        },
+    }
+    for group, (write, state) in CLIMATE_GROUPS.items():
+        values = {role: fields[key] for role, key in (("write", write), ("state", state)) if fields.get(key)}
+        if values:
+            config[group] = values
+    if "ga_fan_speed" in config:
+        config["ga_fan_speed"]["dpt"] = "5.001"
+    return config
+
+
+def group_addresses(config, prefix=()):
+    """Yield KNX group selectors, including the climate setpoint subsection."""
+    for key, group in config.items():
+        if not isinstance(group, dict):
+            continue
+        path = (*prefix, key)
+        if key.startswith("ga_"):
+            yield path, group
+        else:
+            yield from group_addresses(group, path)
+
+
+def configured_addresses(config):
+    return {value for _, group in group_addresses(config) for role, value in group.items()
+            if role in ("write", "state") and isinstance(value, str)}
+
+
 def build(layout, request):
     validated = review(layout, request)
     if not validated["approved_count"]:
@@ -18,13 +63,17 @@ def build(layout, request):
         kind = original["type"]
         if not fields.get("command"):
             raise ValueError("A selected device has no KNX command address")
-        if kind not in ('light', 'dimmer', 'cover', 'switch', 'button'):
+        if kind not in ('light', 'dimmer', 'cover', 'switch', 'button', 'climate'):
             raise ValueError('Tipo non supportato dalla creazione diretta')
         if kind == 'dimmer' and not fields.get('brightness'):
             raise ValueError('Dimmer: GA luminosità assoluta obbligatorio')
         if kind == 'cover' and not fields.get('stop'):
             raise ValueError('Tapparella: GA arresto obbligatorio per il collaudo')
         data = {"entity": {"name": item["name"].strip()}, "knx": {}}
+        if kind == "climate":
+            data["knx"] = climate_config(fields)
+            calls.append({"type": "knx/create_entity", "platform": "climate", "data": data})
+            continue
         if kind == "button":
             platform = "button"
             mapping = {"command": ("ga_send", "write")}

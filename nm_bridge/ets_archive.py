@@ -58,6 +58,13 @@ class ProjectArchive:
             return archive.read(original)
         return self.outer.read(member)
 
+    def open(self, member):
+        name = member if isinstance(member, str) else member.filename
+        if name in self.overlays:
+            _, archive, original = self.overlays[name]
+            return archive.open(original)
+        return self.outer.open(member)
+
 
 @contextmanager
 def open_project(raw, password, max_members, max_xml, max_total):

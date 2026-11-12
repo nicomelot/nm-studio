@@ -2,7 +2,7 @@ import copy
 import unittest
 import xml.etree.ElementTree as ET
 
-from nm_bridge.ets_object_functions import object_dimmers, enrich_suggestions
+from nm_bridge.ets_object_functions import object_climates, object_dimmers, enrich_suggestions
 from nm_bridge.ets_import import application_file, instance_details
 
 
@@ -21,6 +21,27 @@ def circuit(module=1, offset=0):
 
 
 class ObjectImportTests(unittest.TestCase):
+    def test_ac_uses_roles_on_same_gateway_and_distinguishes_controller_mode(self):
+        items = []
+        for i, (text, dpt, write) in enumerate([
+            ('On/Off', '1.001', True), ('On/Off (Status)', '1.001', False),
+            ('Temperature Setpoint', '9.001', True), ('Temperature Setpoint (Status)', '9.001', False),
+            ('Indoor Unit Temperature (Status)', '9.001', False), ('Mode', '20.105', True),
+        ]):
+            items.append(dict(address=f'4/0/{i}', name=f'Arbitrary {i}', linked=True, dpt=dpt,
+                              connections=[dict(device_id='gateway', object_ref=f'O-{i}_R-{i}',
+                                                text='[AC] '+text, dpt=dpt,
+                                                flags=dict(CommunicationFlag=True, WriteFlag=write,
+                                                           TransmitFlag=not write))]))
+        climate, = object_climates(items)
+        self.assertEqual(climate['command'], '4/0/2')
+        self.assertEqual(climate['temperature'], '4/0/4')
+        self.assertEqual(climate['controller_mode'], '4/0/5')
+        items[5]['dpt'] = '20.102'
+        self.assertNotIn('controller_mode', object_climates(items)[0])
+        items[4]['connections'][0]['device_id'] = 'other gateway'
+        self.assertEqual(object_climates(items), [])
+
     def test_names_are_irrelevant_and_channels_stay_separate(self):
         items = circuit() + circuit(2, 10)
         result = object_dimmers(items)

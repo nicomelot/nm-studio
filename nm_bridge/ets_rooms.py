@@ -67,6 +67,11 @@ def room_matches(suggestions, addresses, spaces, functions):
         used_addresses = {suggestion.get(field) for field in ("command", "feedback", "stop", "position")}
         linked = {func["space"] for func in functions
                   if func["space"] in room_paths and used_addresses.intersection(func.get("addresses", []))}
+        if suggestion.get("kind") == "climate":
+            climate_addresses = {suggestion.get(field) for field in ("on_off", "on_off_state", "temperature")}
+            used_addresses.update(climate_addresses)
+            linked.update(func["space"] for func in functions
+                          if func["space"] in room_paths and climate_addresses.intersection(func.get("addresses", [])))
         if len(linked) == 1:
             room = next(iter(linked))
             proposals.append({"command": suggestion["command"], "room": room,

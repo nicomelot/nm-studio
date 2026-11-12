@@ -21,8 +21,9 @@ function installListMarkup(data,access){
 }
 
 function installBlocker(device){
- if(!['light','dimmer','cover','button','switch'].includes(device.type))return 'Tipo da configurare negli strumenti avanzati';
+ if(!['light','dimmer','cover','button','switch','climate'].includes(device.type))return 'Tipo da configurare negli strumenti avanzati';
  if(!device.fields.command)return 'Manca il comando';
+ if(device.type==='climate'&&(!device.fields.temperature||!device.fields.target_temperature_state))return 'Manca la temperatura rilevata o lo stato setpoint';
  if(device.type==='dimmer'&&!device.fields.brightness)return 'Manca il comando luminosità assoluta';
  if(device.type==='cover'&&!device.fields.stop)return 'Manca il comando arresto';
  return '';

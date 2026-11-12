@@ -17,6 +17,10 @@ for kind, fields in (
     ("cover", {"command": "1/2/0", "stop": "1/2/1", "position_command": "1/2/2", "position_feedback": "1/2/3"}),
     ("switch", {"command": "1/3/0", "feedback": "1/3/1"}),
     ("button", {"command": "1/3/2"}),
+    ("climate", {"command": "4/0/2", "target_temperature_state": "4/0/3", "temperature": "4/0/4",
+                 "on_off": "4/0/0", "on_off_state": "4/0/1", "controller_mode": "4/0/5",
+                 "controller_mode_state": "4/0/6", "fan_speed": "4/0/7", "fan_speed_state": "4/0/8",
+                 "swing": "4/0/9", "swing_state": "4/0/10"}),
 ):
     layout = {"version": 1, "project": "a" * 64, "rooms": [], "structure": [],
               "widgets": [{"name": "Synthetic", "room": "Test", "type": kind, "fields": fields}]}
