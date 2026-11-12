@@ -1,5 +1,7 @@
 ## 5.21.0
 
+- Import ETS con lettura progressiva dei cataloghi applicativi fino a 24 MiB ciascuno e 96 MiB complessivi. I cataloghi vengono letti una volta per applicativo.
+- Il riconoscimento dei gateway con ruoli AC espliciti propone un unico widget clima con setpoint, temperatura, ON/OFF e i ruoli di modalità, ventola e swing disponibili. Il flusso di installazione prepara l’entità KNX clima nativa in Home Assistant.
 - Widget manuali Pulsante e Interruttore con GA scelti da ETS o inseriti a mano. Il pulsante invia il valore 1 oppure 0 a ogni pressione. L’interruttore usa ON/OFF e un GA di stato facoltativo. Creazione, collaudo e plancia usano le entità KNX native di Home Assistant.
 - Creazione della stanza direttamente dal widget, con scelta di edificio/piano e assegnazione immediata nella gerarchia condivisa. Stanze omonime nello stesso contenitore vengono riutilizzate; annullare conserva l’assegnazione precedente.
 - Aggiunta widget sempre visibile; apertura della nuova scheda con ricerca azzerata e campi KNX espansi.

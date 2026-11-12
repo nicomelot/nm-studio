@@ -1,4 +1,4 @@
-"""Provisional dimmer recognition from linked application objects, without GA names.
+"""Provisional function recognition from linked application objects.
 
 Never group by GA proximity, device alone or object-number arithmetic. An
 explicit module instance and unambiguous DPT/direction roles are required.
@@ -9,6 +9,61 @@ import re
 def dpt(value):
     match = re.fullmatch(r'(?:DPST-|DPT-)?(\d+)[.-](\d+)', str(value or '').upper())
     return f'{int(match[1])}.{int(match[2]):03d}' if match else ''
+
+
+AC_ROLES = {
+    'on/off': ('1.001', 'on_off', 'on_off_state'),
+    'temperature setpoint': ('9.001', 'command', 'target_temperature_state'),
+    'indoor unit temperature': ('9.001', None, 'temperature'),
+    'mode': ('20.105', 'controller_mode', 'controller_mode_state'),
+    'speed: percentage control': ('5.001', 'fan_speed', 'fan_speed_state'),
+    'flaps: swing': ('1.001', 'swing', 'swing_state'),
+}
+
+
+def object_climates(items):
+    """Recognize an AC gateway by explicit application roles and direction."""
+    devices = {}
+    labels = {item['address']: item['name'] for item in items}
+    for item in items:
+        if not item.get('linked'):
+            continue
+        for obj in item.get('connections', []):
+            label = ' '.join(obj.get('text', '').casefold().split())
+            match = re.fullmatch(r'\[ac\] (.+?)( \(status\))?', label)
+            # Only flat gateway objects here. Module instances may represent
+            # different units on one physical device and must not be combined.
+            if not match or not obj.get('device_id') or not re.fullmatch(r'O-\d+_R-\d+', obj.get('object_ref', '')):
+                continue
+            entry = AC_ROLES.get(match[1])
+            if not entry:
+                continue
+            expected, command, state = entry
+            reporting = bool(match[2])
+            role = state if reporting else command
+            if not role:
+                continue
+            flags = obj.get('flags', {})
+            if (dpt(item.get('dpt')) != expected or dpt(obj.get('dpt')) != expected
+                    or flags.get('CommunicationFlag') is not True
+                    or flags.get('WriteFlag') is not (not reporting)
+                    or flags.get('TransmitFlag') is not reporting):
+                continue
+            devices.setdefault(obj['device_id'], {}).setdefault(role, set()).add(item['address'])
+
+    candidates = []
+    required = {'command', 'target_temperature_state', 'temperature', 'on_off', 'on_off_state'}
+    for roles in devices.values():
+        fields = {role: next(iter(addresses)) for role, addresses in roles.items() if len(addresses) == 1}
+        if not required.issubset(fields) or len(set(fields.values())) != len(fields):
+            continue
+        name = re.sub(r'\s+on\s*/\s*off\s*$', '', labels[fields['on_off']], flags=re.I).strip()
+        candidates.append(dict(name=f"CLIMA {name}", kind='climate', **fields, room='Da assegnare',
+                               confidence='media', reason='Ruoli AC e DPT dagli oggetti di uno stesso gateway ETS'))
+    # A shared primary command does not identify a single unit.
+    return [c for c in candidates if not any(
+        other is not c and (other['command'] == c['command'] or other['on_off'] == c['on_off'])
+        for other in candidates)]
 
 
 def object_dimmers(items):

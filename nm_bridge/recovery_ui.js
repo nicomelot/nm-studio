@@ -12,7 +12,7 @@ function recoveryReport(data, drafts){
  }
  const missing=[];
  for(const [command,list] of groups){
-  const signatures=new Set(list.map(s=>JSON.stringify([s.kind,s.command_mode||'toggle',...['feedback','relative','stop','brightness','brightness_feedback','position','position_command','position_feedback','temperature','target_temperature_state','heat_cool','heat_cool_state','operation_mode','operation_mode_state'].map(k=>s[k]||'')])));
+  const signatures=new Set(list.map(s=>JSON.stringify([s.kind,s.command_mode||'toggle',...['feedback','relative','stop','brightness','brightness_feedback','position','position_command','position_feedback','temperature','target_temperature_state','heat_cool','heat_cool_state','operation_mode','operation_mode_state','on_off','on_off_state','controller_mode','controller_mode_state','fan_speed','fan_speed_state','swing','swing_state'].map(k=>s[k]||'')])));
   const s=list[0],a=addresses.get(command);
   missing.push({...s,command,linked:!!a?.linked,ambiguous:signatures.size>1,
    shared:referenced.has(command)});
@@ -248,6 +248,11 @@ function searchFunctionAddresses(data,query){
 }
 function offAddressCompatible(a){return !!a&&(!a.dpt||['DPST-1-1','DPT-1.001','1.001'].includes(a.dpt));}
 function widgetAddressCompatible(kind,field,address){
+ if(kind==='climate'&&address?.dpt){
+  const match=address.dpt.match(/^(?:DPST-|DPT-)?(\d+)[.-](\d+)$/i);
+  const hint=widgetFields.climate.find(f=>f[0]===field)?.[2];
+  return !match||!hint||hint==='DPT '+Number(match[1])+'.'+String(Number(match[2])).padStart(3,'0');
+ }
  if(!['button','switch'].includes(kind)||!address?.dpt)return true;
  if(offAddressCompatible(address))return true;
  return kind==='switch'&&field==='feedback'&&['DPST-1-11','DPT-1.011','1.011'].includes(address.dpt);

@@ -68,6 +68,27 @@ class InstallationReviewTests(unittest.TestCase):
         self.assertEqual([d['status'] for d in result['devices']], ['update', 'create', 'review'])
         self.assertTrue(all(m.startswith('knx/get_') for m, _ in self.ws.calls))
 
+    def test_climate_nested_setpoint_is_checked_for_overlap_and_conflicts(self):
+        widget = self.layout['widgets'][0]
+        widget.update(type='climate', entity_id='', fields={
+            'command': '4/0/1', 'temperature': '4/0/2', 'target_temperature_state': '4/0/3',
+            'on_off': '4/0/4',
+        })
+        self.ws.used = {'4/0/3': []}
+        self.assertEqual(module.compare(self.layout, 0, self.ws)['status'], 'review')
+        self.ws.used = {}
+        self.assertEqual(module.compare(self.layout, 0, self.ws)['status'], 'create')
+        widget['entity_id'] = 'climate.example'
+        self.ws.config = {'platform': 'climate', 'data': {'entity': {'name': 'Existing'},
+            'knx': {'ga_temperature_current': {'state': '4/0/2'},
+                    'target_temperature': {'ga_temperature_target': {'write': '4/0/1'},
+                                           'min_temp': 16}}}}
+        row = module.compare(self.layout, 0, self.ws)
+        self.assertEqual(row['status'], 'update')
+        self.assertEqual(row['call']['data']['knx']['target_temperature'], {
+            'ga_temperature_target': {'write': '4/0/1', 'state': '4/0/3'}, 'min_temp': 16,
+        })
+
     def test_existing_ga_and_duplicate_commands_cannot_be_created_again(self):
         self.layout['widgets'][0]['entity_id'] = ''
         self.ws.used = {'1/1/1': [{'unique_id': 'existing'}]}

@@ -98,6 +98,21 @@ class DescriptiveImportTests(unittest.TestCase):
                  address('Gruppo 2 VALORE', 'DPST-5-1', 1)]
         self.assertFalse(descriptive_suggestions(items)[0])
 
+    def test_catalog_above_legacy_limit_and_utf16_doctype(self):
+        archive = io.BytesIO()
+        large = (b"<Root><!--" + b"x" * (5 * 1024 * 1024)
+                 + b'--><ComObject Id="APP_O-2" Text="[AC] On/Off"/></Root>')
+        unsafe = '<!DOCTYPE Root [<!ENTITY name "test">]><Root><ComObject Id="APP_O-2" Text="&name;"/></Root>'
+        with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as z:
+            z.writestr("large.xml", large)
+            z.writestr("unsafe.xml", unsafe.encode("utf-16"))
+        with zipfile.ZipFile(archive) as z:
+            budget, cache = [0], {}
+            self.assertEqual(catalog_objects(z, "large.xml", cache, budget)["O-2"]["text"], "[AC] On/Off")
+            catalog_objects(z, "large.xml", cache, budget)
+            self.assertEqual(budget[0], len(large))
+            self.assertEqual(catalog_objects(z, "unsafe.xml", cache, budget), {})
+
     def test_module_catalog_keeps_namespaces_and_reference_overrides(self):
         data = io.BytesIO()
         xml = '''<Root><ComObject Id="APP_MD-1_O-2-32" ObjectSize="1 Bit" FunctionText="Switch" WriteFlag="Enabled" DatapointType="DPST-1-1"/>

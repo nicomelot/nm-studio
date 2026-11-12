@@ -5,10 +5,10 @@ execute without a fresh installer review, a matching plan and explicit consent.
 """
 
 try:
-    from .knx_entity_plan import build
+    from .knx_entity_plan import build, configured_addresses
     from .dashboard_publisher import HAWebSocket
 except ImportError:
-    from knx_entity_plan import build
+    from knx_entity_plan import build, configured_addresses
     from dashboard_publisher import HAWebSocket
 
 
@@ -43,9 +43,7 @@ def create_one(layout, payload, connection_factory=HAWebSocket):
         used = ws.call("knx/get_entities_by_group")
         if not isinstance(used, dict):
             raise KNXApplyError("Indice dei GA KNX non interpretabile: creazione annullata")
-        addresses = {value for group in call["data"]["knx"].values()
-                     if isinstance(group, dict) for key, value in group.items()
-                     if key in ("write", "state") and isinstance(value, str)}
+        addresses = configured_addresses(call["data"]["knx"])
         overlaps = sorted(addresses.intersection(used))
         if overlaps:
             raise KNXApplyError("GA già presente in KNX Home Assistant: " + ", ".join(overlaps))

@@ -23,7 +23,10 @@ FUNCTION_FIELDS = {
                 "target_temperature_state": "9.001", "heat_cool": "1.100",
                 "heat_cool_state": "1.100", "operation_mode": "20.102",
                 "operation_mode_state": "20.102", "humidity": ("9.007", "5.001"),
-                "heating_demand": "1.001", "valve_state": ("1.011", "1.001")},
+                "heating_demand": "1.001", "valve_state": ("1.011", "1.001"),
+                "on_off": "1.001", "on_off_state": "1.001",
+                "controller_mode": "20.105", "controller_mode_state": "20.105",
+                "fan_speed": "5.001", "fan_speed_state": "5.001", "swing": "1.001", "swing_state": "1.001"},
 }
 
 

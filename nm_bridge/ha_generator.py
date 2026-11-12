@@ -105,7 +105,9 @@ def generate(layout=None, evidence=None):
             entry["temperature_address"] = fields["temperature"]
             entry["target_temperature_address"] = command
             entry["target_temperature_state_address"] = fields["target_temperature_state"]
-            for field in ("heat_cool", "heat_cool_state", "operation_mode", "operation_mode_state"):
+            for field in ("heat_cool", "heat_cool_state", "operation_mode", "operation_mode_state",
+                          "on_off", "on_off_state", "controller_mode", "controller_mode_state",
+                          "fan_speed", "fan_speed_state", "swing", "swing_state"):
                 if fields.get(field):
                     entry[field + "_address"] = fields[field]
             warnings.append({"index": index, "name": name, "code": "check_climate_dpt",

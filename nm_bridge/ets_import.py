@@ -10,13 +10,13 @@ try:
     from .ets_rooms import extract_functions, room_matches
     from .recognition import review_suggestions, hvac_address_inventory
     from .ets_named_functions import descriptive_suggestions
-    from .ets_object_functions import enrich_suggestions
+    from .ets_object_functions import enrich_suggestions, object_climates
 except ImportError:  # The add-on runs the modules directly from /app.
     from ets_archive import open_project
     from ets_rooms import extract_functions, room_matches
     from recognition import review_suggestions, hvac_address_inventory
     from ets_named_functions import descriptive_suggestions
-    from ets_object_functions import enrich_suggestions
+    from ets_object_functions import enrich_suggestions, object_climates
 
 MAX_ARCHIVE = 16 * 1024 * 1024
 MAX_XML = 12 * 1024 * 1024
@@ -24,8 +24,8 @@ MAX_TOTAL_XML = 32 * 1024 * 1024
 MAX_MEMBERS = 500
 MAX_ADDRESSES = 6000
 MAX_OBJECT_LINKS = 20000
-MAX_CATALOG_XML = 4 * 1024 * 1024
-MAX_TOTAL_CATALOG = 16 * 1024 * 1024
+MAX_CATALOG_XML = 24 * 1024 * 1024
+MAX_TOTAL_CATALOG = 96 * 1024 * 1024
 MAX_UNLINKED_PER_DEVICE = 150
 MAX_CATALOG_CANDIDATES = 120
 MAX_SPACES = 400
@@ -451,11 +451,38 @@ def catalog_key(reference):
     return '_'.join(p for p in reference.split('_') if p.startswith(('MD-', 'O-', 'R-')))
 
 
+class CatalogRecords:
+    """Collect only bounded communication-object metadata, without an XML tree."""
+
+    def __init__(self):
+        self.objects = []
+        self.references = []
+
+    def start(self, tag, attributes):
+        kind = name_of(tag)
+        if kind not in ("ComObject", "ComObjectRef"):
+            return
+        if len(self.objects) + len(self.references) >= MAX_OBJECT_LINKS:
+            raise ValueError("Troppi oggetti nel catalogo KNX")
+        records = self.objects if kind == "ComObject" else self.references
+        records.append({key: value[:200] for key, value in attributes.items() if key in (
+            "Id", "RefId", "Text", "Name", "FunctionText", "Number", "ObjectSize", "DatapointType",
+            "CommunicationFlag", "ReadFlag", "WriteFlag", "TransmitFlag", "UpdateFlag",
+        )})
+
+    def doctype(self, *_):
+        raise ValueError("DOCTYPE non ammesso nel catalogo KNX")
+
+    def close(self):
+        return self.objects, self.references
+
+
 def catalog_objects(archive, filename, cache, budget):
     if not filename:
         return {}
     if filename in cache:
         return cache[filename]
+    cache[filename] = {}
     try:
         info = archive.getinfo(filename)
     except KeyError:
@@ -463,20 +490,20 @@ def catalog_objects(archive, filename, cache, budget):
     if info.file_size > MAX_CATALOG_XML or budget[0] + info.file_size > MAX_TOTAL_CATALOG or info.flag_bits & 1:
         return {}
     budget[0] += info.file_size
-    content = archive.read(info)
-    if b"<!DOCTYPE" in content.upper() or b"<!ENTITY" in content.upper():
-        return {}
     try:
-        root = ET.fromstring(content)
-    except ET.ParseError:
+        parser = ET.XMLParser(target=CatalogRecords())
+        with archive.open(info) as stream:
+            for chunk in iter(lambda: stream.read(128 * 1024), b""):
+                parser.feed(chunk)
+        definitions, references = parser.close()
+    except (ET.ParseError, ValueError):
         return {}
     objects = {}
-    for node in root.iter():
-        if name_of(node.tag) != "ComObject":
-            continue
+    for node in definitions:
         obj_id = catalog_key(node.get("Id") or "")
-        if obj_id and len(objects) < MAX_OBJECT_LINKS:
+        if obj_id:
             objects[obj_id] = {"name": (node.get("Name") or "")[:120],
+                               "text": (node.get("Text") or "")[:120],
                                "function": (node.get("FunctionText") or "")[:100],
                                "number": node.get("Number"),
                                "size": (node.get("ObjectSize") or "")[:32],
@@ -486,16 +513,15 @@ def catalog_objects(archive, filename, cache, budget):
                                            if node.get(k) in ('Enabled', 'Disabled')}}
     # Parameter-specific ComObjectRef values override generic ComObject
     # metadata (critical for multi-function input channels).
-    for node in root.iter():
-        if name_of(node.tag) != "ComObjectRef":
-            continue
+    for node in references:
         ref_key = (node.get("Id") or "").split("_O-", 1)
         if len(ref_key) != 2 or "_R-" not in ref_key[1]:
             continue
         key = catalog_key(node.get("Id") or "")
-        base = objects.get(key.split("_R-", 1)[0], {})
+        base = objects.get(catalog_key(node.get("RefId") or "") or key.split("_R-", 1)[0], {})
         objects[key] = {**base,
                         "name": (node.get("Text") or node.get("Name") or base.get("name") or "")[:120],
+                        "text": (node.get("Text") or base.get("text") or "")[:120],
                         "function": (node.get("FunctionText") or base.get("function") or "")[:100],
                         "size": (node.get("ObjectSize") or base.get("size") or "")[:32],
                         "dpt": (node.get("DatapointType") or base.get("dpt") or "")[:100],
@@ -603,7 +629,7 @@ def preview(raw, password=""):
                     raise ValueError("Too many group addresses")
             # Links on ComObjectInstanceRef are a direct project-level
             # association, unlike names or DPT guesses. Preserve only a small,
-            # bounded inventory per GA; do not load manufacturer catalogues.
+            # bounded inventory per GA, supplemented by application metadata.
             for device in root.iter():
                 if name_of(device.tag) != "DeviceInstance":
                     continue
@@ -691,6 +717,14 @@ def preview(raw, password=""):
         suggestions = [s for s in suggestions if s['command'] not in covered_addresses]
         suggestions.extend(descriptive)
         suggestions = enrich_suggestions(items, suggestions)
+        climates = object_climates(items)
+        for candidate in climates:
+            addresses_used = {candidate.get(field) for field in ("command", "on_off")}
+            previous = [s for s in suggestions if s["command"] in addresses_used]
+            if any(s["kind"] not in ("binary", "unknown") for s in previous):
+                continue
+            suggestions = [s for s in suggestions if s not in previous]
+            suggestions.append(candidate)
         suggestions.sort(key=lambda x: tuple(map(int, x["command"].split("/"))))
         functions = [{"name": item["name"], "space": item["space"],
                       "addresses": list(dict.fromkeys(address_refs[ref] for ref in item["refs"] if ref in address_refs))}

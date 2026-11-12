@@ -4,13 +4,13 @@ from copy import deepcopy
 try:
     from .dashboard_publisher import HAWebSocket
     from .missing_ha_generator import fingerprint
-    from .knx_entity_plan import build
+    from .knx_entity_plan import build, configured_addresses, group_addresses
     from .knx_install import install_step
     from .widget_layout import read_layout, LAYOUT_LOCK
 except ImportError:
     from dashboard_publisher import HAWebSocket
     from missing_ha_generator import fingerprint
-    from knx_entity_plan import build
+    from knx_entity_plan import build, configured_addresses, group_addresses
     from knx_install import install_step
     from widget_layout import read_layout, LAYOUT_LOCK
 
@@ -34,8 +34,7 @@ def compare(layout, index, ws):
             used = ws.call('knx/get_entities_by_group')
             if not isinstance(used, dict):
                 raise ValueError('Inventario indirizzi KNX non verificabile')
-            addresses = {v for g in target['data']['knx'].values() if isinstance(g, dict)
-                         for k, v in g.items() if k in ('write', 'state') and isinstance(v, str)}
+            addresses = configured_addresses(target['data']['knx'])
             if addresses.intersection(used):
                 raise ValueError('GA già configurati in HA: associa l’entità esistente')
             if sum(x.get('fields', {}).get('command') == w['fields'].get('command') for x in layout['widgets']) > 1:
@@ -50,21 +49,25 @@ def compare(layout, index, ws):
             raise ValueError('Configurazione KNX non verificabile')
         merged = deepcopy(data)
         changes = []
-        primary = {'cover': 'ga_up_down', 'button': 'ga_send'}.get(target['platform'], 'ga_switch')
-        if (data['knx'].get(primary) or {}).get('write') != w['fields'].get('command'):
+        primary = {'cover': ('ga_up_down',), 'button': ('ga_send',),
+                   'climate': ('target_temperature', 'ga_temperature_target')}.get(
+                       target['platform'], ('ga_switch',))
+        current_groups = dict(group_addresses(data['knx']))
+        if current_groups.get(primary, {}).get('write') != w['fields'].get('command'):
             raise ValueError('Il comando principale HA non coincide: verifica l’associazione')
         used = ws.call('knx/get_entities_by_group')
         if not isinstance(used, dict):
             raise ValueError('Inventario indirizzi KNX non verificabile')
-        current_ga = {v for g in data['knx'].values() if isinstance(g, dict)
-                      for k, v in g.items() if k in ('write', 'state') and isinstance(v, str)}
+        current_ga = configured_addresses(data['knx'])
+        if target['platform'] == 'button' and data['knx'].get('data') != target['data']['knx'].get('data'):
+            raise ValueError('Valore del pulsante diverso in HA: verifica la configurazione KNX')
         # Keep HA name, device, options and all configured GA; fill empty roles only.
-        for group, roles in target['data']['knx'].items():
-            if group == 'data':
-                if data['knx'].get(group) != roles:
-                    raise ValueError('Valore del pulsante diverso in HA: verifica la configurazione KNX')
-                continue
-            existing = merged['knx'].get(group) or {}
+        for path, roles in group_addresses(target['data']['knx']):
+            container = merged['knx']
+            for section in path[:-1]:
+                container = container[section]
+            group = path[-1]
+            existing = container.get(group) or {}
             if not isinstance(existing, dict):
                 raise ValueError('Formato indirizzi KNX non verificabile')
             existing = deepcopy(existing)
@@ -73,11 +76,11 @@ def compare(layout, index, ws):
                 if old and old != ga:
                     raise ValueError('Indirizzo diverso in HA: ' + group + '/' + role + '. Verifica manualmente.')
                 if not old:
-                    if ga in used and ga not in current_ga:
+                    if role in ('write', 'state') and ga in used and ga not in current_ga:
                         raise ValueError('Indirizzo già usato in HA: ' + ga)
                     existing[role] = ga
                     changes.append(group + '/' + role + ': ' + ga)
-            merged['knx'][group] = existing
+            container[group] = existing
         row.update(status='update' if changes else 'present',
                    reason='Completa: ' + ', '.join(changes) if changes else 'Già presente e allineata',
                    current_fingerprint=fingerprint(current),
