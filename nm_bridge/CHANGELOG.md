@@ -1,3 +1,11 @@
+## 5.21.0-beta.4
+
+- I gateway con gli stessi ruoli e indirizzi sono proposti come un unico gruppo clima. Il riepilogo esplicita che gli stati condivisi rappresentano l’ultimo telegramma ricevuto. Le condivisioni parziali fra zone rimangono da verificare.
+- Riconoscimento degli oggetti Control_/Status_ con verifica DPT e direzione. I gruppi ventilanti con soli comandi restano visibili come bozze incomplete, indicando i feedback mancanti senza inventare collegamenti.
+- La dashboard reale usa la scheda termostato nativa, con temperatura ambiente in primo piano, setpoint e modalità accessibili.
+- Le funzioni clima accessorie sono raccolte per stanza in Opzioni e manutenzione. Il reset filtro mantiene la conferma e i nomi omettono il suffisso della stanza già aperta.
+- Descrizione italiana e icona laboratorio distinguono il canale LAB nell’elenco applicazioni.
+
 ## 5.21.0-beta.3
 
 - L’import distingue le zone clima dal nome del gruppo ETS del setpoint quando la stanza è univoca. Segnala i GA condivisi fra gateway e omette i controlli e feedback condivisi dalle proposte individuali.

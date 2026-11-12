@@ -40,8 +40,9 @@ function organizeInstallerPage(){
 function climateImportIssues(data){
  const conflicts=data.climate_conflicts||[];
  if(!conflicts.length)return '';
- return `<details open><summary>Clima · indirizzi condivisi da verificare</summary><ul>${conflicts.map(item=>
-  `<li><b>${escapeHTML(item.name)}</b> · ${item.shared_primary?'comandi principali condivisi':'comandi o stati condivisi'} · ${escapeHTML(item.addresses.join(', '))}</li>`).join('')}</ul></details>`;
+ const fields={temperature:'temperatura rilevata',target_temperature_state:'stato setpoint',on_off_state:'stato accensione'};
+ return `<details open><summary>Clima · gruppi e collegamenti da verificare</summary><ul>${conflicts.map(item=>
+  `<li><b>${escapeHTML(item.name)}</b> · ${item.collective?'Gruppo con comandi comuni. Gli stati indicano l’ultimo valore ricevuto, non una media o uno stato aggregato.':item.shared_primary?'comandi principali condivisi':'comandi o stati da verificare'} ${item.missing?.length?'Mancano: '+escapeHTML(item.missing.map(f=>fields[f]||f).join(', '))+'. ':''} · ${escapeHTML(item.addresses.join(', '))}</li>`).join('')}</ul></details>`;
 }
 
 // Real project import: persistence and review, without virtual provisioning.

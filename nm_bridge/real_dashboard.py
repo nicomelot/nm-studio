@@ -38,13 +38,37 @@ def _room_icon(name):
 
 def render_dashboard(approved, url_path):
     rooms, categories = {}, {}
+    climate_options = {}
+    accessory_icons = {'fan_auto': 'mdi:fan-auto', 'fan_auto_inverted': 'mdi:fan-auto',
+                       'flap_position': 'mdi:air-conditioner', 'suspend': 'mdi:timer-pause-outline',
+                       'suspend_delay': 'mdi:timer-outline', 'filter_reset': 'mdi:air-filter',
+                       'filter_alarm': 'mdi:air-filter'}
     for item in approved:
         card = item['card']
         room = item['room']
         category = {'Illuminazione': 'Luci', 'Schermature': 'Motorizzazioni',
                     'Climatizzazione': 'Clima'}.get(item['category'], item['category'])
-        rooms.setdefault(room, []).append(card)
-        categories.setdefault(category, {}).setdefault(room, []).append(card)
+        room_cards = rooms.setdefault(room, [])
+        category_cards = categories.setdefault(category, {}).setdefault(room, [])
+        profile = item.get('profile')
+        if profile in accessory_icons:
+            name = card['name']
+            label, separator, suffix = name.rpartition(' · ')
+            if separator and suffix.casefold() == _location(room)[1].casefold():
+                name = label
+            row = {'entity': item['entity_id'], 'name': name, 'icon': accessory_icons[profile]}
+            if profile == 'filter_reset':
+                row.update(type='button', action_name='Reset', tap_action=card['tap_action'])
+            climate_options.setdefault(room, []).append(row)
+        else:
+            room_cards.append(card)
+            category_cards.append(card)
+    for room, rows in climate_options.items():
+        options = {'type': 'entities', 'title': 'Opzioni e manutenzione',
+                   'show_header_toggle': False, 'entities': rows,
+                   'grid_options': {'columns': 12}}
+        rooms[room].append(options)
+        categories['Clima'][room].append(options)
     total = len(approved)
     def route(prefix, identity):
         return prefix + '-' + hashlib.sha256(identity.encode()).hexdigest()[:12]

@@ -22,7 +22,8 @@ function installListMarkup(data,access){
  return [...groups].map(([room,devices])=>`<details class="install-room" open><summary><span>${escapeHTML(room.split(' / ').at(-1))}</span><small>${devices.length} funzioni</small></summary><div class="install-cards">${devices.map(d=>{
   const reason=installBlocker(d)||(!access.supported_platforms?.includes(d.type==='dimmer'?'light':d.type)?'Piattaforma non disponibile':'');
   const state=reason?'review':d.status,blocked=!!reason||!['create','update'].includes(d.status);
-  return `<article class="install-device"><label class="install-device-top"><input type="checkbox" data-install-index="${d.index}" data-blocked="${blocked}" ${blocked?'disabled':'checked'}><span class="install-icon" aria-hidden="true">${d.type==='cover'?'▤':d.type==='dimmer'?'◐':'☼'}</span><strong>${escapeHTML(d.name)}</strong></label><span class="install-badge ${state}">${escapeHTML(labels[state]||'Da verificare')}</span>${state==='review'?`<p class="install-help">${escapeHTML(reason||d.reason)} · Usa “Modifica funzioni” per correggere.</p>`:''}<details class="install-details"><summary>Dettagli KNX</summary><p>${escapeHTML(room)}<br>${escapeHTML(d.reason||'')}<br>${escapeHTML(d.entity_id||'Entità da creare')}</p><p>${escapeHTML(Object.entries(d.fields||{}).filter(([,v])=>v).map(([k,v])=>k+': '+v).join(' · '))}</p></details>${commissioningControls({...d,status:state})}${climateScheduleLink({...d,status:state})}</article>`;
+  const group=typeof etsData==='undefined'?null:etsData?.climate_conflicts?.find(c=>c.command===d.fields.command&&c.collective);
+  return `<article class="install-device"><label class="install-device-top"><input type="checkbox" data-install-index="${d.index}" data-blocked="${blocked}" ${blocked?'disabled':'checked'}><span class="install-icon" aria-hidden="true">${d.type==='cover'?'▤':d.type==='dimmer'?'◐':'☼'}</span><strong>${escapeHTML(d.name)}</strong></label><span class="install-badge ${state}">${escapeHTML(labels[state]||'Da verificare')}</span>${group?'<p class="install-help">Gruppo con comandi comuni. Gli stati mostrano l’ultimo valore ricevuto dalle unità, non una media o uno stato aggregato. Verifica che questa gestione sia voluta.</p>':''}${state==='review'?`<p class="install-help">${escapeHTML(reason||d.reason)} · Usa “Modifica funzioni” per correggere.</p>`:''}<details class="install-details"><summary>Dettagli KNX</summary><p>${escapeHTML(room)}<br>${escapeHTML(d.reason||'')}<br>${escapeHTML(d.entity_id||'Entità da creare')}</p><p>${escapeHTML(Object.entries(d.fields||{}).filter(([,v])=>v).map(([k,v])=>k+': '+v).join(' · '))}</p></details>${commissioningControls({...d,status:state})}${climateScheduleLink({...d,status:state})}</article>`;
  }).join('')}</div></details>`).join('');
 }
 
@@ -33,7 +34,7 @@ function installBlocker(device){
   const conflict=typeof etsData==='undefined'?null:etsData?.climate_conflicts?.find(item=>item.command===device.fields.command);
   if(conflict){
    const shared=Object.values(device.fields).filter(ga=>conflict.addresses.includes(ga));
-   if(shared.length)return 'Indirizzi clima condivisi fra gateway: '+shared.join(', ');
+   if(shared.length&&!conflict.collective)return 'Indirizzi clima condivisi fra gateway: '+shared.join(', ');
    const missing=Object.values(device.fields).filter(ga=>ga&&!etsData.addresses.some(a=>a.address===ga&&a.linked));
    if(missing.length)return 'Indirizzi clima non collegati in questo export: '+missing.join(', ');
   }

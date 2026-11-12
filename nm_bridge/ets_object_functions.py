@@ -45,6 +45,34 @@ AC_POLARITIES = {
 }
 
 
+def climate_role(obj):
+    """Resolve explicit catalogue semantics, never infer state from transmit alone."""
+    label = ' '.join(obj.get('text', '').casefold().split())
+    match = re.fullmatch(r'\[ac\] (.+?)( \(status\))?', label)
+    if match and match[1] in AC_ROLES:
+        expected, command, state = AC_ROLES[match[1]]
+        reporting = bool(match[2])
+        return expected, state if reporting else command, reporting, False
+    match = re.fullmatch(r'(control|status)_ (.+) \[dpt_(\d+\.\d+)\]', label)
+    if not match:
+        return None
+    roles = {
+        'on/off': ('1.001', 'on_off', 'on_off_state'),
+        'mode': ('20.105', 'controller_mode', 'controller_mode_state'),
+        'setpoint temperature': ('9.001', 'command', None),
+        'ac setpoint temperature': ('9.001', None, 'target_temperature_state'),
+        'ac reference temperature': ('9.001', None, 'temperature'),
+    }
+    entry = roles.get(match[2])
+    if re.fullmatch(r'fan speed / [2345] speeds', match[2]):
+        entry = ('5.001', 'fan_speed', 'fan_speed_state')
+    if not entry or dpt(match[3]) != entry[0]:
+        return None
+    expected, command, state = entry
+    reporting = match[1] == 'status'
+    return expected, state if reporting else command, reporting, True
+
+
 def ac_polarity(role, function):
     active, inactive = AC_POLARITIES[role]
     text = ' '.join(function.casefold().split())
@@ -81,29 +109,25 @@ def object_climates(items, conflicts=None):
     """Recognize an AC gateway by explicit application roles and direction."""
     devices, polarities, owners = {}, {}, {}
     labels = {item['address']: item['name'] for item in items}
+    group_labels = {item['address']: item.get('group_name', '') for item in items}
     for item in items:
         if not item.get('linked'):
             continue
         for obj in item.get('connections', []):
-            label = ' '.join(obj.get('text', '').casefold().split())
-            match = re.fullmatch(r'\[ac\] (.+?)( \(status\))?', label)
+            entry = climate_role(obj)
             # Only flat gateway objects here. Module instances may represent
             # different units on one physical device and must not be combined.
-            if not match or not obj.get('device_id') or not re.fullmatch(r'O-\d+_R-\d+', obj.get('object_ref', '')):
+            if not entry or not obj.get('device_id') or not re.fullmatch(r'O-\d+_R-\d+', obj.get('object_ref', '')):
                 continue
-            entry = AC_ROLES.get(match[1])
-            if not entry:
-                continue
-            expected, command, state = entry
-            reporting = bool(match[2])
-            role = state if reporting else command
+            expected, role, reporting, bidirectional_command = entry
             if not role:
                 continue
             flags = obj.get('flags', {})
             if (dpt(item.get('dpt')) != expected or dpt(obj.get('dpt')) != expected
                     or flags.get('CommunicationFlag') is not True
                     or flags.get('WriteFlag') is not (not reporting)
-                    or flags.get('TransmitFlag') is not reporting):
+                    or (reporting and flags.get('TransmitFlag') is not True)
+                    or (not reporting and not bidirectional_command and flags.get('TransmitFlag') is not False)):
                 continue
             device = obj['device_id']
             owners.setdefault(item['address'], set()).add(device)
@@ -117,34 +141,56 @@ def object_climates(items, conflicts=None):
     core_roles = {role for entry in AC_ROLES.values() for role in entry[1:] if role}
     accessory_roles = AC_ACCESSORIES.keys() | {entry[2] for entry in AC_ACCESSORIES.values()}
     core_roles -= accessory_roles
+    # Collapse only identical complete role maps. Sharing just an ON/OFF GA
+    # does not prove that two independently configured zones form one unit.
+    groups = {}
     for device, roles in devices.items():
+        signature = tuple(sorted((role, tuple(sorted(values))) for role, values in roles.items()))
+        groups.setdefault(signature, []).append(device)
+    for members in groups.values():
+        device = members[0]
+        roles = devices[device]
         fields = {role: next(iter(addresses)) for role, addresses in roles.items() if len(addresses) == 1}
         core = {role: fields[role] for role in core_roles if role in fields}
-        if not required.issubset(core) or len(set(core.values())) != len(core):
+        # A command-only ventilation gateway remains a visible incomplete draft.
+        command_bundle = {'command', 'on_off', 'controller_mode', 'fan_speed'}
+        if (not required.issubset(core) and not command_bundle.issubset(core)) or len(set(core.values())) != len(core):
             continue
-        name = re.sub(r'\s+on\s*/\s*off\s*$', '', labels[core['on_off']], flags=re.I).strip()
+        name = group_labels.get(core['command']) or re.sub(r'\s+on\s*/\s*off\s*$', '', labels[core['on_off']], flags=re.I).strip()
         shared = {address for address in fields.values() if len(owners[address]) > 1}
+        collective = len(members) > 1 and all(owners[a] == set(members) for a in fields.values())
         command = core['command']
         shared_primary = bool({command, core['on_off']}.intersection(shared))
-        if shared and conflicts is not None:
-            conflict = dict(name=name, command=command, addresses=sorted(shared), shared_primary=shared_primary)
+        missing = sorted(required - core.keys())
+        if (shared or missing) and conflicts is not None:
+            conflict = dict(name=name, command=command, addresses=sorted(shared), shared_primary=shared_primary,
+                            collective=collective, missing=missing)
             if conflict not in conflicts:
                 conflicts.append(conflict)
-        if shared_primary:
+        if shared_primary and not collective:
             continue
         # An ETS feedback sent by several gateways is not the state of one room.
         # Keep the climate draft visible, with shared roles to review explicitly.
         for _, write, state in AC_ROLES.values():
-            if core.get(write) in shared or core.get(state) in shared:
+            if not collective and (core.get(write) in shared or core.get(state) in shared):
                 if write not in ('command', 'on_off'):
                     core.pop(write, None)
                 core.pop(state, None)
         available = {role: address for role, address in fields.items()
-                     if role in accessory_roles and address not in shared
+                     if role in accessory_roles and (collective or address not in shared)
                      and list(fields.values()).count(address) == 1}
-        accessories = ac_accessories(available, polarities.get(device, {}), name)
+        group_polarities = {}
+        for member in members:
+            for role, values in polarities.get(member, {}).items():
+                group_polarities.setdefault(role, set()).update(values)
+        accessories = ac_accessories(available, group_polarities, name)
+        reason = 'Ruoli clima e DPT dagli oggetti del gateway ETS'
+        if collective:
+            reason += '; gruppo con comandi comuni: gli stati riportano l’ultimo telegramma ricevuto, non una media o uno stato aggregato'
+        if missing:
+            reason += '; da completare: ' + ', '.join(missing)
         candidate = dict(name=f"CLIMA {name}", kind='climate', **core, room='Da assegnare',
-                         confidence='media', reason='Ruoli AC e DPT dagli oggetti di uno stesso gateway ETS')
+                         collective=collective, confidence='bassa' if missing else 'media', reason=reason)
         if accessories:
             candidate['accessories'] = accessories
         candidates.append(candidate)

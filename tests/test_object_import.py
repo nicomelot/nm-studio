@@ -91,9 +91,55 @@ class ObjectImportTests(unittest.TestCase):
         for first, other in zip(items, second):
             first['connections'].extend(other['connections'])
         conflicts = []
-        self.assertEqual(object_climates(items, conflicts), [])
+        group, = object_climates(items, conflicts)
+        self.assertTrue(group['collective'])
+        self.assertEqual(group['temperature'], '4/0/4')
+        self.assertIn('ultimo telegramma', group['reason'])
         self.assertEqual(len(conflicts), 1)
         self.assertTrue(conflicts[0]['shared_primary'])
+        self.assertTrue(conflicts[0]['collective'])
+        # A third gateway with a partially overlapping map is not a group.
+        outsider = copy.deepcopy(items[0]['connections'][0])
+        outsider['device_id'] = 'third'
+        items[0]['connections'].append(outsider)
+        self.assertEqual(object_climates(items), [])
+
+    def test_control_status_gateway_retains_command_only_group_without_inventing_states(self):
+        entries = [('On/Off', '1.001'), ('Mode', '20.105'),
+                   ('Fan Speed / 2 Speeds', '5.001'), ('Setpoint Temperature', '9.001')]
+        items = [dict(address=f'5/0/{i}', name=f'Generic {i}', group_name='Ventilazione',
+                      linked=True, dpt=value, connections=[
+                          dict(device_id=device, object_ref=f'O-{i}_R-1',
+                               text=f'Control_ {label} [DPT_{value}]', dpt=value,
+                               flags=dict(CommunicationFlag=True, WriteFlag=True, TransmitFlag=True))
+                          for device in ['first', 'second']])
+                 for i, (label, value) in enumerate(entries)]
+        issues = []
+        group, = object_climates(items, issues)
+        self.assertTrue(group['collective'])
+        self.assertEqual(group['name'], 'CLIMA Ventilazione')
+        self.assertEqual(group['fan_speed'], '5/0/2')
+        self.assertNotIn('temperature', group)
+        self.assertNotIn('target_temperature_state', group)
+        self.assertNotIn('on_off_state', group)
+        self.assertEqual(set(issues[0]['missing']),
+                         {'temperature', 'target_temperature_state', 'on_off_state'})
+        # Real linked status objects make the proposal complete.
+        for i, (label, value) in enumerate([('On/Off', '1.001'),
+                   ('AC Setpoint Temperature', '9.001'), ('AC Reference Temperature', '9.001')], 4):
+            item = copy.deepcopy(items[0])
+            item.update(address=f'5/0/{i}', dpt=value)
+            for obj in item['connections']:
+                obj.update(text=f'Status_ {label} [DPT_{value}]', dpt=value, object_ref=f'O-{i}_R-1')
+                obj['flags']['WriteFlag'] = False
+            items.append(item)
+        group, = object_climates(items)
+        self.assertEqual(group['temperature'], '5/0/6')
+        self.assertEqual(group['target_temperature_state'], '5/0/5')
+        items[6]['linked'] = False
+        self.assertNotIn('temperature', object_climates(items)[0])
+        items[2]['dpt'] = '9.001'
+        self.assertEqual(object_climates(items), [])
 
     def test_names_are_irrelevant_and_channels_stay_separate(self):
         items = circuit() + circuit(2, 10)

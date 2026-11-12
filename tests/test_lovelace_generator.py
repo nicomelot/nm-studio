@@ -44,6 +44,41 @@ class LovelaceGeneratorTests(unittest.TestCase):
         self.assertEqual(result["summary"]["tiles"], 0)
         self.assertNotIn('"type": "tile"', __import__("json").dumps(result["dashboard"]))
 
+    def test_climate_controls_and_accessories_stay_in_their_room(self):
+        widgets = []
+        for zone in ('Studio', 'Cucina'):
+            for kind, profile, label in (
+                ('climate', None, 'Clima'),
+                ('switch', 'fan_auto_inverted', 'Ventola automatica'),
+                ('number', 'flap_position', 'Lamelle'),
+                ('button', 'filter_reset', 'Reset filtro'),
+                ('binary_sensor', 'filter_alarm', 'Filtro da pulire'),
+            ):
+                widgets.append({'type': kind, 'profile': profile,
+                                'name': label + ' · ' + zone,
+                                'room': 'Casa / Terra / ' + zone,
+                                'entity_id': kind + '.' + zone.lower()})
+        inventory = [{'entity_id': w['entity_id']} for w in widgets]
+        # A missing accessory must stay out of operational controls.
+        inventory = [e for e in inventory if e['entity_id'] != 'number.cucina']
+        result = generate({'widgets': widgets}, inventory)
+        zones = [v for v in result['dashboard']['views'] if v['path'].startswith('stanza-')]
+        for view in zones:
+            cards = [c for s in view['sections'] for c in s['cards']]
+            thermostat = next(c for c in cards if c['type'] == 'thermostat')
+            self.assertTrue(thermostat['show_current_as_primary'])
+            self.assertEqual(thermostat['entity'], 'climate.' + view['title'].lower())
+            options = next(c for c in cards if c['type'] == 'entities')
+            self.assertFalse(options['show_header_toggle'])
+            self.assertTrue(all(r['entity'].endswith('.' + view['title'].lower())
+                                for r in options['entities']))
+            reset = next(r for r in options['entities'] if r['name'] == 'Reset filtro')
+            self.assertEqual(reset['tap_action']['perform_action'], 'button.press')
+            self.assertEqual(reset['tap_action']['target']['entity_id'], reset['entity'])
+            self.assertIn('confirmation', reset['tap_action'])
+            self.assertFalse(any(c['type'] == 'button' for c in cards))
+        self.assertEqual(len(result['warnings']), 1)
+
     def test_cover_has_native_open_close_feature(self):
         sample = self.sample()
         sample["widgets"][1]["entity_id"] = "cover.t1"

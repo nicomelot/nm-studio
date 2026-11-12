@@ -52,3 +52,21 @@ test('cancellation and disconnected bus prevent provisioning',async()=>{
   const h=await harness(config);h.ids['install-verified'].checked=true;await h.ids['install-create'].onclick();assert.equal(h.calls.filter(c=>c.path==='knx/installation-apply').length,0);
  }
 });
+
+test('identical collective climates allow reviewed shared states but incomplete ventilation stays blocked',()=>{
+ const c={etsData:{addresses:['5/0/0','5/0/1','5/0/2'].map(address=>({address,linked:true})),
+  climate_conflicts:[{command:'5/0/0',addresses:['5/0/0','5/0/1','5/0/2'],collective:true}]},escapeHTML:String};
+ vm.createContext(c);vm.runInContext(fs.readFileSync('nm_bridge/real_ui.js','utf8'),c);
+ const device={type:'climate',fields:{command:'5/0/0',temperature:'5/0/1',target_temperature_state:'5/0/2'}};
+ assert.equal(c.installBlocker(device),'');
+ const html=c.installListMarkup({devices:[{...device,index:0,name:'Gruppo',status:'create'}]}, {supported_platforms:['climate']});
+ assert.match(html,/ultimo valore ricevuto/);
+ assert.match(html,/data-blocked="false"/);
+ c.etsData.climate_conflicts[0].collective=false;
+ assert.match(c.installBlocker(device),/condivisi/);
+ c.etsData.climate_conflicts[0].collective=true;
+ delete device.fields.temperature;
+ assert.match(c.installBlocker(device),/Manca la temperatura/);
+ device.fields.temperature='5/0/3';
+ assert.match(c.installBlocker(device),/non collegati/);
+});

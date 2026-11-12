@@ -73,6 +73,9 @@ def generate(layout, entities):
                 if ident.startswith("cover."):
                     card["features"] = [{"type": "cover-open-close"}]
                 elif ident.startswith("climate."):
+                    card = {"type": "thermostat", "entity": ident, "name": w["name"],
+                            "show_current_as_primary": True,
+                            "grid_options": {"columns": 12}}
                     card["features"] = [{"type": "climate-hvac-modes"}]
                 if kind == 'switch':
                     card['icon_tap_action'] = {'action': 'toggle'}
@@ -106,7 +109,8 @@ def generate(layout, entities):
                 elif kind == 'button' or w.get('command_mode') == 'off_only':
                     category = 'Comandi'
                 approved.append({"card": card, "room": room, "floor": floor,
-                                 "zone": zone, "category": category})
+                                 "zone": zone, "category": category, "profile": profile,
+                                 "entity_id": ident})
             else:
                 reason = ("Entità LAB simulata: associa una entità reale" if is_lab_entity(ident) else
                           "Entità non assegnata" if not ident else

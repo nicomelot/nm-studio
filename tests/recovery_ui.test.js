@@ -217,3 +217,18 @@ test('KNX onboarding reads capabilities only and does not reconfigure an existin
  assert.ok(calls.every(c=>c.path==='knx/panel-capability'&&!c.options));
  assert.match(c.knxPrerequisitePanel(),/config_flow\/[?]domain=knx/);
 });
+
+test('reimport adds one collective thermostat and one incomplete ventilation draft, retaining existing entities',()=>{
+ const c=fixture(),original=JSON.stringify(c.widgetDrafts[0]);
+ c.widgetFields.climate=[['command'],['temperature'],['target_temperature_state'],['on_off'],['fan_speed'],['controller_mode']];
+ c.etsData.suggestions=[
+  {name:'Clima collettivo',kind:'climate',collective:true,command:'1/1/8',temperature:'1/6/8',reason:'Stati condivisi'},
+  {name:'Ventilazione',kind:'climate',collective:true,command:'1/1/9',reason:'Feedback mancanti'}];
+ assert.equal(c.reconcileRecognizedFunctions().added,2);
+ assert.equal(JSON.stringify(c.widgetDrafts[0]),original);
+ assert.equal(c.widgetDrafts[1].fields.temperature,'1/6/8');
+ assert.equal(c.widgetDrafts[2].fields.temperature,'');
+ assert.match(c.widgetDrafts[2].source,/Feedback mancanti/);
+ assert.equal(c.reconcileRecognizedFunctions().added,0);
+ assert.equal(c.widgetDrafts.length,3);
+});
