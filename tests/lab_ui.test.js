@@ -6,20 +6,22 @@ const vm=require('node:vm');
 test('all inline application scripts remain valid JavaScript',()=>{
  const html=fs.readFileSync('nm_bridge/index.html','utf8');
  for(const match of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))new vm.Script(match[1]);
- assert.doesNotMatch(html,/<script src="lab_ui.js"><\/script>/);
+ assert.match(html,/<script src="lab_ui.js"><\/script>/);
+ assert.match(html,/if\(page==='lab'&&etsData\)wireVirtualLab\(\)/);
+ new vm.Script(fs.readFileSync('nm_bridge/lab_ui.js','utf8'));
  new vm.Script(fs.readFileSync('nm_bridge/project_ui.js','utf8'));
  assert.match(html,/<script src="project_ui.js"><\/script>/);
  assert.match(fs.readFileSync('nm_bridge/Dockerfile','utf8'),/COPY lab_ui.js \/app\/lab_ui.js/);
 });
 
 function harness(candidates){
- const ids=Object.fromEntries(['lab-edit-rooms','lab-open-dashboard','lab-room-filter','lab-step-help','lab-prev','lab-next','project-save','project-label','lab-stage','lab-real-path','lab-filter','lab-kind-filter','lab-status','lab-check','lab-setup','lab-install','lab-dashboard-check','lab-dashboard-publish'].map(id=>[id,{disabled:true,textContent:'',value:''}]));
+ const ids=Object.fromEntries(['lab-edit-rooms','lab-open-dashboard','lab-room-filter','lab-step-help','lab-prev','lab-next','project-save','project-label','lab-stage','lab-real-path','lab-filter','lab-kind-filter','lab-select-climate','lab-status','lab-check','lab-setup','lab-install','lab-dashboard-check','lab-dashboard-publish'].map(id=>[id,{disabled:true,textContent:'',value:''}]));
  const rows=candidates.map((d,i)=>{
   const kind={value:d.kind},room={value:d.room},name={value:d.name};
   return {dataset:{index:String(i)},checked:d.selected!==false,closest:()=>({querySelector:s=>s==='.lab-kind'?kind:s==='.lab-name'?name:room}),kind,room,name};
  });
  let html='';
- ids['ets-progress']={closest:()=>({insertAdjacentHTML:(position,value)=>{html=value;}})};
+ ids['virtual-lab-host']={insertAdjacentHTML:(position,value)=>{html=value;}};
  const calls=[];
  const context={
   etsData:{project_key:'a'.repeat(64),lab_candidates:candidates,building:[]},
@@ -56,6 +58,16 @@ test('project without climate exposes install and publishes separate LAB dashboa
  await h.ids['lab-dashboard-publish'].onclick();
  assert.equal(h.calls.at(-1).path,'lab/dashboard-publish');
  assert.ok(h.calls.every(c=>c.path.startsWith('lab/')));
+});
+
+test('virtual thermostat selection reaches package installation after a full import',async()=>{
+ const h=harness([{kind:'light',command:'1/1/0',name:'L1',room:'Sala'},
+  {kind:'climate',command:'2/1/2',name:'Termostato',room:'Sala',selected:false}]);
+ h.ids['lab-select-climate'].onclick();
+ await h.ids['lab-check'].onclick();
+ await h.ids['lab-install'].onclick();
+ assert.deepEqual(h.calls.map(c=>c.path),['lab/preview','lab/install']);
+ assert.deepEqual(h.calls[1].body.devices.map(d=>d.kind),['climate']);
 });
 
 test('changing room invalidates reviewed plan and empty selection performs no write',async()=>{

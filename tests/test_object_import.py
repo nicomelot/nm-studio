@@ -67,6 +67,34 @@ class ObjectImportTests(unittest.TestCase):
         items[7]['connections'][0]['device_id'] = 'another gateway'
         self.assertEqual([x['profile'] for x in object_climates(items)[0]['accessories']], ['filter_alarm'])
 
+    def test_ac_shared_commands_and_feedback_are_reported(self):
+        roles = [('On/Off', '1.001', True), ('On/Off (Status)', '1.001', False),
+                 ('Temperature Setpoint', '9.001', True), ('Temperature Setpoint (Status)', '9.001', False),
+                 ('Indoor Unit Temperature (Status)', '9.001', False)]
+        items = [
+            dict(address=f'4/0/{i}', name='First', linked=True, dpt=dpt,
+                 connections=[dict(device_id='first', object_ref=f'O-{i}_R-{i}', text='[AC] '+label,
+                                   dpt=dpt, flags=dict(CommunicationFlag=True, WriteFlag=write,
+                                                       TransmitFlag=not write))])
+            for i, (label, dpt, write) in enumerate(roles)
+        ]
+        second = copy.deepcopy(items)
+        for i, item in enumerate(second):
+            item.update(address=f'4/1/{i}', name='Second')
+            item['connections'][0]['device_id'] = 'second'
+        items[-1]['connections'].extend(second.pop()['connections'])
+        conflicts = []
+        proposals = object_climates(items + second, conflicts)
+        self.assertEqual({p['command'] for p in proposals}, {'4/0/2', '4/1/2'})
+        self.assertTrue(all('temperature' not in p for p in proposals))
+        self.assertEqual([x['addresses'] for x in conflicts], [['4/0/4'], ['4/0/4']])
+        for first, other in zip(items, second):
+            first['connections'].extend(other['connections'])
+        conflicts = []
+        self.assertEqual(object_climates(items, conflicts), [])
+        self.assertEqual(len(conflicts), 1)
+        self.assertTrue(conflicts[0]['shared_primary'])
+
     def test_names_are_irrelevant_and_channels_stay_separate(self):
         items = circuit() + circuit(2, 10)
         result = object_dimmers(items)

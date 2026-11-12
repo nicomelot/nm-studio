@@ -1,3 +1,11 @@
+## 5.21.0-beta.3
+
+- L’import distingue le zone clima dal nome del gruppo ETS del setpoint quando la stanza è univoca. Segnala i GA condivisi fra gateway e omette i controlli e feedback condivisi dalle proposte individuali.
+
+- La reimportazione aggiunge le nuove stanze ETS alla gerarchia già salvata, rispettando rinomine, spostamenti e associazioni.
+- L’import ETS riapre il percorso di simulazione virtuale in Home Assistant, con selezione diretta dei termostati.
+- L’installazione KNX reale permette di selezionare i termostati e indica la funzione su cui si interrompe il gruppo. Il confronto iniziale legge l’indice degli indirizzi una volta e indica gli indirizzi già in uso.
+
 ## 5.21.0-beta.2
 
 - L'import ETS propone stato e reset filtro, ventola automatica con la polarità del gateway, posizione lamelle, sospensione e ritardo quando gli oggetti sono verificabili.

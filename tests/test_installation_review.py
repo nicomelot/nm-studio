@@ -67,6 +67,7 @@ class InstallationReviewTests(unittest.TestCase):
         result = module.preview(self.layout, lambda: self.ws)
         self.assertEqual([d['status'] for d in result['devices']], ['update', 'create', 'review'])
         self.assertTrue(all(m.startswith('knx/get_') for m, _ in self.ws.calls))
+        self.assertEqual(sum(m == 'knx/get_entities_by_group' for m, _ in self.ws.calls), 1)
 
     def test_climate_nested_setpoint_is_checked_for_overlap_and_conflicts(self):
         widget = self.layout['widgets'][0]

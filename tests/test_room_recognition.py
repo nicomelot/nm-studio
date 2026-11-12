@@ -30,6 +30,16 @@ class RoomRecognitionTests(unittest.TestCase):
         functions.append({'space': paths[1], 'addresses': ['1/1/0']})
         self.assertEqual(self.match('Luce bagno', paths, functions)['confidence'], 'ambiguous')
 
+    def test_climate_uses_unique_setpoint_group_room_before_generic_labels(self):
+        paths = ['Casa / Terra / Ambulatorio 1', 'Casa / Terra / Ambulatorio 2']
+        spaces = [{'path': p, 'type': 'Room'} for p in paths]
+        suggestions = [{'command': '1/1/0', 'name': 'Clima ambulatorio', 'kind': 'climate'}]
+        addresses = [{'address': '1/1/0', 'group_name': 'Ambulatorio 2'}]
+        match, = room_matches(suggestions, addresses, spaces, [])
+        self.assertEqual((match['room'], match['confidence']), (paths[1], 'ets_group'))
+        explicit = [{'space': paths[0], 'addresses': ['1/1/0']}]
+        self.assertEqual(room_matches(suggestions, addresses, spaces, explicit)[0]['room'], paths[0])
+
     def test_fallback_sensor_gets_canonical_room(self):
         room = 'Casa / Terra / Cucina'
         data = {'building': [{'path': room, 'type': 'Room'}], 'addresses': [

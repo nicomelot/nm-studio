@@ -37,12 +37,21 @@ function organizeInstallerPage(){
  content.appendChild(upload);content.appendChild(advanced);
 }
 
+function climateImportIssues(data){
+ const conflicts=data.climate_conflicts||[];
+ if(!conflicts.length)return '';
+ return `<details open><summary>Clima · indirizzi condivisi da verificare</summary><ul>${conflicts.map(item=>
+  `<li><b>${escapeHTML(item.name)}</b> · ${item.shared_primary?'comandi principali condivisi':'comandi o stati condivisi'} · ${escapeHTML(item.addresses.join(', '))}</li>`).join('')}</ul></details>`;
+}
+
 // Real project import: persistence and review, without virtual provisioning.
 function wireImportSummary(){
  const host=$('ets-progress')?.closest('.card');
  if(!host||!etsData)return;
  const counts={};for(const s of etsData.suggestions||[])counts[s.kind]=(counts[s.kind]||0)+1;
- host.insertAdjacentHTML('afterend',`<section class="card" id="import-summary"><h2>Progetto analizzato</h2><p>${escapeHTML(Object.entries(counts).map(([k,v])=>v+' '+({light:'luci',dimmer:'dimmer',cover:'tapparelle',climate:'clima'}[k]||k)).join(' · '))}</p><p>${etsRoomPaths().length} stanze ETS. Le proposte richiedono il controllo delle associazioni.</p><label>Nome progetto<input id="project-label" maxlength="80" value="${escapeHTML(etsData.session_label||etsData.building?.find(n=>n.type==='Building')?.name||'Impianto')}"></label><button id="project-continue" class="primary">Salva progetto e controlla le funzioni</button><p id="import-status" role="status"></p></section>`);
+ host.insertAdjacentHTML('afterend',`<section class="card" id="import-summary"><h2>Progetto analizzato</h2><p>${escapeHTML(Object.entries(counts).map(([k,v])=>v+' '+({light:'luci',dimmer:'dimmer',cover:'tapparelle',climate:'clima'}[k]||k)).join(' · '))}</p><p>${etsRoomPaths().length} stanze ETS. Per creare entità KNX, controlla le funzioni e continua a Installazione.</p>${climateImportIssues(etsData)}<label>Nome progetto<input id="project-label" maxlength="80" value="${escapeHTML(etsData.session_label||etsData.building?.find(n=>n.type==='Building')?.name||'Impianto')}"></label><button id="project-continue" class="primary">Salva progetto e controlla le funzioni</button><button id="project-lab">Simula in Home Assistant</button><p id="import-status" role="status"></p></section>`);
+ const simulation=$('project-lab');
+ if(simulation)simulation.onclick=()=>{setPage('lab');window.scrollTo({top:0,behavior:'smooth'});};
  $('project-continue').onclick=async()=>{
   const b=$('project-continue');b.disabled=true;
   try{

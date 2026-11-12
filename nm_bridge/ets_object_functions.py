@@ -77,9 +77,9 @@ def ac_accessories(fields, polarities, name):
     return accessories
 
 
-def object_climates(items):
+def object_climates(items, conflicts=None):
     """Recognize an AC gateway by explicit application roles and direction."""
-    devices, polarities = {}, {}
+    devices, polarities, owners = {}, {}, {}
     labels = {item['address']: item['name'] for item in items}
     for item in items:
         if not item.get('linked'):
@@ -106,6 +106,7 @@ def object_climates(items):
                     or flags.get('TransmitFlag') is not reporting):
                 continue
             device = obj['device_id']
+            owners.setdefault(item['address'], set()).add(device)
             devices.setdefault(device, {}).setdefault(role, set()).add(item['address'])
             if role in AC_POLARITIES:
                 polarities.setdefault(device, {}).setdefault(role, set()).add(
@@ -114,25 +115,40 @@ def object_climates(items):
     candidates = []
     required = {'command', 'target_temperature_state', 'temperature', 'on_off', 'on_off_state'}
     core_roles = {role for entry in AC_ROLES.values() for role in entry[1:] if role}
-    core_roles -= AC_ACCESSORIES.keys() | {entry[2] for entry in AC_ACCESSORIES.values()}
+    accessory_roles = AC_ACCESSORIES.keys() | {entry[2] for entry in AC_ACCESSORIES.values()}
+    core_roles -= accessory_roles
     for device, roles in devices.items():
         fields = {role: next(iter(addresses)) for role, addresses in roles.items() if len(addresses) == 1}
         core = {role: fields[role] for role in core_roles if role in fields}
         if not required.issubset(core) or len(set(core.values())) != len(core):
             continue
         name = re.sub(r'\s+on\s*/\s*off\s*$', '', labels[core['on_off']], flags=re.I).strip()
+        shared = {address for address in fields.values() if len(owners[address]) > 1}
+        command = core['command']
+        shared_primary = bool({command, core['on_off']}.intersection(shared))
+        if shared and conflicts is not None:
+            conflict = dict(name=name, command=command, addresses=sorted(shared), shared_primary=shared_primary)
+            if conflict not in conflicts:
+                conflicts.append(conflict)
+        if shared_primary:
+            continue
+        # An ETS feedback sent by several gateways is not the state of one room.
+        # Keep the climate draft visible, with shared roles to review explicitly.
+        for _, write, state in AC_ROLES.values():
+            if core.get(write) in shared or core.get(state) in shared:
+                if write not in ('command', 'on_off'):
+                    core.pop(write, None)
+                core.pop(state, None)
         available = {role: address for role, address in fields.items()
-                     if role not in core and list(fields.values()).count(address) == 1}
+                     if role in accessory_roles and address not in shared
+                     and list(fields.values()).count(address) == 1}
         accessories = ac_accessories(available, polarities.get(device, {}), name)
         candidate = dict(name=f"CLIMA {name}", kind='climate', **core, room='Da assegnare',
                          confidence='media', reason='Ruoli AC e DPT dagli oggetti di uno stesso gateway ETS')
         if accessories:
             candidate['accessories'] = accessories
         candidates.append(candidate)
-    # A shared primary command does not identify a single unit.
-    return [c for c in candidates if not any(
-        other is not c and (other['command'] == c['command'] or other['on_off'] == c['on_off'])
-        for other in candidates)]
+    return candidates
 
 
 def object_dimmers(items):

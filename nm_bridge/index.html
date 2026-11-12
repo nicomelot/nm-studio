@@ -34,10 +34,10 @@
 #lab-wizard{max-width:1100px;margin:20px auto}#lab-wizard table input{min-width:120px}
 #lab-wizard table select{max-width:320px}#lab-status{padding:16px;border-radius:10px;background:#122740}
 </style></head><body><main>
-<header><div><div class="workspace-label" id="workspace-label">NM Control · Area installatore</div><h1>NM <span style="color:#70b2ff">Control</span> <span class="muted" style="font-size:15px;letter-spacing:0">5.21.0-beta.2</span></h1><div class="subtitle">KNX · Configurazione guidata · Canale LAB</div></div><div class="header-actions"><span class="pill">⚠ Attivazione KNX su conferma</span><button id="view-switch" aria-label="Cambia visualizzazione">Vista cliente</button></div></header>
+<header><div><div class="workspace-label" id="workspace-label">NM Control · Area installatore</div><h1>NM <span style="color:#70b2ff">Control</span> <span class="muted" style="font-size:15px;letter-spacing:0">5.21.0-beta.3</span></h1><div class="subtitle">KNX · Configurazione guidata · Canale LAB</div></div><div class="header-actions"><span class="pill">⚠ Attivazione KNX su conferma</span><button id="view-switch" aria-label="Cambia visualizzazione">Vista cliente</button></div></header>
 <nav><button data-page="wizard" class="active">Avvio guidato</button><button data-page="live">Dashboard reale</button><button data-page="real">Collaudo KNX reale</button><button data-page="dashboard">Monitor stati</button><button data-page="floorplans">Mappe impianto</button><button data-page="diagnostic">Diagnostica</button><details class="advanced-nav"><summary>Strumenti avanzati</summary><div class="bar"><button data-page="configure">Configuratore</button><button data-page="ets">Importa ETS</button><button data-page="building">Edificio ETS</button><button data-page="widgets">Widget KNX</button><button data-page="knx">Progetto KNX</button><button data-page="ha-preview">Genera HA</button><button data-page="dashboard-export">Plance HA</button><button data-page="matches">Associa entità</button><button data-page="nm-link">NM Link</button><button data-page="intelligence">Intelligence</button><button data-page="inventory">Entità HA</button></div></details></nav>
 <div class="bar"><button class="primary" id="refresh">Aggiorna stati</button><span id="message"></span></div><section id="content"></section>
-</main><script src="project_ui.js"></script><script src="real_ui.js"></script><script src="recovery_ui.js"></script><script>
+</main><script src="lab_ui.js"></script><script src="project_ui.js"></script><script src="real_ui.js"></script><script src="recovery_ui.js"></script><script>
 'use strict';
 let page='wizard', entities=[], layout={version:1,rooms:[]}, entityError='',dirty=false,selectedRoom='all',clientMode=new URLSearchParams(location.search).get('view')==='client',refreshing=false,lastSync=null,etsData=null,etsError='',candidateDrafts=[],approvedDevices=[],auditReviews={},reviewDirty=false,selectedPhysicalDevice='',widgetDrafts=[],widgetSeq=0,widgetRooms=[],widgetDirty=false,structureDraft=[],structureDirty=false,structureAliases={},savedWidgetLayout={version:1,project:'',rooms:[],structure:[],widgets:[]},linkDrafts=[],linkDirty=false,linkPreview=null;
 let intelligenceData=null,intelligenceError='',intelligenceLoading=false;
@@ -107,20 +107,68 @@ function etsRoomPaths(){return [...new Set((etsData?.building||[]).filter(s=>['R
 function nodePath(id,nodes=structureDraft){let map=new Map(nodes.map(n=>[n.id,n])),parts=[],seen=new Set();while(id&&map.has(id)&&!seen.has(id)){seen.add(id);let n=map.get(id);parts.unshift(n.name);id=n.parent}return parts.join(' / ')}
 function structureRooms(onlyActive=true){return structureDraft.filter(n=>n.type==='room'&&(!onlyActive||n.active)&&(!onlyActive||structureAncestorsActive(n.id))).map(n=>nodePath(n.id))}
 function structureAncestorsActive(id){let map=new Map(structureDraft.map(n=>[n.id,n]));while(id&&map.has(id)){let n=map.get(id);if(!n.active)return false;id=n.parent}return true}
-function resolveRoomAlias(value){if(!value||value==='Da assegnare'||structureRooms(false).includes(value))return value;let same=structureRooms(false).filter(path=>path.split(' / ').pop()===value.split(' / ').pop());return same.length===1?same[0]:value}
-function buildEditableStructure(spaces,legacyRooms=[]){
- let nodes=[],parents=new Map(),serial=0;
- const add=(type,name,parent,source='ets')=>{let id='nm_'+(++serial),clean=(name||'Senza nome').trim().slice(0,80);let names=new Set(nodes.filter(n=>n.parent===parent).map(n=>n.name.toLowerCase())),base=clean,i=2;while(names.has(clean.toLowerCase()))clean=(base.slice(0,73)+' '+(i++)).slice(0,80);nodes.push({id,parent,type,name:clean,active:true,source});return id};
- const root=()=>nodes.find(n=>n.type==='building')?.id||add('building','Edificio',null,'manual');
- // Rooms may belong directly to a building: preserve ETS without inventing a floor.
- for(let s of spaces||[]){let parentPath=s.path.split(' / ').slice(0,-1).join(' / '),parent=parents.get(parentPath),id;
-  if(s.type==='Building')id=add('building',s.name,null);
-  else if(s.type==='Floor'||s.type==='BuildingPart')id=add('floor',s.name,parent&&nodes.find(n=>n.id===parent)?.type==='building'?parent:root());
-  else if(['Room','Corridor','Stairway'].includes(s.type)){let container=parent&&['building','floor'].includes(nodes.find(n=>n.id===parent)?.type)?parent:root();id=add('room',s.name,container)}
-  if(id)parents.set(s.path,id);
+function resolveRoomAlias(value){
+ if(!value||value==='Da assegnare')return value;
+ const rooms=structureRooms(false);
+ if(Object.hasOwn(structureAliases,value)&&rooms.includes(structureAliases[value]))return structureAliases[value];
+ if(rooms.includes(value))return value;
+ const same=rooms.filter(path=>path.split(' / ').pop()===value.split(' / ').pop());
+ return same.length===1?same[0]:value;
+}
+function buildEditableStructure(spaces,legacyRooms=[],savedNodes=[],aliases={}){
+ const nodes=savedNodes.map(node=>({...node}));
+ const parents=new Map(), ids=new Set(nodes.map(node=>node.id)), mapped=new Set();
+ let serial=0, roomCount=nodes.filter(node=>node.type==='room').length;
+ const add=(type,name,parent,source='ets')=>{
+  if(nodes.length>=250||(type==='room'&&roomCount>=200))return null;
+  let id;
+  do{id='nm_'+(++serial);}while(ids.has(id));
+  ids.add(id);
+  const base=(name||'Senza nome').trim().slice(0,80);
+  const names=new Set(nodes.filter(node=>node.parent===parent).map(node=>node.name.toLowerCase()));
+  let clean=base,suffix=2;
+  while(names.has(clean.toLowerCase()))clean=(base.slice(0,73)+' '+(suffix++)).slice(0,80);
+  nodes.push({id,parent,type,name:clean,active:true,source});
+  if(type==='room')roomCount++;
+  return id;
+ };
+ const root=()=>nodes.find(node=>node.type==='building')?.id||add('building','Edificio',null,'manual');
+ const byPath=new Map(nodes.map(node=>[nodePath(node.id,nodes),node]));
+ const etsTypes={Building:'building',Floor:'floor',BuildingPart:'floor',Room:'room',Corridor:'room',Stairway:'room'};
+ // Reuse saved paths, including renamed or moved nodes, before adding ETS rooms.
+ for(const space of spaces||[]){
+  const type=etsTypes[space.type];
+  if(!type)continue;
+  const parentPath=space.path.split(' / ').slice(0,-1).join(' / ');
+  const importedParent=parents.get(parentPath);
+  const parentType=nodes.find(node=>node.id===importedParent)?.type;
+  const parent=type==='building'?null:parentType==='building'||(type==='room'&&parentType==='floor')?importedParent:root();
+  if(type!=='building'&&!parent)continue;
+  const savedPath=Object.hasOwn(aliases,space.path)?aliases[space.path]:space.path;
+  const named=byPath.get(savedPath);
+  const name=(space.name||'Senza nome').trim().slice(0,80);
+  const sibling=nodes.find(node=>!mapped.has(node.id)&&node.parent===parent&&node.type===type&&node.name===name);
+  const id=named?.type===type&&!mapped.has(named.id)?named.id:sibling?.id||add(type,name,parent);
+  if(!id)continue;
+  parents.set(space.path,id);
+  mapped.add(id);
+  const currentPath=nodePath(id,nodes);
+  byPath.set(currentPath,nodes.find(node=>node.id===id));
+  if(currentPath!==space.path){
+   Object.defineProperty(aliases,space.path,{value:currentPath,enumerable:true,writable:true,configurable:true});
+  }
  }
- for(let path of legacyRooms){if(nodes.some(n=>n.type==='room'&&nodePath(n.id,nodes)===path))continue;let pieces=path.split(' / ').map(s=>s.trim()).filter(Boolean);if(!pieces.length)continue;let building=nodes.find(n=>n.type==='building'&&n.name===pieces[0])?.id||add('building',pieces.length>=3?pieces[0]:'Edificio',null,'manual');let floorName=pieces.length>=3?pieces[1]:'Altri ambienti',floor=nodes.find(n=>n.type==='floor'&&n.parent===building&&n.name===floorName)?.id||add('floor',floorName,building,'manual');add('room',pieces[pieces.length-1],floor,'manual')}
- return nodes.slice(0,250)
+ for(const path of legacyRooms){
+  if(byPath.get(path)?.type==='room')continue;
+  const pieces=path.split(' / ').map(piece=>piece.trim()).filter(Boolean);
+  if(!pieces.length)continue;
+  const building=nodes.find(node=>node.type==='building'&&node.name===pieces[0])?.id||add('building',pieces.length>=3?pieces[0]:'Edificio',null,'manual');
+  if(!building)continue;
+  const floorName=pieces.length>=3?pieces[1]:'Altri ambienti';
+  const floor=nodes.find(node=>node.type==='floor'&&node.parent===building&&node.name===floorName)?.id||add('floor',floorName,building,'manual');
+  if(floor)add('room',pieces.at(-1),floor,'manual');
+ }
+ return nodes;
 }
 function syncGuidedRooms(aliases=structureAliases){
  if(!etsData)return;
@@ -143,7 +191,21 @@ function refreshEditableRooms(previous=new Map()){
  syncGuidedRooms(Object.fromEntries(updated));
  widgetRooms=structureRooms();structureDirty=true;widgetDirty=true;
 }
-function proposeWidgets(){widgetDrafts=[];widgetSeq=0;widgetDirty=false;structureDirty=false;if(!etsData)return;structureAliases=savedWidgetLayout.project===etsData.project_key?{...(savedWidgetLayout.room_aliases||{})}:{};syncGuidedRooms();alignLegacyGuidedRooms();structureDraft=savedWidgetLayout.project===etsData.project_key&&(savedWidgetLayout.structure||[]).length?(savedWidgetLayout.structure||[]).map(n=>({...n})):buildEditableStructure(etsData.building,savedWidgetLayout.project===etsData.project_key?savedWidgetLayout.rooms:[]);widgetRooms=structureRooms();if(savedWidgetLayout.project===etsData.project_key){widgetDrafts=(savedWidgetLayout.widgets||[]).filter(w=>widgetFields[w.type]).map(w=>newWidget(w.type,w.name,w.fields,'Configurazione salvata',resolveRoomAlias(w.room),w.entity_id||'',w.visible!==false,w.command_mode,w.profile));}reconcileRecognizedFunctions();}
+function proposeWidgets(){
+ widgetDrafts=[];widgetSeq=0;widgetDirty=false;structureDirty=false;
+ if(!etsData)return;
+ const saved=savedWidgetLayout.project===etsData.project_key?savedWidgetLayout:null;
+ const savedNodes=saved?.structure||[];
+ structureAliases={...(saved?.room_aliases||{})};
+ structureDraft=buildEditableStructure(etsData.building,savedNodes.length?[]:saved?.rooms||[],savedNodes,structureAliases);
+ structureDirty=!!savedNodes.length&&structureDraft.length>savedNodes.length;
+ syncGuidedRooms();alignLegacyGuidedRooms();
+ widgetRooms=structureRooms();
+ widgetDrafts=(saved?.widgets||[]).filter(w=>widgetFields[w.type]).map(w=>
+  newWidget(w.type,w.name,w.fields,'Configurazione salvata',resolveRoomAlias(w.room),w.entity_id||'',
+   w.visible!==false,w.command_mode,w.profile));
+ reconcileRecognizedFunctions();
+}
 function widgetGAOptions(current,kind,field,profile){let imported=etsData?.addresses||[],addresses=imported.filter(a=>a.address===current||widgetAddressCompatible(kind,field,a,profile)),seen=new Set(imported.map(a=>a.address));for(const ga of [current,...widgetDrafts.flatMap(w=>Object.values(w.fields||{}))])if(ga&&!seen.has(ga)){addresses.push({address:ga,name:'GA manuale · da verificare in ETS',linked:false});seen.add(ga)}return `<option value="">— Non associato —</option>`+addresses.map(a=>`<option value="${escapeHTML(a.address)}" ${a.address===current?'selected':''}>${escapeHTML(a.address+' · '+a.name)}${a.linked?'':' [NON COLLEGATO]'}</option>`).join('')}
 
 function widgetStatus(w){let mandatory=widgetFields[w.kind].filter(f=>f[3]),missing=mandatory.filter(f=>!w.fields[f[0]]).length,unlinked=widgetFields[w.kind].filter(f=>w.fields[f[0]]&&!linkedGA(w.fields[f[0]])).length,optional=(w.command_mode==='off_only'?[]:widgetFields[w.kind]).filter(f=>!f[3]&&!w.fields[f[0]]).length;return missing?`<span class="warning">${missing} campi essenziali mancanti</span>`:unlinked?`<span class="warning">${unlinked} GA selezionati senza collegamento ETS · verifica necessaria</span>`:optional?`<span class="warning">${optional} funzioni facoltative senza GA</span>`:'<span style="color:#8de2a9">Campi compilati · da verificare</span>'}
@@ -327,7 +389,7 @@ function intelligenceRecorderPanel(){
  return `<div class="card"><h3>Storico Home Assistant (${escapeHTML(r.hours)} ore) · ${rows.length} decisioni</h3>${r.hours<24?`<p class="warning small">Intervallo ridotto automaticamente a ${escapeHTML(r.hours)} ore per rispettare il limite di 2 MB.</p>`:""}${rows.length?`<div style="overflow:auto"><table><thead><tr><th>Ora</th><th>Stato</th><th>Riepilogo</th></tr></thead><tbody>${rows.map(h=>`<tr><td>${escapeHTML(intelligenceDate(h.generated_at))}</td><td>${escapeHTML(intelligenceStates[h.status]||h.status)}</td><td>${escapeHTML(h.summary)}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">Recorder non contiene decisioni complete nelle ultime ${escapeHTML(r.hours)} ore.</p>'}<p class="small muted">Dati letti da Home Assistant Recorder, se disponibili. Non è lo storico completo del database del Decision Engine.</p></div>`;
 }
 async function loadIntelligence(){if(intelligenceLoading)return;intelligenceLoading=true;intelligenceError='';try{let current=await api('intelligence/summary');intelligenceData=current;if(current.found&&current.decision_id&&!intelligenceHistory.some(h=>h.decision_id===current.decision_id)){intelligenceHistory.unshift({decision_id:current.decision_id,generated_at:current.generated_at,status:current.status,summary:current.summary});intelligenceHistory=intelligenceHistory.slice(0,8)}try{intelligenceRecorder=await api('intelligence/history')}catch(e){intelligenceRecorder={available:false,reason:'Storico non disponibile',items:[]}}}catch(e){intelligenceData=null;intelligenceError=e.message}finally{intelligenceLoading=false}if(page==='intelligence')render()}
-function render(){let c=$('content');c.innerHTML=({wizard:wizardPage,live:liveDashboardPage,real:pilotPage,dashboard,configure,ets,building:()=>structureEditor()+widgetMover()+originalBuilding(),'floorplans':floorPlanPage,widgets:widgetSetup,knx:knxProject,'ha-preview':haPreviewPage,'dashboard-export':dashboardExportPage,'matches':entityMatchingPage,'nm-link':nmLinkPage,intelligence:intelligencePage,inventory,diagnostic})[page]();if(page==='intelligence')$('intelligence-refresh').onclick=loadIntelligence;if(page==='diagnostic')wireBusFilters();if(page==='floorplans')wireFloorplan();if(page==='wizard')wireWizard();if(page==='real')wirePilot();if(page==='live')document.querySelectorAll('[data-live-go]').forEach(b=>b.onclick=()=>setPage(b.dataset.liveGo));if(page==='configure')wireConfigure();if(page==='ha-preview'){wireHaPreview();wireMissingHa();wireKnxEntityAudit()}if(page==='dashboard-export'){nmDashboardDraft=null;wireDashboardExport();wireRealDashboardUpdate();}if(page==='matches')wireEntityMatching();if(page==='nm-link'){let available=entities.some(e=>['light','switch'].includes(e.entity_id.split('.')[0]));if(!available)c.firstElementChild.insertAdjacentHTML('afterbegin','<p class="warning">Nessuna entità luce/interruttore presente in HA: puoi lasciare «Seleziona entità» vuoto e salvare una bozza incompleta. Il collegamento resterà inattivo.</p>');wireNmLink();enhanceLinkDpt();enhanceLinkFunctions()}if(page==='building'){c.insertAdjacentHTML('beforeend',buildingEvidence());wireStructureEditor();wireWidgetMover()}if(page==='ets'){c.insertAdjacentHTML('beforeend',etsOverview()+etsDeviceExplorer()+etsReview()+'<div id="audit-panel">'+etsAudit()+'</div>'+generator()+approvedView());wireETS();wireDeviceExplorer();wireReview();wireAudit();wireGenerator();organizeInstallerPage()}if(page==='widgets'){c.insertAdjacentHTML('afterbegin',recoveryPanel());wireWidgetSetup();wireWidgetPersistence();wireRecovery();wireOffButtons();wireClearWidgetFlow();wireInlineWidgetEditor()}if(page==='dashboard'){c.insertAdjacentHTML('beforeend',knxHierarchyDashboard());document.querySelectorAll('[data-select-room]').forEach(b=>b.onclick=()=>{selectedRoom=b.dataset.selectRoom;render()})}if(!clientMode&&['ets','widgets','matches','real','dashboard-export'].includes(page)){c.insertAdjacentHTML('afterbegin',realFlowBar());document.querySelectorAll('[data-real-flow]').forEach(b=>b.onclick=()=>setPage(b.dataset.realFlow));}}
+function render(){let c=$('content');c.innerHTML=({wizard:wizardPage,live:liveDashboardPage,real:pilotPage,lab:virtualLabPage,dashboard,configure,ets,building:()=>structureEditor()+widgetMover()+originalBuilding(),'floorplans':floorPlanPage,widgets:widgetSetup,knx:knxProject,'ha-preview':haPreviewPage,'dashboard-export':dashboardExportPage,'matches':entityMatchingPage,'nm-link':nmLinkPage,intelligence:intelligencePage,inventory,diagnostic})[page]();if(page==='intelligence')$('intelligence-refresh').onclick=loadIntelligence;if(page==='diagnostic')wireBusFilters();if(page==='floorplans')wireFloorplan();if(page==='wizard')wireWizard();if(page==='real')wirePilot();if(page==='lab'&&etsData)wireVirtualLab();if(page==='live')document.querySelectorAll('[data-live-go]').forEach(b=>b.onclick=()=>setPage(b.dataset.liveGo));if(page==='configure')wireConfigure();if(page==='ha-preview'){wireHaPreview();wireMissingHa();wireKnxEntityAudit()}if(page==='dashboard-export'){nmDashboardDraft=null;wireDashboardExport();wireRealDashboardUpdate();}if(page==='matches')wireEntityMatching();if(page==='nm-link'){let available=entities.some(e=>['light','switch'].includes(e.entity_id.split('.')[0]));if(!available)c.firstElementChild.insertAdjacentHTML('afterbegin','<p class="warning">Nessuna entità luce/interruttore presente in HA: puoi lasciare «Seleziona entità» vuoto e salvare una bozza incompleta. Il collegamento resterà inattivo.</p>');wireNmLink();enhanceLinkDpt();enhanceLinkFunctions()}if(page==='building'){c.insertAdjacentHTML('beforeend',buildingEvidence());wireStructureEditor();wireWidgetMover()}if(page==='ets'){c.insertAdjacentHTML('beforeend',etsOverview()+etsDeviceExplorer()+etsReview()+'<div id="audit-panel">'+etsAudit()+'</div>'+generator()+approvedView());wireETS();wireDeviceExplorer();wireReview();wireAudit();wireGenerator();organizeInstallerPage()}if(page==='widgets'){c.insertAdjacentHTML('afterbegin',recoveryPanel());wireWidgetSetup();wireWidgetPersistence();wireRecovery();wireOffButtons();wireClearWidgetFlow();wireInlineWidgetEditor()}if(page==='dashboard'){c.insertAdjacentHTML('beforeend',knxHierarchyDashboard());document.querySelectorAll('[data-select-room]').forEach(b=>b.onclick=()=>{selectedRoom=b.dataset.selectRoom;render()})}if(!clientMode&&['ets','widgets','matches','real','dashboard-export'].includes(page)){c.insertAdjacentHTML('afterbegin',realFlowBar());document.querySelectorAll('[data-real-flow]').forEach(b=>b.onclick=()=>setPage(b.dataset.realFlow));}}
 async function uploadETS(file,passwordInput){
  let secret=new TextEncoder().encode(passwordInput?.value||'');
  if(passwordInput)passwordInput.value='';

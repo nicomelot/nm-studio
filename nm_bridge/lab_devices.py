@@ -47,7 +47,7 @@ def candidates(preview):
     """Separate lab proposals; never promote these guesses to real KNX approval."""
     result, used = [], set()
     rooms = {item['command']: item['room'] for item in preview.get('room_matches', [])
-             if item.get('confidence') in ('ets_function', 'name') and item.get('room')}
+             if item.get('confidence') in ('ets_function', 'ets_group', 'name') and item.get('room')}
     for item in preview.get("suggestions", []):
         if item.get("kind") not in KINDS or item.get("command") in used:
             continue
@@ -84,7 +84,7 @@ def candidates(preview):
     supplied = {m['command']: m for m in preview.get('room_matches', [])}
     for item in result:
         match = supplied.get(item['command']) or matches.get(item['command'], {})
-        if match.get('confidence') in ('ets_function', 'name') and match.get('room'):
+        if match.get('confidence') in ('ets_function', 'ets_group', 'name') and match.get('room'):
             item['room'] = match['room']
             item['room_source'] = match.get('reason', 'Ambiente ETS: da verificare')
         elif match.get('confidence') == 'ambiguous':

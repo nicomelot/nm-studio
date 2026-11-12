@@ -2,7 +2,7 @@ let pilotBusy=false;
 const installationStyles=`
 .install-heading{display:flex;justify-content:space-between;align-items:start;gap:16px;flex-wrap:wrap}.install-heading h2{font-size:28px;margin:8px 0}.install-heading p{max-width:680px;color:#aec1da;line-height:1.6}.install-toolbar{display:flex;gap:8px;flex-wrap:wrap}.install-room{margin:22px 0}.install-room>summary{cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:16px 4px;border-bottom:1px solid #304963;font-size:19px;font-weight:650}.install-room>summary small{font-size:13px;color:#adc1d9;font-weight:400}.install-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,310px),1fr));gap:14px;padding-top:16px}.install-device{padding:18px;border:1px solid #304b69;border-radius:16px;background:#12243b;min-width:0}.install-device-top{display:flex;gap:10px;align-items:center}.install-device-top input{width:20px;height:20px;accent-color:#7d79ff}.install-device-top strong{flex:1;overflow-wrap:anywhere}.install-icon{font-size:23px;color:#adcaff}.install-badge{display:inline-block;font-size:12px;font-weight:650;padding:5px 9px;border-radius:7px;margin:12px 0;background:#233d5e;color:#bcd8ff}.install-badge.present{background:#12473d;color:#a3f0cf}.install-badge.update{background:#433c1f;color:#ffe19a}.install-badge.review{background:#50313e;color:#ffbecb}.install-details{font-size:13px;color:#b2c6e0;overflow-wrap:anywhere}.install-details summary{padding:9px 0;cursor:pointer}.install-details p{line-height:1.6}.install-help{font-size:13px;line-height:1.5;color:#ffcf9b}.install-dock{position:sticky;bottom:10px;z-index:20;border:1px solid #6484b8;border-radius:15px;background:#162b45f5;box-shadow:0 10px 30px #0007;padding:16px;margin-top:20px}.install-dock .bar{margin:12px 0 0}.install-dock label{font-size:13px;color:#c2d1e5}.install-dock button{min-height:44px}.commission-tools{margin:15px 0;padding:14px;border-radius:12px;background:#162f43;border:1px solid #3c6478}.commission-tools label{font-size:14px}.commission-tools input[type=checkbox]{width:20px;height:20px}.commission-tools p{font-size:13px;color:#b7cddd;margin:8px 0}.commission-controls{border-top:1px solid #304b69;margin-top:12px;padding-top:12px;display:flex;gap:8px;flex-wrap:wrap}.commission-controls button{min-height:44px;flex:1}.commission-controls button[data-commission-action=stop]{border:2px solid #ffce82;color:#ffe0ad}.commission-level{display:flex;gap:8px;align-items:center;width:100%}.commission-level input{width:80px}.commission-state{width:100%;font-size:13px;line-height:1.5;color:#bdd1eb;min-height:22px}.install-room summary:focus-visible,button:focus-visible{outline:3px solid #b4d2ff;outline-offset:3px}@media(max-width:600px){.install-heading h2{font-size:23px}.install-dock{bottom:4px;padding:12px}.install-dock .primary{width:100%}.install-device{padding:15px}}
 `;
-function bulkInstallPage(){return `<style>${installationStyles}</style><section class="card" id="bulk-install"><div class="install-heading"><div><div class="workspace-label">Installazione e collaudo</div><h2>Il tuo impianto, stanza per stanza</h2><p>Controlla le funzioni, applica le modifiche e prova i dispositivi installati. I dettagli KNX restano disponibili quando servono.</p></div><div class="install-toolbar"><button id="install-load">Aggiorna elenco</button><button id="install-edit">Modifica funzioni</button></div></div><p id="install-status" role="status"></p><div class="commission-tools"><label class="row"><input type="checkbox" id="commission-enabled"> Abilita i comandi reali per il collaudo</label><p>I controlli azionano i dispositivi installati. L’abilitazione vale solo in questa schermata; il caricamento dell’elenco non invia comandi.</p><button id="commission-refresh">Leggi stati da HA</button></div><div id="install-list"></div><section class="install-dock"><label class="row"><input type="checkbox" id="install-verified" style="width:auto"> Ho verificato indirizzi e tipi in ETS e il backup HA</label><div class="bar"><button id="install-create" class="primary" disabled>Applica modifiche</button><button id="install-areas">Sincronizza stanze HA</button><button id="install-next" hidden>Apri pubblicazione dashboard</button></div></section><details><summary>Registro delle operazioni</summary><pre id="install-results" style="white-space:pre-wrap" aria-live="polite"></pre></details></section>`;}
+function bulkInstallPage(){return `<style>${installationStyles}</style><section class="card" id="bulk-install"><div class="install-heading"><div><div class="workspace-label">Installazione e collaudo</div><h2>Il tuo impianto, stanza per stanza</h2><p>Controlla le funzioni, applica le modifiche e prova i dispositivi installati. I dettagli KNX restano disponibili quando servono.</p></div><div class="install-toolbar"><button id="install-load">Aggiorna elenco</button><button id="install-select-climate" disabled>Seleziona termostati</button><button id="install-edit">Modifica funzioni</button></div></div><p id="install-status" role="status"></p><div class="commission-tools"><label class="row"><input type="checkbox" id="commission-enabled"> Abilita i comandi reali per il collaudo</label><p>I controlli azionano i dispositivi installati. L’abilitazione vale solo in questa schermata; il caricamento dell’elenco non invia comandi.</p><button id="commission-refresh">Leggi stati da HA</button></div><div id="install-list"></div><section class="install-dock"><label class="row"><input type="checkbox" id="install-verified" style="width:auto"> Ho verificato indirizzi e tipi in ETS e il backup HA</label><div class="bar"><button id="install-create" class="primary" disabled>Applica modifiche</button><button id="install-areas">Sincronizza stanze HA</button><button id="install-next" hidden>Apri pubblicazione dashboard</button></div></section><details><summary>Registro delle operazioni</summary><pre id="install-results" style="white-space:pre-wrap" aria-live="polite"></pre></details></section>`;}
 
 function commissioningControls(d){
  if(d.status!=='present'||!d.entity_id||!['light','dimmer','cover','button','switch'].includes(d.type))return '';
@@ -29,7 +29,16 @@ function installListMarkup(data,access){
 function installBlocker(device){
  if(!['light','dimmer','cover','button','switch','climate','binary_sensor','number'].includes(device.type))return 'Tipo da configurare negli strumenti avanzati';
  if(!device.fields.command)return device.type==='binary_sensor'?'Manca l’indirizzo di stato':'Manca il comando';
- if(device.type==='climate'&&(!device.fields.temperature||!device.fields.target_temperature_state))return 'Manca la temperatura rilevata o lo stato setpoint';
+ if(device.type==='climate'){
+  const conflict=typeof etsData==='undefined'?null:etsData?.climate_conflicts?.find(item=>item.command===device.fields.command);
+  if(conflict){
+   const shared=Object.values(device.fields).filter(ga=>conflict.addresses.includes(ga));
+   if(shared.length)return 'Indirizzi clima condivisi fra gateway: '+shared.join(', ');
+   const missing=Object.values(device.fields).filter(ga=>ga&&!etsData.addresses.some(a=>a.address===ga&&a.linked));
+   if(missing.length)return 'Indirizzi clima non collegati in questo export: '+missing.join(', ');
+  }
+  if(!device.fields.temperature||!device.fields.target_temperature_state)return 'Manca la temperatura rilevata o lo stato setpoint';
+ }
  if(device.type==='dimmer'&&!device.fields.brightness)return 'Manca il comando luminosità assoluta';
  if(device.type==='cover'&&!device.fields.stop)return 'Manca il comando arresto';
  return '';
@@ -83,7 +92,15 @@ function wireBulkInstall(){
   catch(e){target.textContent='Comando non confermato: '+e.message+(d.type==='button'?' Controlla il dispositivo prima di riprovare.':' Leggi lo stato prima di riprovare.');}
   finally{testPending--;pilotBusy=testPending>0;gate();gateTests();}
  }
- function gate(){const n=source?selected().length:0;$('install-create').textContent=`Applica ${n} modifiche`;$('install-create').disabled=busy||testPending>0||!n||!$('install-verified').checked||!capability?.available||!capability?.connected;}
+ const selectClimate=$('install-select-climate');
+ const readyClimate=()=>rows.filter(r=>r.dataset.blocked!=='true'
+  &&source?.devices.find(d=>d.index===Number(r.dataset.installIndex))?.type==='climate');
+ if(selectClimate)selectClimate.onclick=()=>{
+  const thermostats=new Set(readyClimate());
+  rows.forEach(r=>r.checked=thermostats.has(r));gate();
+  status(`${thermostats.size} termostati selezionati.`);
+ };
+ function gate(){if(selectClimate)selectClimate.disabled=busy||!readyClimate().length;const n=source?selected().length:0;$('install-create').textContent=`Applica ${n} modifiche`;$('install-create').disabled=busy||testPending>0||!n||!$('install-verified').checked||!capability?.available||!capability?.connected;}
  async function run(work){if(busy||pilotBusy)return;busy=true;pilotBusy=true;gate();document.querySelectorAll('#bulk-install input,#bulk-install button').forEach(el=>el.disabled=true);try{await work();}catch(e){status('Interrotto: '+e.message+' Le operazioni già confermate restano salvate. Aggiorna elenco prima di riprovare.');source=null;}finally{busy=false;pilotBusy=false;document.querySelectorAll('#bulk-install button').forEach(el=>el.disabled=false);document.querySelectorAll('#bulk-install input').forEach(el=>el.disabled=false);$('install-verified').disabled=false;rows.forEach(r=>r.disabled=!source||r.dataset.blocked==='true');gate();gateTests();}}
  if($('install-areas'))$('install-areas').onclick=()=>run(async()=>{
   if(widgetDirty||structureDirty)throw Error('Salva prima funzioni e stanze.');
@@ -98,12 +115,19 @@ function wireBulkInstall(){
  $('install-verified').onchange=gate;
  $('install-load').onclick=()=>run(async()=>{
   source=null;rows=[];if($('commission-enabled'))$('commission-enabled').checked=false;$('install-list').innerHTML='';$('install-verified').checked=false;status('Confronto con la configurazione KNX di Home Assistant.');
-  const [data,access]=await Promise.all([api('knx/installation-review'),api('knx/panel-capability')]);
+  const access=await api('knx/panel-capability');
+  if(!access.available){
+   status(access.message+' Per la simulazione torna a Importa ETS.');
+   return;
+  }
+  const data=await api('knx/installation-review');
   if(etsData?.project_key&&data.project!==etsData.project_key)throw Error('Salva prima le funzioni del progetto aperto.');
   source=data;capability=access;
   paint();
   const labels={create:'da creare',update:'da aggiornare',present:'installate',review:'da verificare'};
-  status(Object.entries(labels).map(([key,label])=>`${data.devices.filter(d=>d.status===key).length} ${label}`).join(' · '));
+  const summary=Object.entries(labels).map(([key,label])=>`${data.devices.filter(d=>d.status===key).length} ${label}`).join(' · ');
+  const connection=access.connected?'':' KNX non connesso. Per la simulazione torna a Importa ETS.';
+  status(summary+connection);
   $('install-next').hidden=false;
  });
  $('install-create').onclick=()=>run(async()=>{
@@ -114,9 +138,15 @@ function wireBulkInstall(){
   let fingerprint=source.source_fingerprint;
   for(let i=0;i<devices.length;i++){
    const d=devices[i];status(`Applicazione ${i+1}/${devices.length}: ${d.name}`);
-   const done=await post('knx/installation-apply',{confirm:true,backup_confirmed:true,ets_confirmed:true,source_fingerprint:fingerprint,index:d.index,expected:d});
+   let done;
+   try{
+    done=await post('knx/installation-apply',{confirm:true,backup_confirmed:true,ets_confirmed:true,source_fingerprint:fingerprint,index:d.index,expected:d});
+    if(!done.linked||done.stop)throw Error(done.message||'Verifica la funzione in HA.');
+   }catch(e){
+    const detail=`${d.name} (${i+1}/${devices.length}): ${e.message}`;
+    $('install-results').textContent+=detail+'\n';throw Error(detail);
+   }
    $('install-results').textContent+=`${d.name}: ${done.entity_id} · ${done.updated?'aggiornata':'creata e associata'}\n`;
-   if(!done.linked||done.stop)throw Error(done.message||'Verifica la funzione in HA.');
    syncCreatedAssociation(source.project,d,done.entity_id);fingerprint=done.source_fingerprint;d.entity_id=done.entity_id;d.status='present';d.reason='Installazione confermata; esegui il collaudo.';
    const row=rows.find(r=>Number(r.dataset.installIndex)===d.index);row.checked=false;row.dataset.blocked='true';
   }

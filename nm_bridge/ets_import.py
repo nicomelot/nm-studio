@@ -610,6 +610,9 @@ def preview(raw, password=""):
             if len(building_spaces) > MAX_SPACES:
                 raise ValueError("Too many ETS building spaces")
             local_addresses = {}
+            group_names = {child: (parent.get("Name") or "").strip()[:100]
+                           for parent in root.iter() if name_of(parent.tag) == "GroupRange"
+                           for child in parent if name_of(child.tag) == "GroupAddress"}
             for node in root.iter():
                 if name_of(node.tag) != "GroupAddress":
                     continue
@@ -622,6 +625,8 @@ def preview(raw, password=""):
                 record = {"address": group, "name": name, "description": description,
                           "dpt": dpt, "kind": guess_kind(name, dpt), "role": guess_role(name),
                           "linked": False, "connections": []}
+                if group_names.get(node):
+                    record["group_name"] = group_names[node]
                 addresses[group] = record
                 if node.get("Id"):
                     address_refs[node.get("Id")] = group
@@ -718,7 +723,8 @@ def preview(raw, password=""):
         suggestions = [s for s in suggestions if s['command'] not in covered_addresses]
         suggestions.extend(descriptive)
         suggestions = enrich_suggestions(items, suggestions)
-        climates = object_climates(items)
+        climate_conflicts = []
+        climates = object_climates(items, climate_conflicts)
         accessory_candidates = []
         for candidate in climates:
             accessories = candidate.pop('accessories', [])
@@ -749,6 +755,10 @@ def preview(raw, password=""):
                      for item in function_refs]
         matches = room_matches(suggestions[:300], items, building_spaces, functions)
         room_by_command = {match['command']: match for match in matches}
+        for candidate in climates:
+            match = room_by_command.get(candidate['command'], {})
+            if match.get('confidence') == 'ets_group':
+                candidate['name'] = ('CLIMA ' + match['room'].rsplit(' / ', 1)[-1])[:80]
         for accessory in added_accessories:
             match = room_by_command.get(accessory['command'])
             climate_match = room_by_command.get(accessory['climate_command'])
@@ -756,9 +766,12 @@ def preview(raw, password=""):
                     and match.get('confidence') != 'ambiguous' and climate_match.get('room')):
                 match.update(room=climate_match['room'], confidence=climate_match['confidence'],
                              reason='Stesso gateway ETS del climatizzatore')
+            if climate_match and climate_match.get('confidence') == 'ets_group':
+                label = accessory['name'].split(' · ', 1)[0]
+                accessory['name'] = (label + ' · ' + climate_match['room'].rsplit(' / ', 1)[-1])[:80]
         return {"project_key": project_key, "addresses": items, "devices": device_inventory, "suggestions": suggestions[:300],
                 "recognition_reviews": review_suggestions(items, suggestions),
-                "hvac_inventory": hvac_address_inventory(items),
+                "hvac_inventory": hvac_address_inventory(items), "climate_conflicts": climate_conflicts,
                 "building": building_spaces, "functions": functions, "room_matches": matches, "total": len(items),
                 "warning": "Tipi e abbinamenti sono ipotesi, non verifiche ETS. DPT mancanti da controllare. Nessun dato salvato."}
 

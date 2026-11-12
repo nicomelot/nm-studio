@@ -24,19 +24,20 @@ def desired(layout, index):
     return build(draft, review)['calls'][0]
 
 
-def compare(layout, index, ws):
+def compare(layout, index, ws, groups=None):
     w = layout['widgets'][index]
     row = {**deepcopy(w), 'index': index, 'status': 'review', 'reason': ''}
     try:
         target = desired(layout, index)
         ident = w.get('entity_id')
         if not ident:
-            used = ws.call('knx/get_entities_by_group')
+            used = ws.call('knx/get_entities_by_group') if groups is None else groups
             if not isinstance(used, dict):
                 raise ValueError('Inventario indirizzi KNX non verificabile')
             addresses = configured_addresses(target['data']['knx'])
-            if addresses.intersection(used):
-                raise ValueError('GA già configurati in HA: associa l’entità esistente')
+            overlaps = sorted(addresses.intersection(used))
+            if overlaps:
+                raise ValueError('GA già configurati in HA (' + ', '.join(overlaps) + '): associa l’entità esistente')
             if sum(x.get('fields', {}).get('command') == w['fields'].get('command') for x in layout['widgets']) > 1:
                 raise ValueError('Comando presente in più funzioni: verifica i duplicati')
             row.update(status='create', reason='Pronta da creare')
@@ -57,7 +58,7 @@ def compare(layout, index, ws):
         primary_role = 'state' if platform == 'binary_sensor' else 'write'
         if current_groups.get(primary, {}).get(primary_role) != w['fields'].get('command'):
             raise ValueError('Il comando principale HA non coincide: verifica l’associazione')
-        used = ws.call('knx/get_entities_by_group')
+        used = ws.call('knx/get_entities_by_group') if groups is None else groups
         if not isinstance(used, dict):
             raise ValueError('Inventario indirizzi KNX non verificabile')
         current_ga = configured_addresses(data['knx'])
@@ -97,7 +98,11 @@ def compare(layout, index, ws):
 
 def preview(layout, connection_factory=HAWebSocket):
     with connection_factory() as ws:
-        devices = [compare(layout, i, ws) for i in range(len(layout.get('widgets', [])))]
+        widgets = layout.get('widgets', [])
+        groups = ws.call('knx/get_entities_by_group') if widgets else {}
+        if not isinstance(groups, dict):
+            raise ValueError('Inventario indirizzi KNX non verificabile')
+        devices = [compare(layout, i, ws, groups) for i in range(len(widgets))]
     return {'project': layout.get('project'), 'source_fingerprint': fingerprint(layout), 'devices': devices}
 
 

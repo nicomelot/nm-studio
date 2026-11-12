@@ -82,6 +82,14 @@ def room_matches(suggestions, addresses, spaces, functions):
                               "confidence": "ambiguous", "reason": "Più funzioni ETS in ambienti diversi"})
             continue
 
+        if suggestion.get("kind") == "climate":
+            group = normalized(lookup.get(suggestion["command"], {}).get("group_name", ""))
+            matched = [room for room in dict.fromkeys(room_paths)
+                       if group and normalized(room.rsplit(" / ", 1)[-1]) == group]
+            if len(matched) == 1:
+                proposals.append({"command": suggestion["command"], "room": matched[0],
+                                  "confidence": "ets_group", "reason": "Nome del gruppo ETS del setpoint"})
+                continue
         labels = [suggestion.get("name", "")]
         for address in used_addresses:
             record = lookup.get(address)

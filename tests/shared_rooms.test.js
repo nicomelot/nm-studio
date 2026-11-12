@@ -28,3 +28,41 @@ test('ETS rooms directly under building retain their path without fictitious flo
  assert.equal(nodes.length,2);
  assert.equal(c.nodePath(nodes[1].id,nodes),'Casa / Sala');
 });
+
+test('a reimport adds an ETS climate room under a renamed saved floor',()=>{
+ const original=[
+  {id:'nm_1',parent:null,type:'building',name:'Casa',active:true,source:'ets'},
+  {id:'nm_2',parent:'nm_1',type:'floor',name:'Ingresso',active:true,source:'ets'},
+  {id:'nm_3',parent:'nm_2',type:'room',name:'Studio',active:true,source:'ets'},
+ ];
+ const oldWidget={type:'climate',name:'Termostato esistente',room:'Casa / Ingresso / Studio',
+  fields:{command:'2/1/2'},entity_id:'climate.studio'};
+ const c={savedWidgetLayout:{project:'p',structure:original,rooms:[oldWidget.room],widgets:[oldWidget],
+  room_aliases:{'Casa / Terra':'Casa / Ingresso','Casa / Terra / Ufficio':'Casa / Ingresso / Studio'}},
+  etsData:{project_key:'p',
+   building:[{type:'Building',name:'Casa',path:'Casa'},
+    {type:'Floor',name:'Terra',path:'Casa / Terra'},
+    {type:'Room',name:'Ufficio',path:'Casa / Terra / Ufficio'},
+    {type:'Room',name:'Sala nuova',path:'Casa / Terra / Sala nuova'}],
+   addresses:[{address:'2/1/2',name:'Studio',linked:true},{address:'2/2/2',name:'Sala nuova',linked:true}],
+   suggestions:[{kind:'climate',name:'Sala nuova',command:'2/2/2'}],
+   room_matches:[{command:'2/2/2',room:'Casa / Terra / Sala nuova'}]},
+  widgetFields:{climate:[['command']]},newWidget:(kind,name,fields,source,room,entity_id)=>({kind,name,fields,room,entity_id}),
+  linkedGA:()=>'',widgetDrafts:[],widgetSeq:0,widgetDirty:false,structureDirty:false,widgetRooms:[],structureDraft:[],structureAliases:{}};
+ vm.createContext(c);
+ vm.runInContext(get('nodePath','widgetGAOptions')+fs.readFileSync('nm_bridge/recovery_ui.js','utf8'),c);
+ c.proposeWidgets();
+ assert.equal(c.structureDraft.length,4);
+ assert.equal(c.structureDraft[3].parent,'nm_2');
+ assert.equal(c.widgetDrafts.length,2);
+ assert.equal(c.widgetDrafts[0].entity_id,'climate.studio');
+ assert.equal(c.widgetDrafts[0].room,oldWidget.room);
+ assert.equal(c.widgetDrafts[1].room,'Casa / Ingresso / Sala nuova');
+ assert.equal(c.structureDirty,true);
+ assert.equal(original.length,3);
+ c.savedWidgetLayout={...c.savedWidgetLayout,structure:c.structureDraft,room_aliases:c.structureAliases};
+ c.proposeWidgets();
+ assert.equal(c.structureDraft.length,4);
+ assert.equal(c.widgetDrafts.length,2);
+ assert.equal(c.structureDirty,false);
+});
