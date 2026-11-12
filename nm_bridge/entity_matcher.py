@@ -6,7 +6,7 @@ import unicodedata
 
 COMPATIBLE = {"light": {"light", "switch"}, "dimmer": {"light"}, "cover": {"cover"},
               "climate": {"climate"}, "sensor": {"sensor", "binary_sensor"},
-              "switch": {"switch"}, "fan": {"fan"}}
+              "switch": {"switch"}, "button": {"button"}, "fan": {"fan"}}
 STOP = {"luce", "luci", "stato", "comando", "on", "off", "knx", "ha", "di", "del", "della", "il", "la", "le", "the"}
 FEEDBACK_WORDS = {"notifica", "feedback", "riscontro", "segnalazione", "status"}
 UNCERTAIN_WORDS = {"pulsantiera", "pulsante", "scatola", "derivazione"}

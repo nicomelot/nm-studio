@@ -42,7 +42,7 @@ def inspect_configuration(widget_data=None, approved=None, ha_entity_ids=None):
             issue("missing_command", "blocking", "command", "Indirizzo comando mancante")
         else:
             command_owners.setdefault(fields["command"], []).append(index)
-        if not fields.get("feedback"):
+        if kind != "button" and widget.get("command_mode") != "off_only" and not fields.get("feedback"):
             issue("missing_feedback", "warning", "feedback", "Stato non disponibile: associare un GA verificato")
         if kind == "cover" and not fields.get("stop"):
             issue("missing_stop", "warning", "stop", "Indirizzo stop non configurato")

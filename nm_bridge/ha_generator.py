@@ -61,7 +61,7 @@ def validate_evidence(payload, project):
 
 def generate(layout=None, evidence=None):
     layout = read_layout() if layout is None else layout
-    entries = {"light": [], "cover": [], "climate": []}
+    entries = {"light": [], "cover": [], "climate": [], "switch": []}
     warnings = []
     seen = {}
     if evidence is not None and not isinstance(evidence, dict):
@@ -85,7 +85,11 @@ def generate(layout=None, evidence=None):
                     fields[field] = ""
                     warnings.append({"index": index, "name": name, "code": "field_unlinked",
                                      "message": field + ": GA " + address + " scollegato in ETS, escluso dalla bozza"})
-        platform = kind if kind in ("cover", "climate") else "light"
+        if kind == "button":
+            warnings.append({"index": index, "name": name, "code": "button_panel_only",
+                             "message": "Pulsante: usa Installazione e collaudo per creare l’entità dal pannello KNX."})
+            continue
+        platform = kind if kind in ("cover", "climate", "switch") else "light"
         if platform == "climate" and (not fields.get("temperature") or not fields.get("target_temperature_state")):
             warnings.append({"index": index, "name": name, "code": "climate_missing_required",
                              "message": "Termostato escluso: temperatura ambiente e feedback setpoint obbligatori per HA KNX"})
@@ -106,7 +110,7 @@ def generate(layout=None, evidence=None):
                     entry[field + "_address"] = fields[field]
             warnings.append({"index": index, "name": name, "code": "check_climate_dpt",
                              "message": "Verificare setpoint e temperatura DPT 9.001, caldo/freddo DPT 1.100 e modalità DPT 20.102; modalità HVAC non presunte"})
-        elif platform == "light":
+        elif platform in ("light", "switch"):
             entry["address"] = command
             warnings.append({"index": index, "name": name, "code": "check_switch_dpt",
                              "message": "Verificare DPT 1.001 del comando in ETS"})
@@ -157,7 +161,7 @@ def generate(layout=None, evidence=None):
     lines = ["# NM Control - bozza da verificare in ETS prima di applicare",
              "# Non applicata automaticamente. L'uso in HA abilita possibili comandi sul bus.",
              "# Integrare nella chiave knx: esistente, senza duplicarla.", "knx:"]
-    for platform in ("light", "cover", "climate"):
+    for platform in entries:
         if not entries[platform]:
             continue
         lines.append("  " + platform + ":")

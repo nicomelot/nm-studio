@@ -52,6 +52,24 @@ class CommissioningTests(unittest.TestCase):
         self.ws.states[0]['attributes']['supported_color_modes'] = ['onoff']
         with self.assertRaises(ValueError): self.execute(self.payload())
         self.assertEqual(self.writes(), [])
+
+    def test_native_button_press_checks_the_saved_payload(self):
+        entity = 'button.campanello'
+        self.layout['widgets'][0].update(type='button', entity_id=entity, command_mode='on_only',
+                                         fields={'command': '1/1/1'})
+        knx = {'ga_send': {'write': '1/1/1'}, 'data': {'payload': '0x1', 'payload_length': 0}}
+        self.ws.config = {'platform': 'button', 'data': {'entity': {'name': 'Campanello'}, 'knx': knx}}
+        self.ws.states = [{'entity_id': entity, 'state': 'unknown'}]
+        payload = {**self.payload(), 'entity_id': entity, 'action': 'press'}
+        self.execute(payload)
+        self.assertEqual(self.writes(), [{'domain': 'button', 'service': 'press',
+                                         'target': {'entity_id': entity}, 'service_data': {}}])
+        knx['data']['payload'] = '0x0'
+        with self.assertRaises(ValueError):
+            self.execute(payload)
+        with self.assertRaises(ValueError):
+            self.execute({**payload, 'action': 'off'})
+        self.assertEqual(len(self.writes()), 1)
     def test_cover_stop_is_allowed_even_when_state_unavailable(self):
         self.layout['widgets'][0].update(type='cover', entity_id='cover.sala', fields={'command': '1/1/1', 'stop': '1/1/2'})
         self.ws.config = {'platform': 'cover', 'data': {'entity': {'name': 'Sala'}, 'knx': {'ga_up_down': {'write': '1/1/1'}, 'ga_stop': {'write': '1/1/2'}}}}

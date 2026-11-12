@@ -41,14 +41,16 @@ def preflight(layout, request, inventory):
                              "code": "duplicate_command", "message": "GA comando condiviso con " + by_command[command]})
         else:
             by_command[command] = item["name"]
-        key = (_normalize(item["name"]), "cover" if item["type"] == "cover" else "light")
+        kind = item["type"]
+        platform = "light" if kind == "dimmer" else kind
+        key = (_normalize(item["name"]), platform)
         if key in by_name:
             findings.append({"severity": "review", "index": idx, "name": item["name"],
                              "code": "duplicate_name", "message": "Nome simile al dispositivo " + by_name[key]})
         else:
             by_name[key] = item["name"]
 
-        expected_domains = {"cover"} if item["type"] == "cover" else {"light", "switch"}
+        expected_domains = {"light", "switch"} if platform == "light" else {platform}
         similarities = [entry.get("entity_id", "") for entry in inventory
                         if entry.get("entity_id", "").split(".", 1)[0] in expected_domains
                         and _normalize(entry.get("name") or entry.get("entity_id", "").split(".")[-1]) == key[0]]

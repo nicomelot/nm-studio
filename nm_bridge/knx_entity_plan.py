@@ -18,14 +18,25 @@ def build(layout, request):
         kind = original["type"]
         if not fields.get("command"):
             raise ValueError("A selected device has no KNX command address")
-        if kind not in ('light', 'dimmer', 'cover'):
-            raise ValueError('Creazione diretta supportata solo per luci, dimmer e tapparelle')
+        if kind not in ('light', 'dimmer', 'cover', 'switch', 'button'):
+            raise ValueError('Tipo non supportato dalla creazione diretta')
         if kind == 'dimmer' and not fields.get('brightness'):
             raise ValueError('Dimmer: GA luminosità assoluta obbligatorio')
         if kind == 'cover' and not fields.get('stop'):
             raise ValueError('Tapparella: GA arresto obbligatorio per il collaudo')
         data = {"entity": {"name": item["name"].strip()}, "knx": {}}
-        if kind in ("light", "dimmer"):
+        if kind == "button":
+            platform = "button"
+            mapping = {"command": ("ga_send", "write")}
+            # HA accepts raw short payloads with length 0 for 1-bit values.
+            data["knx"]["data"] = {
+                "payload": "0x0" if original.get("command_mode") == "off_only" else "0x1",
+                "payload_length": 0,
+            }
+        elif kind == "switch":
+            platform = "switch"
+            mapping = {"command": ("ga_switch", "write"), "feedback": ("ga_switch", "state")}
+        elif kind in ("light", "dimmer"):
             platform = "light"
             mapping = {"command": ("ga_switch", "write"), "feedback": ("ga_switch", "state"),
                        "brightness": ("ga_brightness", "write"), "brightness_feedback": ("ga_brightness", "state")}
