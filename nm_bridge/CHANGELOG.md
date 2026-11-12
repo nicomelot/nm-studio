@@ -1,4 +1,4 @@
-## 5.21.0
+## 5.21.0-beta.1
 
 - Import ETS con lettura progressiva dei cataloghi applicativi fino a 24 MiB ciascuno e 96 MiB complessivi. I cataloghi vengono letti una volta per applicativo.
 - Il riconoscimento dei gateway con ruoli AC espliciti propone un unico widget clima con setpoint, temperatura, ON/OFF e i ruoli di modalità, ventola e swing disponibili. Il flusso di installazione prepara l’entità KNX clima nativa in Home Assistant.
