@@ -24,6 +24,20 @@ class ImportRolesTests(unittest.TestCase):
         self.assertEqual(result[0]['kind'], 'cover')
         self.assertEqual(result[0]['stop'], '1/1/1')
 
+    def test_cover_position_command_and_feedback_are_independent(self):
+        movement = [('Movimento Comando', '1.008'), ('STOP', '1.017')]
+        command = ('Posizione Comando', '5.001')
+        feedback = ('Posizione Feedback', '5.001')
+        for roles, expected in [
+            ([command, feedback], {'position_command': '1/1/2', 'position_feedback': '1/1/3'}),
+            ([command], {'position_command': '1/1/2'}),
+            ([feedback], {'position_feedback': '1/1/2'}),
+            ([('Posizione Feedback', '1.008')], {}),
+        ]:
+            with self.subTest(roles=roles):
+                result = self.recognize(movement + roles)[0]
+                self.assertEqual({k: v for k, v in result.items() if k.startswith('position')}, expected)
+
     def test_ambiguous_or_wrong_dpt_movement_never_assumed(self):
         self.assertFalse(self.recognize([('Su/Giù', '1.001'), ('Arresto', '1.007')]))
         self.assertFalse(self.recognize([('Su/Giù', '1.008'), ('Movimento', '1.008'), ('Arresto', '1.007')]))

@@ -198,9 +198,8 @@ def structured_suggestions(items):
                     fields.update({"color_temperature": cct, "color_temperature_feedback": cct_fb})
         elif move and stop and not (light_on or ambient or setpoint):
             kind = "cover"
-            fields = {"command": move, "stop": stop}
-            if position and position_fb:
-                fields.update({"position": position, "position_feedback": position_fb})
+            fields = {"command": move, "stop": stop,
+                      "position_command": position, "position_feedback": position_fb}
             if slats and slats_fb:
                 fields.update({"slats": slats, "slats_feedback": slats_fb})
         elif ambient and setpoint and setpoint_fb and not (light_on or move):

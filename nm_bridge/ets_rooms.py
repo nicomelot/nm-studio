@@ -64,7 +64,8 @@ def room_matches(suggestions, addresses, spaces, functions):
     lookup = {item["address"]: item for item in addresses}
     proposals = []
     for suggestion in suggestions[:MAX_ROOM_MATCHES]:
-        used_addresses = {suggestion.get(field) for field in ("command", "feedback", "stop", "position")}
+        used_addresses = {suggestion.get(field) for field in
+                          ("command", "feedback", "stop", "position", "position_command", "position_feedback")}
         linked = {func["space"] for func in functions
                   if func["space"] in room_paths and used_addresses.intersection(func.get("addresses", []))}
         if len(linked) == 1:
