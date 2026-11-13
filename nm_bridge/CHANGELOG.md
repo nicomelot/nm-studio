@@ -1,3 +1,10 @@
+## 5.21.0-beta.5
+
+- Configurazione delle funzioni KNX in righe compatte: dettagli apribili e anteprime ridotte, con confronto ETS e ricerca degli indirizzi richiudibili.
+- Maniglia per riordinare le funzioni e spostarle nella stanza scelta. Disponibili anche selezione e pulsante, riordino da tastiera con Alt + freccia su/giù e annullamento dell’ultimo spostamento.
+- Ordine e stanza restano modifiche in bozza fino al salvataggio; indirizzi KNX, associazioni HA e profili vengono conservati.
+- Versione LAB: test automatici eseguiti; collaudo visivo e su impianto ancora da completare.
+
 ## 5.21.0-beta.4
 
 - I gateway con gli stessi ruoli e indirizzi sono proposti come un unico gruppo clima. Il riepilogo esplicita che gli stati condivisi rappresentano l’ultimo telegramma ricevuto. Le condivisioni parziali fra zone rimangono da verificare.
@@ -482,4 +489,3 @@
 ## 3.3.0
 
 - Preflight di rilascio e rilevazione di conflitti tra indirizzi KNX.
-

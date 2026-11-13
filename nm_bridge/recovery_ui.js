@@ -139,6 +139,7 @@ function widgetFlowIssues(drafts){
 function focusWidget(index){
  const row=document.querySelector('.widget-proposal[data-index="'+index+'"]');
  if(!row)return;
+ const editor=row.querySelector('.widget-editor');if(editor)editor.open=true;
  row.scrollIntoView({behavior:'smooth',block:'center'});
  row.querySelector('.widget-room')?.focus({preventScroll:true});
 }
@@ -390,9 +391,158 @@ function assignManualWidgetGA(widget, field, value){
 function revealWidgetEditor(index){
  functionSearch='';renderKeepingScroll();
  const row=document.querySelector(`.widget-proposal[data-index="${index}"]`);
- if(!row)return;row.hidden=false;const details=row.querySelector('details');if(details)details.open=true;
+ if(!row)return;row.hidden=false;
+ for(const details of row.querySelectorAll('.widget-editor, .widget-editor > .widget-edit-body > details'))details.open=true;
+ const details=row.querySelector('details');if(details)details.open=true;
  row.scrollIntoView({block:'center'});row.querySelector('.widget-name')?.focus({preventScroll:true});
 }
+// Reorder only draft objects or change their room, preserving GA, HA bindings and profiles.
+function placeWidget(drafts,from,to,room){
+ if(!Number.isInteger(from)||!Number.isInteger(to)||from<0||from>=drafts.length||to<0||to>=drafts.length)return false;
+ const widget=drafts[from];
+ if(room!==undefined&&(typeof room!=='string'||!room.trim()))return false;
+ if(from===to&&(room===undefined||widget.room===room))return false;
+ if(room!==undefined)widget.room=room;
+ drafts.splice(from,1);drafts.splice(to,0,widget);return true;
+}
+let widgetPlacementUndo=null,compactSelectedWidget=null,compactDestinationRoom='';
+const compactOpenWidgets=new WeakSet();
+function rememberWidgetPlacement(drafts){return drafts.map(widget=>({widget,room:widget.room,afterRoom:widget.room}));}
+function canRestoreWidgetPlacement(drafts,snapshot){
+ return !!snapshot&&snapshot.length===drafts.length&&snapshot.every(item=>drafts.includes(item.widget)&&item.widget.room===item.afterRoom);
+}
+function restoreWidgetPlacement(drafts,snapshot){
+ if(!canRestoreWidgetPlacement(drafts,snapshot))return false;
+ for(const item of snapshot)item.widget.room=item.room;
+ drafts.splice(0,drafts.length,...snapshot.map(item=>item.widget));return true;
+}
+function wireCompactWidgetEditor(){
+ if(!etsData||!$('widget-save-next'))return;
+ const content=$('content'),rows=[...content.querySelectorAll('.widget-proposal')];
+ const style=document.createElement('style');
+ style.textContent=`
+ .widget-proposal.compact-widget{position:relative;padding:0 0 0 48px;margin-bottom:8px;border-radius:12px;box-shadow:none;min-width:0}
+ .compact-widget > .widget-editor{margin:0}.compact-widget > .widget-editor > summary{display:flex;align-items:center;gap:12px;padding:12px;background:transparent;margin:0;list-style:none;min-height:72px}
+ .widget-editor > summary::-webkit-details-marker{display:none}.widget-editor > summary::after{content:'Modifica';color:#9fc5ff;font-size:12px;margin-left:auto}
+ .widget-editor[open] > summary::after{content:'Chiudi'}.widget-row-copy{min-width:0;flex:1}.widget-row-copy b{display:block;font-size:14px;overflow-wrap:anywhere}
+ .widget-row-meta{display:block;font-size:12px;color:#a4bad4;margin-top:4px;overflow-wrap:anywhere}.widget-row-issue{color:#ffd18a}
+ .widget-grip{position:absolute;top:14px;left:6px;width:38px;height:44px;padding:4px;touch-action:none;cursor:grab;font-size:20px;background:#1b3049}
+ .widget-grip[aria-pressed=true]{border-color:#8abaff;background:#31548b}.widget-grip:focus-visible{outline:3px solid #8abaff;outline-offset:2px}
+ .widget-edit-body{padding:0 12px 12px}.widget-edit-body .widget-name{min-width:0!important;width:100%}.widget-edit-body > .row > div{min-width:0;flex:1 1 260px}
+ .widget-edit-body .widget-preview{margin:8px 0!important}.widget-preview .tile.smart{min-height:72px!important;max-width:420px!important;padding:10px 12px;flex-direction:row;gap:12px;align-items:center;box-shadow:none}
+ .widget-preview .smart-top{flex-direction:column-reverse;gap:4px;flex:0 0 80px}.widget-preview .smart-icon{width:28px;height:28px;font-size:18px}.widget-preview .smart-state{font-size:14px!important;letter-spacing:0}.widget-preview .smart-name{font-size:13px}
+ .widget-preview .smart-meta{margin-top:3px}.widget-preview .tile.smart > div{min-width:0}.widget-edit-body > p{font-size:12px}.widget-edit-body .tile{padding:12px}
+ .widget-organizer{position:sticky;top:0;z-index:21;background:#102137;border:1px solid #436387;border-radius:12px;padding:10px;margin:12px 0}
+ .widget-organizer .bar{margin:6px 0;gap:8px}.widget-organizer label{flex:1 1 230px;font-size:12px}.widget-organizer select{margin-top:4px}
+ .widget-organizer p{margin:4px 0;font-size:12px;color:#b8cce6}.widget-room-drop{min-height:44px}.widget-drop-target{outline:3px solid #79c9ff;outline-offset:-3px;background:#21466b!important}
+ .widget-drop-before{border-top:4px solid #79c9ff!important}.widget-drop-after{border-bottom:4px solid #79c9ff!important}.widget-dragging{opacity:.55}
+ .widget-flow-actions{padding:9px;gap:8px;bottom:4px}.widget-flow-actions p{font-size:12px}.widget-flow-actions button{font-size:13px;padding:8px 10px;min-height:40px}
+ .compact-evidence{margin:10px 0;padding:12px;border:1px solid #304963;border-radius:12px}.compact-evidence > summary{cursor:pointer}
+ @media(max-width:600px){.widget-editor > summary::after{content:'＋';font-size:20px}.widget-editor[open] > summary::after{content:'−'}
+ .widget-organizer .bar{display:grid;grid-template-columns:minmax(0,1fr) auto}.widget-organizer label{grid-column:1/-1}.widget-organizer button{font-size:13px;padding:8px}
+ .widget-flow-actions{position:static}.widget-edit-body .grid{grid-template-columns:minmax(0,1fr)}.widget-row-meta{font-size:11px}}
+ `;
+ content.append(style);
+ const recovery=$('recovery-panel');
+ if(recovery){const details=document.createElement('details');details.className='compact-evidence';
+  details.innerHTML='<summary>Confronto ETS e funzioni da recuperare</summary>';recovery.before(details);details.append(recovery);}
+ const results=$('function-search-results');
+ if(results){const details=document.createElement('details');details.className='compact-evidence';
+  details.innerHTML='<summary>Indirizzi ETS e pulsanti di solo spegnimento</summary>';results.before(details);details.append(results);
+  const note=details.nextElementSibling;if(note?.tagName==='P')details.append(note);}
+ const organizer=document.createElement('section');organizer.className='widget-organizer';
+ const rooms=[...new Set(['Da assegnare',...(structureDraft.length?structureRooms():widgetRooms)])];
+ organizer.innerHTML=`<b>Ordina e sposta le funzioni</b><p>Trascina dalla maniglia ↕ per ordinare. Per cambiare stanza, scegli la destinazione e trascina su “Sposta qui”, oppure seleziona la maniglia e premi il pulsante.</p><div class="bar"><label>Stanza di destinazione<select id="widget-move-room"><option value="">Scegli una stanza…</option>${rooms.map(room=>`<option value="${escapeHTML(room)}">${escapeHTML(room)}</option>`).join('')}</select></label><button id="widget-room-drop" class="widget-room-drop" disabled>Sposta qui</button><button id="widget-move-undo" ${canRestoreWidgetPlacement(widgetDrafts,widgetPlacementUndo)?'':'disabled'}>Annulla spostamento</button></div><p id="widget-organizer-status" role="status" aria-live="polite"></p>`;
+ if(rows.length)rows[0].before(organizer);else content.append(organizer);
+ const destination=$('widget-move-room'),drop=$('widget-room-drop'),status=$('widget-organizer-status');
+ destination.value=rooms.includes(compactDestinationRoom)?compactDestinationRoom:'';
+ function announce(text){status.textContent=text;}
+ function selectWidget(widget){
+  compactSelectedWidget=widget;
+  for(const row of rows)row.querySelector('.widget-grip')?.setAttribute('aria-pressed',String(widgetDrafts[Number(row.dataset.index)]===widget));
+  drop.disabled=!widgetDrafts.includes(widget)||!destination.value;
+  announce(widget?'Selezionata: '+widget.name+'. Le modifiche restano in bozza fino al salvataggio.':'Seleziona una funzione dalla maniglia ↕. Da tastiera: Alt + freccia su o giù per riordinare.');
+ }
+ function move(widget,to,room){
+  const snapshot=rememberWidgetPlacement(widgetDrafts),from=widgetDrafts.indexOf(widget);
+  if(room!==undefined&&!rooms.includes(room))return;
+  if(!placeWidget(widgetDrafts,from,to,room))return;
+  for(const item of snapshot)item.afterRoom=item.widget.room;
+  widgetPlacementUndo=snapshot;widgetDirty=true;renderKeepingScroll();
+  document.querySelector(`.widget-proposal[data-index="${widgetDrafts.indexOf(widget)}"] .widget-grip`)?.focus({preventScroll:true});
+  const notice=room!==undefined?widget.name+' spostata in '+room:widget.name+' riordinata';
+  $('widget-organizer-status').textContent=notice+'. Premi Salva bozza per conservare la modifica.';
+ }
+ destination.onchange=()=>{compactDestinationRoom=destination.value;drop.disabled=!widgetDrafts.includes(compactSelectedWidget)||!destination.value;};
+ drop.onclick=()=>{if(compactSelectedWidget&&destination.value)move(compactSelectedWidget,widgetDrafts.indexOf(compactSelectedWidget),destination.value);};
+ $('widget-move-undo').onclick=()=>{if(restoreWidgetPlacement(widgetDrafts,widgetPlacementUndo)){widgetPlacementUndo=null;widgetDirty=true;renderKeepingScroll();$('widget-organizer-status').textContent='Ultimo spostamento annullato. Salva bozza per conservare la modifica.';}};
+ for(const row of rows){
+  const widget=widgetDrafts[Number(row.dataset.index)],body=document.createElement('div');body.className='widget-edit-body';
+  while(row.firstChild)body.append(row.firstChild);
+  const details=document.createElement('details');details.className='widget-editor';
+  const summary=document.createElement('summary');summary.innerHTML='<span class="widget-row-copy"><b></b><span class="widget-row-meta"></span></span>';
+  const grip=document.createElement('button');grip.type='button';grip.className='widget-grip';grip.textContent='↕';
+  function label(){
+   summary.querySelector('b').textContent=widget.name||'Funzione senza nome';grip.setAttribute('aria-label','Sposta '+(widget.name||'funzione senza nome'));
+   const missing=(widgetFields[widget.kind]||[]).filter(f=>f[3]&&!widget.fields[f[0]]).length;
+   const meta=summary.querySelector('.widget-row-meta');meta.textContent=[widget.room||'Da assegnare',widget.fields.command||'Nessun GA',missing?'Da completare':null,widget.visible===false?'Nascosta':null].filter(Boolean).join(' · ');
+   meta.classList.toggle('widget-row-issue',!!missing||widget.room==='Da assegnare');
+  }
+  details.append(summary,body);details.open=compactOpenWidgets.has(widget);
+  details.ontoggle=()=>{if(details.open)compactOpenWidgets.add(widget);else compactOpenWidgets.delete(widget);};
+  grip.title='Trascina per ordinare o spostare. Alt + ↑ / ↓ per riordinare.';
+  grip.onclick=()=>selectWidget(widget);
+  grip.onkeydown=e=>{
+   if(e.altKey&&['ArrowUp','ArrowDown'].includes(e.key)){
+    e.preventDefault();selectWidget(widget);
+    const visible=rows.filter(r=>!r.hidden),position=visible.indexOf(row),target=visible[position+(e.key==='ArrowUp'?-1:1)];
+    if(target)move(widget,Number(target.dataset.index));
+   }
+  };
+  row.classList.add('compact-widget');row.append(grip,details);label();
+  row.addEventListener('input',label);row.addEventListener('change',label);
+  grip.onpointerdown=e=>{
+   if(e.button!==0||!e.isPrimary)return;
+   selectWidget(widget);grip.setPointerCapture(e.pointerId);
+   const start={x:e.clientX,y:e.clientY};let dragging=false,target=null,after=false,frame=0,lastY=e.clientY,lastX=e.clientX;
+   const clearTarget=()=>{content.querySelectorAll('.widget-drop-target,.widget-drop-before,.widget-drop-after').forEach(el=>el.classList.remove('widget-drop-target','widget-drop-before','widget-drop-after'));};
+   const locate=(x,y)=>{
+    clearTarget();target=null;
+    const hit=document.elementFromPoint(x,y);
+    if(hit?.closest('#widget-room-drop')&&destination.value){target=drop;drop.classList.add('widget-drop-target');return;}
+    const candidate=hit?.closest('.widget-proposal');
+    if(candidate&&candidate!==row&&!candidate.hidden){target=candidate;const box=target.getBoundingClientRect();after=y>box.top+box.height/2;target.classList.add(after?'widget-drop-after':'widget-drop-before');}
+   };
+   const scroll=()=>{if(!dragging)return;const delta=lastY<50?-12:lastY>window.innerHeight-60?12:0;
+    if(delta){window.scrollBy(0,delta);locate(lastX,lastY);}frame=requestAnimationFrame(scroll);};
+   grip.onpointermove=event=>{
+    if(event.pointerId!==e.pointerId)return;
+    lastX=event.clientX;lastY=event.clientY;
+    if(!dragging&&Math.hypot(lastX-start.x,lastY-start.y)<7)return;
+    event.preventDefault();if(!dragging){dragging=true;row.classList.add('widget-dragging');frame=requestAnimationFrame(scroll);}
+    locate(lastX,lastY);
+   };
+   const finish=(event,cancelled=false)=>{
+    if(event.pointerId!==e.pointerId)return;
+    cancelAnimationFrame(frame);document.removeEventListener('keydown',escape);
+    const picked=target;clearTarget();row.classList.remove('widget-dragging');
+    grip.onpointermove=grip.onpointerup=grip.onpointercancel=grip.onlostpointercapture=null;
+    if(grip.hasPointerCapture(e.pointerId))grip.releasePointerCapture(e.pointerId);
+    if(cancelled||!dragging)return;
+    grip.onclick=null;
+    if(picked===drop)move(widget,widgetDrafts.indexOf(widget),destination.value);
+    else if(picked){const from=widgetDrafts.indexOf(widget),index=Number(picked.dataset.index);move(widget,index+(after?1:0)-(from<index?1:0));}
+    else announce('Nessuno spostamento. Rilascia su una funzione o sulla stanza scelta.');
+    grip.onclick=()=>selectWidget(widget);
+   };
+   const escape=event=>{if(event.key==='Escape'){event.preventDefault();finish({pointerId:e.pointerId},true);}};
+   document.addEventListener('keydown',escape);
+   grip.onpointerup=event=>finish(event);grip.onpointercancel=event=>finish(event,true);grip.onlostpointercapture=event=>finish(event,true);
+  };
+ }
+ selectWidget(widgetDrafts.includes(compactSelectedWidget)?compactSelectedWidget:null);
+}
+
 function wireInlineWidgetEditor(){
  if(!etsData)return;
  document.querySelectorAll('.widget-add').forEach(button=>button.onclick=()=>{
