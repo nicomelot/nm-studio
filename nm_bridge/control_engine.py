@@ -50,12 +50,14 @@ def binding(widget):
     return digest({k: widget.get(k) for k in ('type', 'entity_id', 'fields', 'command_mode')})
 
 
-def catalog(layout, states):
+def catalog(layout, states, temperature_unit='°C'):
     by_entity = {s['entity_id']: s for s in states}
     result = []
     for i, w in enumerate(layout.get('widgets', [])):
         state = by_entity.get(w.get('entity_id'), {})
         attrs = state.get('attributes') or {}
+        if w['type']=='climate':
+            attrs={**attrs,'temperature_unit':attrs.get('temperature_unit') or temperature_unit}
         result.append({'id': binding(w), 'index': i, 'name': w['name'], 'room': w['room'],
                        'type': w['type'], 'entity_id': w.get('entity_id', ''),
                        'visible': w.get('visible', True), 'fields': w['fields'],
@@ -316,7 +318,7 @@ class ControlEngine:
             combined = {**layout, 'widgets':layout.get('widgets', []) + self.features.widgets(layout.get('project',''),raw)}
             return {'project': layout.get('project', ''), 'fingerprint': digest(layout), 'revision': raw['revision'],
                     'rooms': list(dict.fromkeys(layout.get('rooms', []) + [w['room'] for w in combined['widgets']])),
-                    'devices': catalog(combined, states), 'widget_candidates': self.features.candidates(states), 'release_error':self.features.last_release_error, 'lab_candidates': lab_candidates(layout, states),
+                    'devices': catalog(combined, states, config.get('unit_system', {}).get('temperature') or '°C'), 'widget_candidates': self.features.candidates(states), 'release_error':self.features.last_release_error, 'lab_candidates': lab_candidates(layout, states),
                     'records': records, 'logs': self.history(layout.get('project', '')),
                     'ha_error': error, 'time_zone': config.get('time_zone'),
                     'location_name': config.get('location_name'),

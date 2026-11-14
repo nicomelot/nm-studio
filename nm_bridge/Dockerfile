@@ -67,3 +67,6 @@ COPY commissioning.py /app/commissioning.py
 COPY control_features.py /app/control_features.py
 COPY control-diagrams.js /app/control-diagrams.js
 COPY control-diagrams.css /app/control-diagrams.css
+
+COPY control-visuals.js /app/control-visuals.js
+COPY control-theme.css /app/control-theme.css

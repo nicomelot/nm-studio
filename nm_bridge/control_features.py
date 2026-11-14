@@ -191,7 +191,13 @@ class ControlFeatures:
                     # Keep stale links visible; only newly introduced links must exist.
                     old={(q['id'],v['id'],v.get('device','')) for q in current['plans'] for v in q['points']}
                     if target and target not in known and (p['id'],t['id'],target) not in old:raise ValueError('Dispositivo non presente nel progetto')
-                    pins.append({'id':t['id'],'symbol':t['symbol'],'label':t['label'].strip(),'device':target,'x':round(t['x'],3),'y':round(t['y'],3)})
+                    pin={'id':t['id'],'symbol':t['symbol'],'label':t['label'].strip(),'device':target,'x':round(t['x'],3),'y':round(t['y'],3)}
+                    if 'temp_low' in t or 'temp_high' in t:
+                        low,high=t.get('temp_low',18),t.get('temp_high',28)
+                        if any(type(v) not in (int,float) or not math.isfinite(v) or not -100<=v<=300 for v in (low,high)) or low>=high:
+                            raise ValueError('Soglie temperatura: la soglia bassa deve essere inferiore a quella alta (da -100 a 300 °C)')
+                        pin.update(temp_low=low,temp_high=high)
+                    pins.append(pin)
                 clean.append({'id':p['id'],'name':name.strip(),'kind':kind,'background':image,'points':pins})
             data={'plans':clean};encoded=json.dumps(data,ensure_ascii=False)
             if len(encoded.encode())>20*1024*1024:raise ValueError('Archivio schemi troppo grande (20 MB)')
