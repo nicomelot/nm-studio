@@ -47,6 +47,7 @@ from lab_dashboard import (preview as lab_dashboard_preview, publish as lab_dash
 from bus_recorder import Recorder
 from project_sessions import Sessions
 from knx_history import query as query_knx_history
+from control_engine import ControlEngine
 
 LOG = logging.getLogger("nm_bridge")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -57,6 +58,7 @@ CONFIG_PATH = Path(os.getenv("NM_CONFIG_PATH", "/data/nm_control_layout.json"))
 MAX_BODY = 65536
 BUS_RECORDER = Recorder(CONFIG_PATH.parent / "nm_knx_events.sqlite")
 PROJECTS = Sessions(CONFIG_PATH.parent / "nm_projects")
+CONTROL = ControlEngine(CONFIG_PATH.parent)
 
 
 def get_ha_states():
@@ -191,7 +193,17 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(403)
             return
         path = self.path.split("?", 1)[0].rstrip("/")
-        if path in ("/projects", "/projects/resume", "/projects/export"):
+        if path == "/control/snapshot":
+            try:
+                self.respond(200, "application/json; charset=utf-8", json.dumps(CONTROL.snapshot(), ensure_ascii=False).encode())
+            except (ValueError, OSError, KeyError, TypeError) as exc:
+                self.respond(400, "application/json", json.dumps({'error': str(exc)[:180]}).encode())
+        elif path in ("/control.js", "/control.css"):
+            self.respond(200, "text/javascript; charset=utf-8" if path.endswith('.js') else "text/css; charset=utf-8",
+                         Path(__file__).with_name(path[1:]).read_bytes())
+        elif path == "/advanced":
+            self.respond(200, "text/html; charset=utf-8", HTML)
+        elif path in ("/projects", "/projects/resume", "/projects/export"):
             try:
                 key = parse_qs(urlsplit(self.path).query).get("project", [""])[0]
                 data = PROJECTS.list() if path == "/projects" else PROJECTS.resume(key) if path.endswith("resume") else PROJECTS.read(key)
@@ -364,7 +376,7 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/project_ui.js":
             self.respond(200, "text/javascript; charset=utf-8", Path(__file__).with_name("project_ui.js").read_bytes())
         elif path in ("", "/"):
-            self.respond(200, "text/html; charset=utf-8", HTML)
+            self.respond(200, "text/html; charset=utf-8", Path(__file__).with_name("control.html").read_bytes())
         else:
             self.send_error(404)
 
@@ -379,7 +391,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?", 1)[0]
-        if self.client_address[0] != INGRESS_PROXY or path not in ("/knx/history", "/lab/dashboard-existing", "/lab/dashboard-update", "/projects/save", "/bus-log/start", "/bus-log/stop", "/layout", "/modules/plan", "/floorplans", "/floorplans/dashboard-publish", "/ets/preview", "/knx/approved", "/audit", "/knx/widgets", "/knx/ha-preview", "/knx/yaml-audit", "/dashboard/missing-ha/review", "/dashboard/deployment-preflight", "/knx/panel-create-plan", "/knx/panel-create-one", "/knx/install-step", "/knx/installation-apply", "/knx/commission-command", "/native/areas-sync", "/dashboard/publish", "/dashboard/update-preview", "/dashboard/update", "/migration/restore", "/nm-link", "/nm-link/preview", "/nm-link/simulate", "/lab/preview", "/lab/install", "/lab/replace", "/lab/packages-preview", "/lab/packages-enable", "/lab/dashboard-preview", "/lab/dashboard-publish"):
+        if self.client_address[0] != INGRESS_PROXY or path not in ("/control/action-preview", "/control/action-run", "/control/save", "/control/preview", "/control/activate", "/control/run", "/control/assign", "/knx/history", "/lab/dashboard-existing", "/lab/dashboard-update", "/projects/save", "/bus-log/start", "/bus-log/stop", "/layout", "/modules/plan", "/floorplans", "/floorplans/dashboard-publish", "/ets/preview", "/knx/approved", "/audit", "/knx/widgets", "/knx/ha-preview", "/knx/yaml-audit", "/dashboard/missing-ha/review", "/dashboard/deployment-preflight", "/knx/panel-create-plan", "/knx/panel-create-one", "/knx/install-step", "/knx/installation-apply", "/knx/commission-command", "/native/areas-sync", "/dashboard/publish", "/dashboard/update-preview", "/dashboard/update", "/migration/restore", "/nm-link", "/nm-link/preview", "/nm-link/simulate", "/lab/preview", "/lab/install", "/lab/replace", "/lab/packages-preview", "/lab/packages-enable", "/lab/dashboard-preview", "/lab/dashboard-publish"):
             self.send_error(403)
             return
         # Ingress protects access; these checks also reject cross-site form POSTs.
@@ -396,7 +408,13 @@ class Handler(BaseHTTPRequestHandler):
             if not 0 < n <= max_body:
                 raise ValueError("Invalid length")
             body = self.rfile.read(n)
-            if path == "/knx/history":
+            if path.startswith('/control/'):
+                operations = {'/control/save': CONTROL.save, '/control/preview': CONTROL.preview,
+                              '/control/activate': CONTROL.activate, '/control/run': CONTROL.run,
+                              '/control/assign': CONTROL.assign, '/control/action-preview': CONTROL.action_preview,
+                              '/control/action-run': CONTROL.action_run}
+                data = operations[path](json.loads(body))
+            elif path == "/knx/history":
                 data = query_knx_history(json.loads(body))
             elif path == "/projects/save":
                 data = PROJECTS.save(json.loads(body))
@@ -499,6 +517,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    LOG.info("Starting read-only bridge behind Home Assistant Ingress")
+    LOG.info("Starting NM Control behind Home Assistant Ingress")
+    CONTROL.start()
     ThreadingHTTPServer(("0.0.0.0", 8099), Handler).serve_forever()
 

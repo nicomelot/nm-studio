@@ -1,13 +1,13 @@
 name: NM Control
 slug: nm_bridge
-description: NM Control installer lab with explicitly confirmed KNX entity provisioning
-version: 5.20.2
+description: NM Control with compact project dashboard, scenes and persistent weekly and solar schedules
+version: 5.21.0
 arch:
   - amd64
   - aarch64
 init: false
 startup: application
-boot: manual
+boot: auto
 ingress: true
 ingress_port: 8099
 panel_icon: mdi:lan-connect
