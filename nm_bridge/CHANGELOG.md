@@ -1,3 +1,7 @@
+## 5.21.1
+
+- Tema grafite per NM Control, con accenti verde menta, widget compatti e contrasto leggibile anche nelle finestre di programmazione.
+
 ## 5.21.0
 
 - Nuova interfaccia NM Control con widget compatti e dati reali del progetto; tutti gli strumenti precedenti restano in Strumenti avanzati.

@@ -1,0 +1,31 @@
+/* Graphite surfaces and mint accents keep compact controls legible at night. */
+:root{color-scheme:dark;color:#e8efed;background:#101716;--green:#79d9b1;--line:#30403b;--muted:#a3b5ad}
+aside,header,.dialog-foot{background:#151e1b}
+button,.link-button{background:#23312b;color:#e4eee9}
+button:hover{background:#30473c}
+.primary,.brand>b{background:#79d9b1;border-color:#79d9b1;color:#10251b}
+.primary:hover{background:#a2ebcd}
+.brand>span{color:#a3b5ad}
+nav button{background:transparent}
+nav button.active{background:#284337;color:#a2ebcd}
+.hero{background:linear-gradient(120deg,#213b30,#1a2924);border-color:#395948}
+.hero p,.schedule-summary{color:#b3c6bb}
+.stat,.compact,.room-card,.record,.run{background:#1b2722}
+.compact.on{border-color:#669d7d;background:#233c2d}
+.compact.offline{background:#202725}
+.symbol{background:#2b4034;color:#a2ebcd}
+.compact-bottom,.action-line{border-color:#30403b}
+.toolbar input,.toolbar select,.dialog-body input:not([type=checkbox]),.dialog-body select{background:#131d18;border-color:#405348;color:#e8efed}
+input::placeholder{color:#a3b5ad;opacity:1}
+.empty{background:#17221c;border-color:#405348}
+.notice,.preview{background:#20362a;border-color:#3a5743;color:#d0e8d7}
+.notice.warn,.badge.warn{background:#3d3220;border-color:#705b34;color:#f2d296}
+.notice.error,.badge.error{background:#432824;border-color:#77463c;color:#ffc2b2}
+.badge{background:#2b4433;color:#b8e8c7}
+.danger,.error-text{color:#ffb6a6}
+dialog{background:#1b2722;color:#e8efed;border-color:#405348;box-shadow:0 24px 90px #0009}
+dialog::backdrop{background:#060e0acc}
+.slot{background:#16231b}
+.days label,.week-table td span{background:#2a4030;color:#d8ebdc}
+footer{color:#a3b5ad}
+#toast{background:#b4eccb;color:#142a1c;box-shadow:0 8px 32px #0008}
