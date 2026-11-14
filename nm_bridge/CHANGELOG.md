@@ -1,3 +1,9 @@
+## 5.23.0
+
+- Copia i programmi di temperatura verso più termostati con verifica delle temperature e salvataggio unico in pausa.
+- Le copie sono indipendenti e non sovrascrivono i programmi esistenti.
+- Chiarito il percorso tra importazione KNX/configurazione e uso quotidiano; accesso diretto all’ambiente simulato.
+
 ## 5.22.1
 
 - Copia le fasce di un giorno su più giorni, dal calendario o dagli orari del widget.

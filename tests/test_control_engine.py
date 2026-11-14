@@ -75,6 +75,54 @@ class EngineTests(unittest.TestCase):
             with self.assertRaises(ValueError): self.engine.add_lab(self.context(entities=[{'entity_id':ident,'name':'X'}]))
             self.assertEqual(save.call_count, 1)
 
+    def week_copy_fixture(self):
+        self.save(kind='schedule', actions=[self.action(2,'temperature',21)], triggers=[{'id':'day','kind':'time','time':'07:00','days':[0,1,2,3,4],'value':22}, {'id':'solar','kind':'sunset','offset':-15,'days':[5,6],'value':18}])
+        targets=[]
+        for suffix in ('one','two'):
+            widget=copy.deepcopy(self.layout['widgets'][2])
+            widget.update(name=suffix, entity_id='climate.'+suffix, room='Room '+suffix)
+            self.layout['widgets'].append(widget)
+            state=copy.deepcopy(self.ha.states[2]);state['entity_id']=widget['entity_id']
+            self.ha.states.append(state);targets.append(m.binding(widget))
+        return targets
+
+    def test_copy_week_atomic_paused_independent_and_deduplicated(self):
+        targets=self.week_copy_fixture()
+        before=self.engine.read()
+        preview=self.engine.copy_week(self.context(id='demo',targets=targets))
+        self.assertEqual(self.engine.read(),before)
+        self.assertEqual(self.ha.writes(),[])
+        result=self.engine.copy_week(self.context(id='demo',targets=targets,preview_hash=preview['preview_hash']))
+        records=self.engine.records(self.engine.read(),self.layout['project'])
+        self.assertEqual(result['count'],2)
+        self.assertEqual(records[0],before['projects'][self.layout['project']][0])
+        for index,record in enumerate(records[1:]):
+            self.assertFalse(record['enabled'])
+            self.assertEqual(record['actions'][0]['device'],targets[index])
+            self.assertEqual(record['triggers'],records[0]['triggers'])
+            self.assertEqual(record['room'],'Room '+('one','two')[index])
+        self.assertEqual(self.ha.writes(),[])
+        with self.assertRaises(ValueError):self.engine.copy_week(self.context(id='demo',targets=targets))
+
+    def test_copy_week_rejects_incompatible_destination_without_partial_save(self):
+        targets=self.week_copy_fixture();before=self.engine.read()
+        self.ha.states[-1]['attributes']['max_temp']=20
+        with self.assertRaises(ValueError):self.engine.copy_week(self.context(id='demo',targets=targets))
+        self.assertEqual(self.engine.read(),before)
+        self.ha.states[-1]['attributes']['max_temp']=30
+        preview=self.engine.copy_week(self.context(id='demo',targets=targets))
+        self.ha.states[-1]['state']='unavailable'
+        with self.assertRaises(ValueError):self.engine.copy_week(self.context(id='demo',targets=targets,preview_hash=preview['preview_hash']))
+        self.assertEqual(self.engine.read(),before)
+        self.assertEqual(self.ha.writes(),[])
+
+    def test_copy_week_rejects_source_duplicate_stale_and_missing_consent(self):
+        targets=self.week_copy_fixture()
+        for invalid in ([],targets*2,[m.binding(self.layout['widgets'][2])],[m.binding(self.layout['widgets'][0])]):
+            with self.assertRaises(ValueError):self.engine.copy_week(self.context(id='demo',targets=invalid))
+        for change in ({'confirm':False},{'revision':999},{'preview_hash':'bad'}):
+            with self.assertRaises(ValueError):self.engine.copy_week({**self.context(id='demo',targets=targets),**change})
+
     def test_save_preview_and_snapshot_never_send_commands(self):
         self.save()
         snap = self.engine.snapshot()
@@ -247,7 +295,7 @@ class EngineTests(unittest.TestCase):
 
     def test_http_endpoints_are_ingress_only_and_require_confirmation(self):
         from test_lab_http import request, bridge
-        for path in ('/control/save','/control/run','/control/activate','/control/action-run','/control/assign'):
+        for path in ('/control/save','/control/run','/control/activate','/control/action-run','/control/assign','/control/copy-week'):
             self.assertEqual(request(path,{},address='192.168.1.8')['status'],403)
             with patch.object(bridge,'CONTROL',self.engine):
                 self.assertEqual(request(path,{})['status'],400)

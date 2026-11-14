@@ -21,6 +21,10 @@ from test_control_engine import layout, FakeHA
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('--port',type=int,default=8766);args=parser.parse_args()
     current=layout();ha=FakeHA()
+    for suffix in ('Studio', 'Camera'):
+        widget=copy.deepcopy(current['widgets'][2]);widget.update(name='Termostato '+suffix, entity_id='climate.'+suffix.lower(), room='Casa / '+suffix)
+        current['widgets'].append(widget);current['rooms'].append(widget['room'])
+        state=copy.deepcopy(ha.states[2]);state['entity_id']=widget['entity_id'];ha.states.append(state)
     ha.config['location_name']='Laboratorio QA (dati sintetici)'
     original=ha.call
     def call(method,**params):
