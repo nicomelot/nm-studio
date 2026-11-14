@@ -74,3 +74,14 @@ class FeatureTests(unittest.TestCase):
         with patch('nm_bridge.control_features.subprocess.run') as run:
             with self.assertRaises(ValueError):self.f.background(self.ctx(data='YWJj',page=1))
             run.assert_not_called()
+
+    def test_temperature_thresholds_roundtrip_and_reject_invalid_ranges(self):
+        point={'id':'s','label':'Supply','symbol':'temperature','device':'','x':50,'y':50,'temp_low':35,'temp_high':65}
+        plan={'id':'p','kind':'schematic','name':'Plant','background':None,'points':[point]}
+        def save():
+            return self.f.save_diagrams(self.ctx(plans=[plan],diagram_fingerprint=self.f.diagrams(self.ctx())['fingerprint']))
+        save()
+        self.assertEqual(self.f.diagrams(self.ctx())['plans'][0]['points'][0],point)
+        for low,high in [(65,35),(35,35),(float('nan'),65),(-101,65),(35,301),('35',65),(True,65)]:
+            point.update(temp_low=low,temp_high=high)
+            with self.assertRaises(ValueError):save()

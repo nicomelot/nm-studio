@@ -41,3 +41,11 @@ Dispositivi → Aggiungi widget collega sonde HA di classe temperatura e pulsant
 Il pulsante richiede abilitazione esplicita per ogni apertura. Pointer-up/cancel, perdita del fuoco, tastiera e chiusura della finestra richiedono il reset. Un registro SQLite conserva il reset prima dell’accensione. L’add-on tenta OFF entro 10 secondi e recupera i reset dopo riavvio; se HA/rete/add-on non sono operativi, il rilascio fisico non è garantito. Non è un dispositivo di sicurezza. Le richieste duplicate e i rilasci arrivati prima delle pressioni non riaccendono il comando.
 
 Gli schemi sono separati per progetto e verificano una versione dell’archivio al salvataggio. Lo sfondo conserva il rapporto d’aspetto; zoom e scorrimento restano nel riquadro, il pannello di modifica passa sotto lo schema su tablet/telefono. I simboli usano coordinate percentuali e una legenda leggibile anche su display piccoli.
+
+### Visualizzazione e flusso 5.25
+
+I simboli SVG condividono colori e stile con i widget e la configurazione impianto. La pompa ruota solo se HA riporta ON (oppure heating/cooling per un clima); la valvola mostra percentuale e direzione quando disponibili, altrimenti ON/OFF. Il colore non sostituisce un allarme e gli stati offline non sono mostrati come spenti.
+
+Le sonde usano soglie grafiche di 18/28 °C; nel componente del sinottico si possono cambiare (ad esempio 35/65 °C per una mandata). Le letture Fahrenheit/Kelvin vengono convertite per il confronto. Sono rispettate le preferenze di riduzione delle animazioni.
+
+In Modifica si possono aggiungere rapidamente pompe, sonde e valvole, cercare un dispositivo, cambiare simbolo e duplicare un punto con lo stesso collegamento. Salva e usa salva e torna alla supervisione in un passaggio. In Uso, gli stati sono riletti ogni 5 secondi; durante modifiche e finestre aperte la rilettura è sospesa. Le dashboard native già pubblicate in HA conservano il proprio tema.

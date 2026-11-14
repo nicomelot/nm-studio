@@ -1,3 +1,10 @@
+## 5.25.0
+
+- Simboli vettoriali coerenti, pompe animate sullo stato letto, valvole con apertura e direzione, sonde con colori e soglie regolabili.
+- Palette scura e controlli uniformi tra supervisione e configurazione; animazioni disattivate se richiesto dal dispositivo.
+- Editor più rapido: componenti rapidi, ricerca dispositivo, duplicazione, cambio simbolo e Salva e usa.
+- Stati live aggiornati ogni 5 secondi nei sinottici; dati non disponibili distinti dagli stati spenti.
+
 ## 5.24.0
 
 - Sinottici e planimetrie nella nuova interfaccia: sfondi PDF/PNG/JPG, simboli trascinabili, collegamenti ai dispositivi, modalità Modifica e Uso.
