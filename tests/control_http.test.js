@@ -14,3 +14,16 @@ test('new record and request IDs work on HTTP ingress without randomUUID', () =>
   assert.equal(new Set(ids).size, 100);
   for (const id of ids) assert.match(id, /^[a-zA-Z0-9_-]{1,80}$/);
 });
+
+test('failed preview after saving reports the error outside the closed dialog', () => {
+  const source = fs.readFileSync(require('node:path').join(__dirname, '../nm_bridge/control.js'), 'utf8');
+  const declaration = source.slice(source.indexOf('function showError('), source.indexOf('function commandForm('));
+  const hidden = {textContent:''}; let message = '';
+  const showError = vm.runInNewContext(declaration + '\nshowError', {
+    $: selector => selector === '#editor' ? {open:false} : hidden,
+    toast: text => {message = text;}
+  });
+  showError(new Error('Entità non disponibile'));
+  assert.equal(message, 'Entità non disponibile');
+  assert.equal(hidden.textContent, '');
+});

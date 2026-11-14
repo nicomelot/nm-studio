@@ -1,3 +1,7 @@
+## 5.21.3
+
+- Mostra gli errori di anteprima anche dopo la chiusura della finestra di salvataggio, per rendere visibile il motivo di un'attivazione bloccata.
+
 ## 5.21.2
 
 - Corregge la creazione di scenari, programmi e richieste di comando quando Home Assistant viene aperto tramite HTTP sulla rete locale.
