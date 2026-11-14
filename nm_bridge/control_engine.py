@@ -68,6 +68,17 @@ def numeric(value, low, high):
     return value
 
 
+def lab_candidates(layout, states):
+    project = layout.get('project', '')
+    if not project:
+        return []
+    prefix = 'nm_lab_' + project[:12] + '_'
+    return [{'entity_id': s['entity_id'], 'name': (s.get('attributes') or {}).get('friendly_name', s['entity_id']),
+             'state': s.get('state', 'unavailable')}
+            for s in states if s['entity_id'].split('.')[0] in ('light', 'cover', 'climate')
+            and s['entity_id'].split('.', 1)[1].startswith(prefix)]
+
+
 def clean_actions(raw, layout):
     if not isinstance(raw, list) or not 1 <= len(raw) <= 50:
         raise ValueError('Servono da 1 a 50 azioni')
@@ -299,7 +310,8 @@ class ControlEngine:
                     r['warning'] = str(exc)
             return {'project': layout.get('project', ''), 'fingerprint': digest(layout), 'revision': raw['revision'],
                     'rooms': list(dict.fromkeys(layout.get('rooms', []) + [w['room'] for w in layout.get('widgets', [])])),
-                    'devices': catalog(layout, states), 'records': records, 'logs': self.history(layout.get('project', '')),
+                    'devices': catalog(layout, states), 'lab_candidates': lab_candidates(layout, states),
+                    'records': records, 'logs': self.history(layout.get('project', '')),
                     'ha_error': error, 'time_zone': config.get('time_zone'),
                     'location_name': config.get('location_name'),
                     'temperature_unit': config.get('unit_system', {}).get('temperature'),
@@ -478,6 +490,40 @@ class ControlEngine:
             if not isinstance(request, str) or not IDENT.fullmatch(request):
                 raise ValueError('Identità esecuzione richiesta')
             return self.execute(layout, record, record['actions'], f"manual:{layout['project']}:{request}")
+
+    def add_lab(self, payload):
+        """Append selected existing virtual entities; never replace real bindings."""
+        with LAYOUT_LOCK, self.lock:
+            layout, raw = self.layout_provider(), self.read()
+            self.guard(payload, layout, raw)
+            selected = payload.get('entities')
+            if not isinstance(selected, list) or not 1 <= len(selected) <= 50:
+                raise ValueError('Seleziona da 1 a 50 simulazioni')
+            with self.connection_factory() as ws:
+                states = ws.call('get_states')
+            allowed = {s['entity_id'] for s in lab_candidates(layout, states)}
+            by_id = {s['entity_id']: s for s in states}
+            linked = {w.get('entity_id') for w in layout['widgets']}
+            additions = []
+            for item in selected:
+                if not isinstance(item, dict) or item.get('entity_id') not in allowed:
+                    raise ValueError('Sono ammesse solo simulazioni NM LAB del progetto attivo')
+                ident, name = item['entity_id'], item.get('name')
+                if ident in linked:
+                    raise ValueError('Simulazione già associata o selezionata due volte')
+                if not isinstance(name, str) or not 1 <= len(name.strip()) <= 70:
+                    raise ValueError('Inserisci un nome per ogni simulazione')
+                if by_id[ident].get('state') in ('unknown', 'unavailable'):
+                    raise ValueError('Simulazione non disponibile')
+                kind = ident.split('.')[0]
+                if kind == 'light' and set(by_id[ident].get('attributes', {}).get('supported_color_modes') or []) - {'onoff', 'unknown'}:
+                    kind = 'dimmer'
+                additions.append({'type': kind, 'name': 'SIM · ' + name.strip(), 'room': 'Collaudo simulato',
+                                  'fields': {}, 'entity_id': ident})
+                linked.add(ident)
+            layout['widgets'].extend(additions)
+            layout['rooms'] = list(dict.fromkeys(layout.get('rooms', []) + ['Collaudo simulato']))
+            return save_layout({**layout, 'confirm': True})
 
     def assign(self, payload):
         with LAYOUT_LOCK, self.lock:

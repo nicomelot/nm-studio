@@ -1,3 +1,8 @@
+## 5.21.4
+
+- Collega le simulazioni NM LAB già presenti del progetto come widget separati per collaudare luci, tapparelle e termostati nella nuova interfaccia.
+- Mantiene le associazioni reali e impedisce importazioni duplicate o da altri progetti.
+
 ## 5.21.3
 
 - Mostra gli errori di anteprima anche dopo la chiusura della finestra di salvataggio, per rendere visibile il motivo di un'attivazione bloccata.

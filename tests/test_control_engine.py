@@ -60,6 +60,21 @@ class EngineTests(unittest.TestCase):
         check = self.engine.preview(self.context(id='demo'))
         return self.engine.activate(self.context(id='demo', enabled=True, preview_hash=check['preview_hash']))
 
+    def test_lab_import_preserves_originals_and_never_commands(self):
+        ident = 'light.nm_lab_aaaaaaaaaaaa_1_1_1'
+        self.ha.states.append({'entity_id': ident, 'state': 'off', 'attributes': {'supported_color_modes': ['brightness']}})
+        with patch.object(m, 'save_layout', side_effect=lambda p:p) as save:
+            result = self.engine.add_lab(self.context(entities=[{'entity_id':ident,'name':'Prova'}]))
+            self.assertEqual(result['widgets'][:3], self.layout['widgets'])
+            self.assertEqual(result['widgets'][3]['type'], 'dimmer')
+            self.assertEqual(result['widgets'][3]['room'], 'Collaudo simulato')
+            self.assertEqual(self.ha.writes(), [])
+            for entities in ([{'entity_id':'climate.sala','name':'Real'}], [{'entity_id':ident,'name':'X'}]*2):
+                with self.assertRaises(ValueError): self.engine.add_lab(self.context(entities=entities))
+            self.ha.states[-1]['state'] = 'unavailable'
+            with self.assertRaises(ValueError): self.engine.add_lab(self.context(entities=[{'entity_id':ident,'name':'X'}]))
+            self.assertEqual(save.call_count, 1)
+
     def test_save_preview_and_snapshot_never_send_commands(self):
         self.save()
         snap = self.engine.snapshot()
