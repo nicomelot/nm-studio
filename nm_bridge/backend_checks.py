@@ -77,7 +77,8 @@ def export_backup(layout_path):
     """Snapshot only NM Studio settings, with no tokens or imported ETS archive."""
     files = {"ha_layout": layout_path, "knx_widgets": WIDGET_PATH,
              "approved_devices": DEVICE_PATH, "review_notes": NOTES_PATH,
-             "nm_link_drafts": LINK_PATH}
+             "nm_link_drafts": LINK_PATH,
+             "control_automations": layout_path.parent / "nm_control_automations.json"}
     snapshot = {}
     for key, path in files.items():
         if not path.exists():

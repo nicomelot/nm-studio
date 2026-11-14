@@ -1,3 +1,11 @@
+## 5.21.0
+
+- Nuova interfaccia NM Control con widget compatti e dati reali del progetto; tutti gli strumenti precedenti restano in Strumenti avanzati.
+- Ambienti condivisi con il layout esistente, scenari e comandi con anteprima dei destinatari.
+- Programmazioni persistenti per luci, dimmer, tapparelle e clima: giorni, orari, alba/tramonto con scostamento e fasce settimanali con setpoint diversi.
+- Salvataggio in pausa, attivazione separata, controllo conflitti nei prossimi 8 giorni, registro esecuzioni e prevenzione dei reinvii al riavvio.
+- Dettagli operativi e limiti in `docs/control-interface.md` alla radice del repository.
+
 ## 5.20.2
 
 - Serrande: riconoscimento di STOP, POSIZIONE e POSIZIONE STATO con verifica DPT; lo stato direzione non viene usato come posizione.

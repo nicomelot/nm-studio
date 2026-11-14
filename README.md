@@ -1,3 +1,8 @@
+# NM Studio 5.21.0
+
+Interfaccia NM Control integrata con dispositivi, ambienti, scenari e programmazioni persistenti: orari, alba/tramonto e fasce settimanali dei termostati. Le funzioni precedenti restano disponibili in **Strumenti avanzati**. [Guida e limiti operativi](docs/control-interface.md).
+
+Questa versione può inviare comandi reali tramite Home Assistant dopo conferma e attivazione esplicite. Le descrizioni read-only sottostanti documentano le versioni storiche del progetto.
 # NM Bridge — prototype 0.1
 
 ## NM Studio 3.5 — Preparazione KNX Panel ufficiale (read-only)

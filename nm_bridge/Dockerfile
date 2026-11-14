@@ -7,6 +7,10 @@ RUN /opt/nm-venv/bin/pip install --no-cache-dir -r /app/requirements.txt
 ENV PATH="/opt/nm-venv/bin:$PATH"
 COPY bridge.py /app/bridge.py
 COPY index.html /app/index.html
+COPY control.html /app/control.html
+COPY control.js /app/control.js
+COPY control.css /app/control.css
+COPY control_engine.py /app/control_engine.py
 COPY lab_ui.js /app/lab_ui.js
 COPY ets_import.py /app/ets_import.py
 COPY ets_named_functions.py /app/ets_named_functions.py

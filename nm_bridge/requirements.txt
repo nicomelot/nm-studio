@@ -1,2 +1,4 @@
 pyzipper==0.3.6
 pycryptodomex==3.23.0
+astral==3.2
+tzdata==2025.2
