@@ -1,3 +1,9 @@
+## 5.22.0
+
+- Vista settimanale con filtri per ambiente, dispositivo e stato del programma.
+- Modifica rapida di orari, eventi solari, giorni e temperature dai widget e dal calendario.
+- Il salvataggio conserva le altre fasce e apre l’anteprima per la riattivazione.
+
 ## 5.21.4
 
 - Collega le simulazioni NM LAB già presenti del progetto come widget separati per collaudare luci, tapparelle e termostati nella nuova interfaccia.
