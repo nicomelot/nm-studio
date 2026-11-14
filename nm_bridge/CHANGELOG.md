@@ -1,3 +1,8 @@
+## 5.22.1
+
+- Copia le fasce di un giorno su più giorni, dal calendario o dagli orari del widget.
+- Anteprima di orari e temperature con sostituzione limitata ai giorni scelti del programma.
+
 ## 5.22.0
 
 - Vista settimanale con filtri per ambiente, dispositivo e stato del programma.
