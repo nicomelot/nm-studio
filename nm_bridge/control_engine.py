@@ -197,10 +197,10 @@ def occurrences(triggers, config, now, horizon=8):
     return sorted(result, key=lambda item: item[0])
 
 
-def service_plan(layout, actions, ws):
+def service_plan(layout, actions, ws, states=None):
     """Validate EVERY action before sending any. Never accept arbitrary services."""
     actions = clean_actions(actions, layout)
-    states = ws.call('get_states')
+    states = ws.call('get_states') if states is None else states
     if not isinstance(states, list):
         raise ValueError('Stati Home Assistant non disponibili')
     by_entity = {s['entity_id']: s for s in states}
@@ -354,6 +354,60 @@ class ControlEngine:
             raw['revision'] += 1
             self.write(raw)
             return {'saved': True, 'id': ident, 'enabled': False}
+
+    def copy_week(self, payload):
+        """Validate all destinations, then persist independent paused copies atomically."""
+        with LAYOUT_LOCK, self.lock:
+            layout, raw = self.layout_provider(), self.read()
+            self.guard(payload, layout, raw)
+            records = self.records(raw, layout['project'])
+            source = next((r for r in records if r['id'] == payload.get('id')), None)
+            if not source or source['kind'] != 'schedule' or len(source['actions']) != 1 or source['actions'][0]['action'] != 'temperature':
+                raise ValueError('Scegli un programma di temperatura di un singolo termostato')
+            clean_actions(source['actions'], layout)
+            triggers = clean_triggers(source['triggers'])
+            targets = payload.get('targets')
+            if not isinstance(targets, list) or not 1 <= len(targets) <= 50 or any(not isinstance(t, str) for t in targets) or len(set(targets)) != len(targets):
+                raise ValueError('Scegli da 1 a 50 termostati diversi')
+            if len(records) + len(targets) > 200:
+                raise ValueError('Limite di 200 automazioni per progetto')
+            copies, summaries = [], []
+            used_entities = {w['entity_id'] for w in layout['widgets'] if binding(w) == source['actions'][0]['device']}
+            with self.connection_factory() as ws:
+                states = ws.call('get_states')
+                for target in targets:
+                    matches = [w for w in layout['widgets'] if binding(w) == target and w['type'] == 'climate']
+                    if len(matches) != 1 or target == source['actions'][0]['device']:
+                        raise ValueError('Destinatario non valido o uguale al termostato di origine')
+                    widget = matches[0]
+                    if widget['entity_id'] in used_entities:
+                        raise ValueError('Entità di destinazione duplicata o uguale all’origine')
+                    used_entities.add(widget['entity_id'])
+                    ident = 'copy_' + digest({'source':source['id'], 'target':target})[:40]
+                    if any(r['id'] == ident for r in records):
+                        raise ValueError(widget['name'] + ': copia già presente; modifica il programma esistente')
+                    record = {'id':ident, 'name':(source['name'][:38] + ' · ' + widget['name'][:39])[:80],
+                              'kind':'schedule', 'room':widget.get('room',''), 'enabled':False,
+                              'actions':[dict(source['actions'][0], device=target)], 'triggers':copy.deepcopy(triggers)}
+                    clean_actions(record['actions'], layout)
+                    service_plan(layout, record['actions'], ws, states)
+                    for trigger in triggers:
+                        actions = clean_actions(slot_actions(record, trigger), layout)
+                        service_plan(layout, actions, ws, states)
+                    copies.append(record)
+                    summaries.append({'id':ident, 'name':widget['name'], 'room':widget.get('room',''),
+                                      'existing':sum(r['kind']=='schedule' and any(a['device']==target for a in r['actions']) for r in records)})
+            proof = digest({'copies':copies, 'layout':layout, 'revision':raw['revision']})
+            if payload.get('preview_hash') is None:
+                return {'preview_hash':proof, 'targets':summaries, 'triggers':triggers}
+            if payload['preview_hash'] != proof:
+                raise ValueError('Anteprima cambiata: verifica di nuovo i destinatari')
+            for record in copies:
+                record['updated_at'] = datetime.now(UTC).isoformat()
+            raw['projects'][layout['project']] = records + copies
+            raw['revision'] += 1
+            self.write(raw)
+            return {'saved':True, 'count':len(copies), 'ids':[r['id'] for r in copies]}
 
     def preview(self, payload):
         with LAYOUT_LOCK, self.lock:
