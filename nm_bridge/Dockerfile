@@ -10,6 +10,7 @@ COPY index.html /app/index.html
 COPY control.html /app/control.html
 COPY control.js /app/control.js
 COPY control.css /app/control.css
+COPY control-dark.css /app/control-dark.css
 COPY control_engine.py /app/control_engine.py
 COPY lab_ui.js /app/lab_ui.js
 COPY ets_import.py /app/ets_import.py
