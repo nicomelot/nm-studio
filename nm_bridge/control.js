@@ -6,7 +6,8 @@ const MODES={off:'Spento',heat:'Riscaldamento',cool:'Raffrescamento',heat_cool:'
 const TYPES={light:'Luce',dimmer:'Dimmer',cover:'Tapparella',climate:'Clima'};
 const SYMBOL={light:'☼',dimmer:'◐',cover:'▤',climate:'♨'};
 let snapshot=null,page='home',room='',query='',filter='',userMode=new URLSearchParams(location.search).get('view')==='client',busy=false,loading=false,draft=null,previewResult=null,pollTimer,toastTimer;
-const uid=()=>crypto.randomUUID();
+// getRandomValues also works on HTTP LAN ingress, unlike randomUUID.
+const uid=()=>Array.from(crypto.getRandomValues(new Uint8Array(16)),b=>b.toString(16).padStart(2,'0')).join('');
 const fmt=iso=>{try{return new Intl.DateTimeFormat('it-IT',{timeZone:snapshot?.time_zone||undefined,weekday:'short',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}).format(new Date(iso))}catch{return iso}};
 const shortRoom=name=>(name||'Da assegnare').split(' / ').at(-1);
 const number=(n,one,many)=>`${n} ${n===1?one:many}`;

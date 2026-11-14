@@ -1,3 +1,7 @@
+## 5.21.2
+
+- Corregge la creazione di scenari, programmi e richieste di comando quando Home Assistant viene aperto tramite HTTP sulla rete locale.
+
 ## 5.21.1
 
 - Tema grafite per NM Control, con accenti verde menta, widget compatti e contrasto leggibile anche nelle finestre di programmazione.
