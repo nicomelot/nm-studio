@@ -198,7 +198,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.respond(200, "application/json; charset=utf-8", json.dumps(CONTROL.snapshot(), ensure_ascii=False).encode())
             except (ValueError, OSError, KeyError, TypeError) as exc:
                 self.respond(400, "application/json", json.dumps({'error': str(exc)[:180]}).encode())
-        elif path in ("/control.js", "/control.css", "/control-dark.css"):
+        elif path in ("/control.js", "/control.css", "/control-dark.css", "/control-diagrams.js", "/control-diagrams.css"):
             self.respond(200, "text/javascript; charset=utf-8" if path.endswith('.js') else "text/css; charset=utf-8",
                          Path(__file__).with_name(path[1:]).read_bytes())
         elif path == "/advanced":
@@ -391,7 +391,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?", 1)[0]
-        if self.client_address[0] != INGRESS_PROXY or path not in ("/control/copy-week", "/control/add-lab", "/control/action-preview", "/control/action-run", "/control/save", "/control/preview", "/control/activate", "/control/run", "/control/assign", "/knx/history", "/lab/dashboard-existing", "/lab/dashboard-update", "/projects/save", "/bus-log/start", "/bus-log/stop", "/layout", "/modules/plan", "/floorplans", "/floorplans/dashboard-publish", "/ets/preview", "/knx/approved", "/audit", "/knx/widgets", "/knx/ha-preview", "/knx/yaml-audit", "/dashboard/missing-ha/review", "/dashboard/deployment-preflight", "/knx/panel-create-plan", "/knx/panel-create-one", "/knx/install-step", "/knx/installation-apply", "/knx/commission-command", "/native/areas-sync", "/dashboard/publish", "/dashboard/update-preview", "/dashboard/update", "/migration/restore", "/nm-link", "/nm-link/preview", "/nm-link/simulate", "/lab/preview", "/lab/install", "/lab/replace", "/lab/packages-preview", "/lab/packages-enable", "/lab/dashboard-preview", "/lab/dashboard-publish"):
+        if self.client_address[0] != INGRESS_PROXY or path not in ("/control/widgets", "/control/hold", "/control/diagrams", "/control/diagrams-save", "/control/background", "/control/copy-week", "/control/add-lab", "/control/action-preview", "/control/action-run", "/control/save", "/control/preview", "/control/activate", "/control/run", "/control/assign", "/knx/history", "/lab/dashboard-existing", "/lab/dashboard-update", "/projects/save", "/bus-log/start", "/bus-log/stop", "/layout", "/modules/plan", "/floorplans", "/floorplans/dashboard-publish", "/ets/preview", "/knx/approved", "/audit", "/knx/widgets", "/knx/ha-preview", "/knx/yaml-audit", "/dashboard/missing-ha/review", "/dashboard/deployment-preflight", "/knx/panel-create-plan", "/knx/panel-create-one", "/knx/install-step", "/knx/installation-apply", "/knx/commission-command", "/native/areas-sync", "/dashboard/publish", "/dashboard/update-preview", "/dashboard/update", "/migration/restore", "/nm-link", "/nm-link/preview", "/nm-link/simulate", "/lab/preview", "/lab/install", "/lab/replace", "/lab/packages-preview", "/lab/packages-enable", "/lab/dashboard-preview", "/lab/dashboard-publish"):
             self.send_error(403)
             return
         # Ingress protects access; these checks also reject cross-site form POSTs.
@@ -403,13 +403,15 @@ class Handler(BaseHTTPRequestHandler):
         try:
             n = int(self.headers.get("Content-Length", "0"))
             max_body = MAX_ARCHIVE if path == "/ets/preview" else 4 * 1024 * 1024 if path == "/floorplans" else 1024 * 1024 if path == "/migration/restore" else 256 * 1024 if path in ("/knx/widgets", "/knx/ha-preview", "/knx/yaml-audit") else 256 * 1024 if path == "/projects/save" else MAX_BODY
+            if path in ("/control/diagrams-save", "/control/background"):
+                max_body = 22 * 1024 * 1024
             if path == "/ets/preview" and content_type == "application/vnd.nm.ets-upload":
                 max_body += MAX_PASSWORD_BYTES + 4
             if not 0 < n <= max_body:
                 raise ValueError("Invalid length")
             body = self.rfile.read(n)
             if path.startswith('/control/'):
-                operations = {'/control/save': CONTROL.save, '/control/preview': CONTROL.preview,
+                operations = {'/control/widgets':CONTROL.features.add_widget, '/control/hold':CONTROL.features.hold, '/control/diagrams':CONTROL.features.diagrams, '/control/diagrams-save':CONTROL.features.save_diagrams, '/control/background':CONTROL.features.background, '/control/save': CONTROL.save, '/control/preview': CONTROL.preview,
                               '/control/activate': CONTROL.activate, '/control/run': CONTROL.run,
                               '/control/assign': CONTROL.assign, '/control/action-preview': CONTROL.action_preview,
                               '/control/action-run': CONTROL.action_run, '/control/add-lab': CONTROL.add_lab, '/control/copy-week': CONTROL.copy_week}

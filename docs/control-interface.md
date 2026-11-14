@@ -30,3 +30,14 @@ Il backup completo dell'add-on include entrambi i file. L'esportazione diagnosti
 ## Verifica
 
 `python -m unittest discover -s tests` e `node --test tests/*.test.js` verificano il progetto. `python tests/control_preview.py --port 8766` apre un laboratorio locale con dati sintetici e servizi simulati, senza programmatore in esecuzione. Non è un server di produzione. Il collaudo su HA con dispositivi fisici resta distinto dai test simulati.
+
+
+## Sinottici, planimetrie e widget aggiuntivi (5.24)
+
+Nella nuova interfaccia aprire Sinottici o Planimetrie, creare uno schema e scegliere Modifica. Caricare un PDF (pagina selezionabile, massimo 12 MB) oppure PNG/JPG; lo sfondo viene rasterizzato fino a 2000 px e conservato nel progetto. Aggiungere componenti, trascinarli oppure inserire X/Y, collegarli ai dispositivi e salvare. Uso apre i dettagli/comandi del dispositivo; Modifica non invia comandi. Le planimetrie precedenti si importano come copie, senza modificare gli originali.
+
+Dispositivi → Aggiungi widget collega sonde HA di classe temperatura e pulsanti momentanei a entità light/switch/input_boolean dedicate. Il comando 1 corrisponde a turn_on, 0 a turn_off; non invia telegrammi KNX arbitrari. Per un impianto KNX occorre prima una corretta entità HA associata. Sonde e pulsanti sono salvati separatamente dalle funzioni ETS e compaiono anche nel selettore dei componenti.
+
+Il pulsante richiede abilitazione esplicita per ogni apertura. Pointer-up/cancel, perdita del fuoco, tastiera e chiusura della finestra richiedono il reset. Un registro SQLite conserva il reset prima dell’accensione. L’add-on tenta OFF entro 10 secondi e recupera i reset dopo riavvio; se HA/rete/add-on non sono operativi, il rilascio fisico non è garantito. Non è un dispositivo di sicurezza. Le richieste duplicate e i rilasci arrivati prima delle pressioni non riaccendono il comando.
+
+Gli schemi sono separati per progetto e verificano una versione dell’archivio al salvataggio. Lo sfondo conserva il rapporto d’aspetto; zoom e scorrimento restano nel riquadro, il pannello di modifica passa sotto lo schema su tablet/telefono. I simboli usano coordinate percentuali e una legenda leggibile anche su display piccoli.

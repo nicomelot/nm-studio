@@ -295,7 +295,7 @@ class EngineTests(unittest.TestCase):
 
     def test_http_endpoints_are_ingress_only_and_require_confirmation(self):
         from test_lab_http import request, bridge
-        for path in ('/control/save','/control/run','/control/activate','/control/action-run','/control/assign','/control/copy-week'):
+        for path in ('/control/save','/control/run','/control/activate','/control/action-run','/control/assign','/control/copy-week','/control/widgets','/control/hold','/control/diagrams','/control/diagrams-save','/control/background'):
             self.assertEqual(request(path,{},address='192.168.1.8')['status'],403)
             with patch.object(bridge,'CONTROL',self.engine):
                 self.assertEqual(request(path,{})['status'],400)

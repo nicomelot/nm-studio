@@ -4,6 +4,10 @@ The worker runs in the add-on, never in a browser. Schedule occurrences are
 durably claimed before any service call: ambiguous sends are not retried.
 """
 import copy
+try:
+    from .control_features import ControlFeatures
+except ImportError:
+    from control_features import ControlFeatures
 import hashlib
 import json
 import logging
@@ -58,7 +62,7 @@ def catalog(layout, states):
                        'actions': ['off'] if w.get('command_mode') == 'off_only' else ACTIONS.get(w['type'], []),
                        'state': state.get('state', 'unavailable'),
                        'attributes': {k: attrs[k] for k in ('brightness', 'current_position', 'current_temperature',
-                           'temperature', 'min_temp', 'max_temp', 'temperature_unit', 'hvac_modes', 'hvac_action') if k in attrs}})
+                           'temperature', 'min_temp', 'max_temp', 'temperature_unit', 'hvac_modes', 'hvac_action', 'unit_of_measurement', 'device_class') if k in attrs}})
     return result
 
 
@@ -257,6 +261,7 @@ class ControlEngine:
         self.lock = threading.RLock()
         self.stop_event = threading.Event()
         self.worker = None
+        self.features = ControlFeatures(self, binding)
         self.health = {'running': False, 'last_check': None, 'error': None}
 
     def read(self):
@@ -308,9 +313,10 @@ class ControlEngine:
                             r['warning'] = 'Nessuna occorrenza nei prossimi 8 giorni'
                 except (ValueError, KeyError, TypeError) as exc:
                     r['warning'] = str(exc)
+            combined = {**layout, 'widgets':layout.get('widgets', []) + self.features.widgets(layout.get('project',''),raw)}
             return {'project': layout.get('project', ''), 'fingerprint': digest(layout), 'revision': raw['revision'],
-                    'rooms': list(dict.fromkeys(layout.get('rooms', []) + [w['room'] for w in layout.get('widgets', [])])),
-                    'devices': catalog(layout, states), 'lab_candidates': lab_candidates(layout, states),
+                    'rooms': list(dict.fromkeys(layout.get('rooms', []) + [w['room'] for w in combined['widgets']])),
+                    'devices': catalog(combined, states), 'widget_candidates': self.features.candidates(states), 'release_error':self.features.last_release_error, 'lab_candidates': lab_candidates(layout, states),
                     'records': records, 'logs': self.history(layout.get('project', '')),
                     'ha_error': error, 'time_zone': config.get('time_zone'),
                     'location_name': config.get('location_name'),
@@ -474,6 +480,7 @@ class ControlEngine:
     def db(self):
         self.root.mkdir(parents=True, exist_ok=True)
         db = sqlite3.connect(self.journal, timeout=10)
+        db.execute('CREATE TABLE IF NOT EXISTS holds (token TEXT PRIMARY KEY, project TEXT, device TEXT, entity TEXT, expires REAL, created REAL, status TEXT)')
         db.execute('CREATE TABLE IF NOT EXISTS runs (key TEXT PRIMARY KEY, project TEXT, name TEXT, time TEXT, status TEXT, detail TEXT)')
         try:
             with db:
@@ -613,6 +620,7 @@ class ControlEngine:
                         self.execute(layout, r, slot_actions(r, trigger), f"scheduled:{layout['project']}:{r['id']}:{occurrence}")
 
     def start(self):
+        self.features.start()
         if self.worker and self.worker.is_alive():
             return
         def loop():

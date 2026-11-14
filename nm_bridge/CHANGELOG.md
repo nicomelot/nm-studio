@@ -1,3 +1,10 @@
+## 5.24.0
+
+- Sinottici e planimetrie nella nuova interfaccia: sfondi PDF/PNG/JPG, simboli trascinabili, collegamenti ai dispositivi, modalità Modifica e Uso.
+- Importazione delle planimetrie precedenti come copie; proporzioni e posizioni stabili tra desktop, tablet e telefono.
+- Widget sonda temperatura e pulsante mantenuto ON/OFF (1 premuto, 0 rilasciato), con durata massima di 10 s e reset persistente ritentato dopo problemi di collegamento.
+- Nessun comando viene inviato mentre si configurano o si spostano i componenti.
+
 ## 5.23.0
 
 - Copia i programmi di temperatura verso più termostati con verifica delle temperature e salvataggio unico in pausa.
