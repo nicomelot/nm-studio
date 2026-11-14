@@ -25,6 +25,7 @@ if __name__=='__main__':
         widget=copy.deepcopy(current['widgets'][2]);widget.update(name='Termostato '+suffix, entity_id='climate.'+suffix.lower(), room='Casa / '+suffix)
         current['widgets'].append(widget);current['rooms'].append(widget['room'])
         state=copy.deepcopy(ha.states[2]);state['entity_id']=widget['entity_id'];ha.states.append(state)
+    ha.states += [{'entity_id':'sensor.nm_lab_supply','state':'42.5','attributes':{'friendly_name':'Sonda mandata simulata','device_class':'temperature','unit_of_measurement':'°C'}},{'entity_id':'switch.nm_lab_pulse','state':'off','attributes':{'friendly_name':'Pulsante simulato'}}]
     ha.config['location_name']='Laboratorio QA (dati sintetici)'
     original=ha.call
     def call(method,**params):
@@ -44,6 +45,7 @@ if __name__=='__main__':
         engine=control_engine.ControlEngine(root,lambda:copy.deepcopy(current),lambda:ha)
         engine.health={'running':False,'last_check':None,'error':'Anteprima QA: programmatore disattivato, servizi HA simulati'}
         bridge.CONTROL=engine
+        engine.features.start()
         class Local(bridge.Handler):
             def do_GET(self):
                 self.client_address=(bridge.INGRESS_PROXY,self.client_address[1]);super().do_GET()

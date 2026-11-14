@@ -1,6 +1,6 @@
 ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:latest
 FROM ${BUILD_FROM}
-RUN apk add --no-cache python3 py3-websocket-client py3-pip \
+RUN apk add --no-cache python3 py3-websocket-client py3-pip poppler-utils \
     && python3 -m venv --system-site-packages /opt/nm-venv
 COPY requirements.txt /app/requirements.txt
 RUN /opt/nm-venv/bin/pip install --no-cache-dir -r /app/requirements.txt
@@ -63,3 +63,7 @@ CMD ["/command/with-contenv", "python3", "-u", "/app/bridge.py"]
 COPY installation_review.py /app/installation_review.py
 
 COPY commissioning.py /app/commissioning.py
+
+COPY control_features.py /app/control_features.py
+COPY control-diagrams.js /app/control-diagrams.js
+COPY control-diagrams.css /app/control-diagrams.css
