@@ -82,3 +82,6 @@ COPY nm-floorplan-card.js /app/nm-floorplan-card.js
 
 COPY control_decisions.py /app/control_decisions.py
 COPY control-decisions.js /app/control-decisions.js
+
+COPY control_ha.py /app/control_ha.py
+COPY control-ha.js /app/control-ha.js
