@@ -33,7 +33,7 @@ def digest(config):
     return hashlib.sha256(json.dumps(config,sort_keys=True).encode()).hexdigest()
 
 def install_resource(client, config_root='/homeassistant'):
-    name='nm-floorplan-card-5.34.0.js';url='/local/nm-control/'+name
+    name='nm-floorplan-card-5.34.1.js';url='/local/nm-control/'+name
     directory=Path(config_root)/'www'/'nm-control';directory.mkdir(parents=True,exist_ok=True)
     content=Path(__file__).with_name('nm-floorplan-card.js').read_bytes()
     target=directory/name;temp=directory/(name+'.tmp');temp.write_bytes(content);os.replace(temp,target)
