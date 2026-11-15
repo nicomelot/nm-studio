@@ -1,3 +1,9 @@
+# 5.29.0
+
+- Planimetria Home Assistant con popup sul posto, adattamento allo schermo, zoom, trascinamento e pinch. Simboli da 44 px e selettore dispositivi per accesso rapido da telefono.
+- Aggiornamento esplicito delle pagine pubblicate, con confronto della versione e copia di ripristino. Scheda grafica NM inclusa, senza dipendenze HACS.
+- Ricerca nella finestra Associa dispositivi per nome, ambiente o entità; selezioni conservate durante i filtri e contatore risultati.
+
 # 5.28.0
 
 - Schede tecniche rete (rack, patch panel, porte e switch) e DALI (linea, indirizzo ECG, gruppi).

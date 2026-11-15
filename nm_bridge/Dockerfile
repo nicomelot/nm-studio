@@ -77,3 +77,5 @@ COPY control-pipes.js /app/control-pipes.js
 
 COPY control-technical.js /app/control-technical.js
 COPY diagram_publisher.py /app/diagram_publisher.py
+
+COPY nm-floorplan-card.js /app/nm-floorplan-card.js
