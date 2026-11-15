@@ -17,3 +17,5 @@ body.nm-setup{background:var(--nm-bg);color:var(--nm-text);font:14px/1.45 system
 .diagram-pin>small{opacity:0;visibility:hidden;max-width:240px;white-space:normal;text-align:left;transition:opacity .12s}.diagram-pin:hover,.diagram-pin:focus-visible{z-index:6}.diagram-pin:hover>small,.diagram-pin:focus-visible>small,.diagram-pin.selected>small,.labels-always .diagram-pin>small{opacity:1;visibility:visible}.diagram-pin small span{display:block;margin-top:3px}.technical-fields{border:1px solid var(--line);border-radius:8px;padding:10px;min-width:0}.technical-details{display:grid;grid-template-columns:auto 1fr;gap:9px 18px}.technical-details dt{color:var(--muted)}.technical-details dd{margin:0;overflow-wrap:anywhere}
 
 #assign-list [hidden]{display:none!important}
+
+.decision-diff{width:100%;border-collapse:collapse;margin:20px 0;table-layout:fixed}.decision-diff th,.decision-diff td{text-align:left;padding:14px;border:1px solid var(--border,#345348);overflow-wrap:anywhere}.decision-diff th{background:#10271f}.decision-diff td{vertical-align:top}

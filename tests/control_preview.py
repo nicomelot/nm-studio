@@ -7,6 +7,7 @@ import argparse
 import copy
 import sys
 import tempfile
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from http.server import ThreadingHTTPServer
 
@@ -26,6 +27,19 @@ if __name__=='__main__':
         current['widgets'].append(widget);current['rooms'].append(widget['room'])
         state=copy.deepcopy(ha.states[2]);state['entity_id']=widget['entity_id'];ha.states.append(state)
     ha.states += [{'entity_id':'sensor.nm_lab_supply','state':'42.5','attributes':{'friendly_name':'Sonda mandata simulata','device_class':'temperature','unit_of_measurement':'°C'}},{'entity_id':'switch.nm_lab_pulse','state':'off','attributes':{'friendly_name':'Pulsante simulato'}}]
+    for index, widget in enumerate(current['widgets']):
+        state=next(s for s in ha.states if s['entity_id']==widget['entity_id'])
+        widget['entity_id']=widget['entity_id'].split('.')[0]+'.nm_lab_'+current['project'][:12]+'_'+str(index)
+        state['entity_id']=widget['entity_id']
+    now=datetime.now(timezone.utc)
+    ha.states.append({'entity_id':'sensor.decision_qa','state':'ready','attributes':{
+        'decision_id':'qa-decision','simulation':True,'status':'ready','execution_enabled':False,
+        'generated_at':now.isoformat(),'expires_at':(now+timedelta(hours=1)).isoformat(),
+        'summary':'Decisioni di collaudo: dati sintetici, nessun impianto reale',
+        'actions':[{'action':name,'reason':reason,'explanation':'Scenario sintetico per verificare anteprima e conferma.',
+                    'proposal_only':True,'requires_confirmation':True} for name,reason in [
+                    ('Riduci illuminazione','Stanza simulata non occupata'),('Regola tapparella','Protezione solare simulata'),
+                    ('Imposta comfort','Temperatura simulata sotto obiettivo')]]}})
     ha.config['location_name']='Laboratorio QA (dati sintetici)'
     original=ha.call
     def call(method,**params):
@@ -33,8 +47,11 @@ if __name__=='__main__':
         if method=='call_service':
             state=next(s for s in ha.states if s['entity_id']==params['target']['entity_id'])
             service=params['service'];data=params['service_data']
-            if service=='turn_on':state['state']='on'
+            if service=='turn_on':
+                state['state']='on'
+                if 'brightness_pct' in data:state['attributes']['brightness']=round(data['brightness_pct']*255/100)
             elif service=='turn_off':state['state']='off'
+            elif service=='set_cover_position':state['attributes']['current_position']=data['position']
             elif service=='set_temperature':state['attributes']['temperature']=data['temperature']
         return result
     ha.call=call
