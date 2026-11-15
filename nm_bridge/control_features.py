@@ -222,6 +222,16 @@ class ControlFeatures:
                             values=value.split(',') if key=='dali_groups' else [value]
                             if value and any(not v.strip().isdigit() or not 0<=int(v.strip())<=limit for v in values):raise ValueError('Indirizzo DALI 0–63; gruppi 0–15 separati da virgole')
                         pin['technical']={k:v.strip() for k,v in fields.items()}
+                    if 'network' in t:
+                        net=t['network']
+                        allowed_net={'switch_id','entity','mode','simulation'}
+                        if not isinstance(net,dict) or set(net)-allowed_net:raise ValueError('Collegamento rete non valido')
+                        if any(not isinstance(v,str) or len(v)>150 for v in net.values()):raise ValueError('Riferimento rete non valido')
+                        if net.get('entity') and not re.fullmatch(r'(sensor|binary_sensor)\.[a-z0-9_]+',net['entity']):raise ValueError('Scegli un sensore di stato o velocità, non un comando PoE')
+                        if net.get('mode','link') not in ('link','speed'):raise ValueError('Tipo stato porta non valido')
+                        if net.get('simulation','') not in ('','up','down','unavailable'):raise ValueError('Stato simulato non valido')
+                        if net.get('simulation') and (net.get('entity') or net.get('switch_id')):raise ValueError('Separa la simulazione dal collegamento reale')
+                        pin['network']=dict(net)
                     if 'notes' in t:
                         if not isinstance(t['notes'],str) or len(t['notes'])>500:raise ValueError('Note massimo 500 caratteri')
                         pin['notes']=t['notes'].strip()

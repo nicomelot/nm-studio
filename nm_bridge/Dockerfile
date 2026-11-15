@@ -88,3 +88,6 @@ COPY control-ha.js /app/control-ha.js
 
 COPY control_buttons.py /app/control_buttons.py
 COPY control-buttons.js /app/control-buttons.js
+
+COPY control_network.py /app/control_network.py
+COPY control-network.js /app/control-network.js

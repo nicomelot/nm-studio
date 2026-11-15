@@ -24,20 +24,23 @@ def generate(plan, devices, url_path):
     points=[]
     for p in plan['points']:
         d=by_id.get(p.get('device'),{})
-        points.append({'label':p['label'],'x':p['x'],'y':p['y'],'icon':ICONS.get(p['symbol'],'mdi:map-marker'),'entity':d.get('entity_id',''),'notes':p.get('notes',''),'rows':[[n,p['technical'][k]] for k,n in FIELDS.items() if p.get('technical',{}).get(k)]})
+        points.append({'label':p['label'],'x':p['x'],'y':p['y'],'icon':ICONS.get(p['symbol'],'mdi:map-marker'),'entity':d.get('entity_id',''),'notes':p.get('notes',''),'network':p.get('network',{}),'technical':p.get('technical',{}),'rows':[[n,p['technical'][k]] for k,n in FIELDS.items() if p.get('technical',{}).get(k)]})
     return {'title':plan['name'],'views':[{'title':plan['name'],'path':'mappa','type':'panel','cards':[{'type':'custom:nm-floorplan-card','title':plan['name'],'image':plan['background'],'points':points}]}]}
 
 def digest(config):
     return hashlib.sha256(json.dumps(config,sort_keys=True).encode()).hexdigest()
 
 def install_resource(client, config_root='/homeassistant'):
-    name='nm-floorplan-card-5.29.0.js';url='/local/nm-control/'+name
+    name='nm-floorplan-card-5.33.0.js';url='/local/nm-control/'+name
     directory=Path(config_root)/'www'/'nm-control';directory.mkdir(parents=True,exist_ok=True)
     content=Path(__file__).with_name('nm-floorplan-card.js').read_bytes()
     target=directory/name;temp=directory/(name+'.tmp');temp.write_bytes(content);os.replace(temp,target)
     resources=client.call('lovelace/resources')
     if not isinstance(resources,list):raise PublishError('Elenco risorse HA non disponibile')
-    if not any(r.get('url')==url for r in resources):client.call('lovelace/resources/create',res_type='module',url=url)
+    existing=next((r for r in resources if str(r.get('url','')).startswith('/local/nm-control/nm-floorplan-card-')),None)
+    if existing:
+        if existing.get('url')!=url:client.call('lovelace/resources/update',resource_id=existing['id'],res_type='module',url=url)
+    else:client.call('lovelace/resources/create',res_type='module',url=url)
 
 def publish(payload, plan, devices, client_factory=HAWebSocket, config_root="/homeassistant", backup_root="/data/nm_diagram_backups"):
     if payload.get('confirm') is not True:raise PublishError('Conferma esplicita richiesta')

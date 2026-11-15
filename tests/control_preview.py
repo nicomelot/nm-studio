@@ -49,6 +49,7 @@ if __name__=='__main__':
         {'entity_id':'event.sonoff_demo','state':'unknown','attributes':{'friendly_name':'DEMO pulsante Sonoff','event_type':'single','event_types':['single','double','hold']}}
     ])
     ha.states.append({'entity_id':'input_button.sonoff_sim','state':'unknown','attributes':{'friendly_name':'SIM Sonoff · pressione'}})
+    ha.states.append({'entity_id':'sensor.unifi_sim_port_1','state':'1000','attributes':{'friendly_name':'SIM Porta 1 velocità','unit_of_measurement':'Mbit/s'}})
     ha.config['location_name']='Laboratorio QA (dati sintetici)'
     original=ha.call
     def call(method,**params):
@@ -88,7 +89,8 @@ if __name__=='__main__':
             except queue.Empty:raise TimeoutError()
         def call(self,method,**args):
             self.sequence+=1
-            if method=='config/device_registry/list':return []
+            if method=='config/device_registry/list':return [{'id':'unifi-sim','name':'SIM UniFi QA','model':'Switch simulato'}]
+            if method=='config/entity_registry/list':return [{'entity_id':'sensor.unifi_sim_port_1','platform':'unifi','device_id':'unifi-sim','original_name':'Porta 1 Link speed'}]
             if method=='subscribe_trigger':self.subs[self.sequence]=args['trigger'];return None
             if method=='unsubscribe_events':self.subs.pop(args['subscription'],None);return None
             return ha.call(method,**args)

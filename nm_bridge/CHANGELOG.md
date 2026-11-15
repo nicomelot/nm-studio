@@ -1,3 +1,9 @@
+## 5.33.0
+
+- Rete: collegamento bidirezionale porte switch / prese in planimetria, rack, patch panel, ricerca e avviso associazioni duplicate.
+- Associazione in sola lettura ai sensori UniFi presenti in HA; stato collegamento o velocità porta, senza deduzioni dallo stato PoE.
+- Esempio simulato separato dai dati reali; popup e navigazione switch anche nella pagina planimetrica Home Assistant.
+
 ## 5.32.0
 - Entità importate da HA utilizzabili negli scenari e nelle programmazioni settimanali/solari, inclusi volume, sorgente e silenzioso audio.
 - Scenari → Pulsanti: trigger nativi dei dispositivi HA (ZHA/MQTT), entità evento e input_button simulati; anteprima, conferma, pausa e verifica dopo modifiche.

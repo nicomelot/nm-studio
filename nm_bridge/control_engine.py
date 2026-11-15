@@ -5,12 +5,14 @@ durably claimed before any service call: ambiguous sends are not retried.
 """
 import copy
 try:
+    from .control_network import readings as network_readings
     from .control_buttons import ControlButtons
     from .control_features import ControlFeatures
     from .control_ha import HomeAssistantWidgets, actions as ha_actions, ATTRIBUTES as HA_ATTRIBUTES, plan as ha_plan, clean_value as ha_clean_value
     from .control_decisions import ControlDecisions, simulated, review_summary
     from .intelligence import summarize
 except ImportError:
+    from control_network import readings as network_readings
     from control_buttons import ControlButtons
     from control_features import ControlFeatures
     from control_ha import HomeAssistantWidgets, actions as ha_actions, ATTRIBUTES as HA_ATTRIBUTES, plan as ha_plan, clean_value as ha_clean_value
@@ -340,6 +342,7 @@ class ControlEngine:
             return {'project': layout.get('project', ''), 'fingerprint': digest(layout), 'revision': raw['revision'],
                     'rooms': list(dict.fromkeys(layout.get('rooms', []) + [w['room'] for w in combined['widgets']])),
                     'devices': catalog(combined, states, config.get('unit_system', {}).get('temperature') or '°C'), 'widget_candidates': self.features.candidates(states), 'release_error':self.features.last_release_error, 'lab_candidates': lab_candidates(layout, states),
+                    'network_states': network_readings(states),
                     'decision_model': review_summary(states),
                     'decision_devices': [binding(w) for w in layout.get('widgets', []) if simulated(w.get('entity_id'), layout.get('project',''))],
                     'button_links': [{**r, 'active': r in self.buttons.active(layout, raw)} for r in self.buttons.rules(raw, layout.get('project',''))],
