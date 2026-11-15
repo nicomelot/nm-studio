@@ -19,6 +19,8 @@ except ImportError:
 
 ID = re.compile(r'^[a-zA-Z0-9_-]{1,80}$')
 SYMBOLS = {'pump', 'valve', 'temperature', 'boiler', 'tank', 'light', 'button', 'label'}
+SYMBOLS.update({'data','dali','knx','wifi','camera','rack','outlet','spot','downlight','led-strip','pendant','wall','cover','thermostat','sensor','fan','motion','contact'})
+LAYERS = {'light','dali','knx','data','wifi','camera','climate','rack','other'}
 
 
 def fingerprint(value):
@@ -192,13 +194,34 @@ class ControlFeatures:
                     old={(q['id'],v['id'],v.get('device','')) for q in current['plans'] for v in q['points']}
                     if target and target not in known and (p['id'],t['id'],target) not in old:raise ValueError('Dispositivo non presente nel progetto')
                     pin={'id':t['id'],'symbol':t['symbol'],'label':t['label'].strip(),'device':target,'x':round(t['x'],3),'y':round(t['y'],3)}
+                    if 'layer' in t:
+                        if t['layer'] not in LAYERS:raise ValueError('Livello tecnico non valido')
+                        pin['layer']=t['layer']
+                    if 'notes' in t:
+                        if not isinstance(t['notes'],str) or len(t['notes'])>500:raise ValueError('Note massimo 500 caratteri')
+                        pin['notes']=t['notes'].strip()
                     if 'temp_low' in t or 'temp_high' in t:
                         low,high=t.get('temp_low',18),t.get('temp_high',28)
                         if any(type(v) not in (int,float) or not math.isfinite(v) or not -100<=v<=300 for v in (low,high)) or low>=high:
                             raise ValueError('Soglie temperatura: la soglia bassa deve essere inferiore a quella alta (da -100 a 300 °C)')
                         pin.update(temp_low=low,temp_high=high)
                     pins.append(pin)
-                clean.append({'id':p['id'],'name':name.strip(),'kind':kind,'background':image,'points':pins})
+                plan={'id':p['id'],'name':name.strip(),'kind':kind,'background':image,'points':pins}
+                if 'pipes' in p:
+                    pipes=p['pipes'];pipe_ids=set();paths=[]
+                    if not isinstance(pipes,list) or len(pipes)>100:raise ValueError('Massimo 100 tubazioni per schema')
+                    for pipe in pipes:
+                        if not isinstance(pipe,dict) or not isinstance(pipe.get('id'),str) or not ID.fullmatch(pipe['id']) or pipe['id'] in pipe_ids:raise ValueError('Identificativo tubazione non valido')
+                        pipe_ids.add(pipe['id'])
+                        label,color,width,xy=(pipe.get(k) for k in ('label','color','width','xy'))
+                        if not isinstance(label,str) or not 1<=len(label.strip())<=65:raise ValueError('Nome tubazione non valido')
+                        if not isinstance(color,str) or not re.fullmatch('#[0-9a-fA-F]{6}',color):raise ValueError('Colore tubazione non valido')
+                        if type(width) not in (int,float) or not math.isfinite(width) or not 2<=width<=12:raise ValueError('Spessore tubazione da 2 a 12')
+                        if not isinstance(xy,list) or not 2<=len(xy)<=64:raise ValueError('Ogni tubazione richiede da 2 a 64 punti')
+                        if any(not isinstance(v,list) or len(v)!=2 or any(type(n) not in (int,float) or not math.isfinite(n) or not 0<=n<=100 for n in v) for v in xy):raise ValueError('Posizione tubazione non valida')
+                        paths.append({'id':pipe['id'],'label':label.strip(),'color':color.lower(),'width':width,'xy':[[round(n,3) for n in v] for v in xy]})
+                    plan['pipes']=paths
+                clean.append(plan)
             data={'plans':clean};encoded=json.dumps(data,ensure_ascii=False)
             if len(encoded.encode())>20*1024*1024:raise ValueError('Archivio schemi troppo grande (20 MB)')
             path=self.diagram_path(layout['project']);path.parent.mkdir(parents=True,exist_ok=True)

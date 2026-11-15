@@ -85,3 +85,19 @@ class FeatureTests(unittest.TestCase):
         for low,high in [(65,35),(35,35),(float('nan'),65),(-101,65),(35,301),('35',65),(True,65)]:
             point.update(temp_low=low,temp_high=high)
             with self.assertRaises(ValueError):save()
+
+    def test_technical_layers_symbols_notes_and_editable_pipes(self):
+        from nm_bridge.control_features import SYMBOLS
+        plan={'id':'tech','kind':'floorplan','name':'Technical','background':None,'points':[{'id':f'p{i}','symbol':s,'label':s,'device':'','x':20,'y':30,'layer':'dali','notes':'ECG 05 / rack A'} for i,s in enumerate(sorted(SYMBOLS))],'pipes':[{'id':'supply','label':'Mandata','color':'#EF4444','width':5,'xy':[[10,20],[80,20],[80,70]]}]}
+        read=self.f.diagrams(self.ctx())
+        self.f.save_diagrams(self.ctx(plans=[plan],diagram_fingerprint=read['fingerprint']))
+        saved=self.f.diagrams(self.ctx());result=saved['plans'][0]
+        self.assertEqual(result['points'],plan['points']);self.assertEqual(result['pipes'][0]['color'],'#ef4444')
+        self.assertEqual(self.ha.writes(),[])
+        for change in [{'width':True},{'width':15},{'color':'url(x)'},{'xy':[[0,0]]},{'xy':[[0,0],[101,0]]},{'xy':[[0,0],[float('nan'),0]]}]:
+            bad=copy.deepcopy(plan);bad['pipes'][0].update(change)
+            with self.assertRaises(ValueError):self.f.save_diagrams(self.ctx(plans=[bad],diagram_fingerprint=saved['fingerprint']))
+        for change in [{'layer':'invalid'},{'notes':'x'*501}]:
+            bad=copy.deepcopy(plan);bad['points'][0].update(change)
+            with self.assertRaises(ValueError):self.f.save_diagrams(self.ctx(plans=[bad],diagram_fingerprint=saved['fingerprint']))
+        self.assertEqual(self.f.diagrams(self.ctx())['fingerprint'],saved['fingerprint'])

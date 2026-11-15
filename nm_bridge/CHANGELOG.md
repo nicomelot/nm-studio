@@ -1,3 +1,9 @@
+# 5.27.0
+
+- Tubazioni modificabili: disegno ortogonale, punti trascinabili, colore, spessore e annulla/ripeti. Nuovi modelli con tubi separati dallo sfondo; conversione esplicita dei modelli precedenti.
+- Planimetrie: livelli tecnici, prese RJ45, DALI/ECG, KNX, access point, video, rack e simboli luce, tapparelle, sensori e contatti. Note tecniche per porta rack o indirizzo ECG.
+- Importazione dalla vecchia planimetria conserva simboli, livelli, posizioni e associazioni disponibili nel progetto.
+
 ## 5.26.0
 
 - Libreria di tre modelli di centrale termica con sfondi e componenti pronti.
