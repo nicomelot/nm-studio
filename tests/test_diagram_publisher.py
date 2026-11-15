@@ -11,6 +11,17 @@ class DiagramPublisherTests(unittest.TestCase):
         card=result['views'][0]['cards'][0];self.assertEqual(card['type'],'custom:nm-floorplan-card')
         self.assertEqual(card['points'][0]['entity'],'light.demo');self.assertEqual(card['points'][1]['entity'],'')
         self.assertEqual(card['points'][0]['x'],25);self.assertIn(['Indirizzo ECG','12'],card['points'][0]['rows'])
+    def test_schematic_without_background_preserves_pipes_and_symbols(self):
+        plan=self.plan();plan['kind']='schematic';plan['background']=''
+        plan['pipes']=[{'xy':[[10,20],[80,20]],'color':'#ff0000','width':4}]
+        plan['points'][0].update(symbol='temperature',temp_low=15,temp_high=60)
+        card=generate(plan,[{'id':'d','entity_id':'sensor.demo'}],'nm-studio-plant')['views'][0]['cards'][0]
+        self.assertTrue(card['image'].startswith('data:image/svg+xml;base64,'))
+        self.assertEqual(card['pipes'],plan['pipes'])
+        self.assertEqual(card['points'][0]['symbol'],'temperature')
+        self.assertEqual(card['points'][0]['temp_high'],60)
+        self.assertEqual(card['points'][0]['entity'],'sensor.demo')
+
     def test_create_preview_update_backup_and_stale_guard(self):
         class Client:
             def __init__(self):self.calls=[];self.paths=[];self.config=None

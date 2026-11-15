@@ -1,3 +1,9 @@
+## 5.34.0
+
+- Card Home Assistant termostato con popup compatto scuro, temperatura in evidenza, modalità supportate, filtro, ventola e palette associabili.
+- Settimana modificabile dalla card: copia giorni, salvataggio in pausa, conferma di attivazione, esecuzione tramite il programmatore NM e protezione dai salvataggi incompleti.
+- Sinottici pubblicabili nelle plance HA con tubazioni, pompe animate, valvole e sonde colorate; conservata l’autogenerazione delle plance.
+
 ## 5.33.0
 
 - Rete: collegamento bidirezionale porte switch / prese in planimetria, rack, patch panel, ricerca e avviso associazioni duplicate.

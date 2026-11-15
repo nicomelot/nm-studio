@@ -9,8 +9,10 @@ import os
 import re
 
 try:
+    from .climate_cards import prepare as prepare_climate_cards
     from .lovelace_generator import generate
 except ImportError:
+    from climate_cards import prepare as prepare_climate_cards
     from lovelace_generator import generate
 
 
@@ -124,6 +126,7 @@ def publish_generated(payload, generated, client_factory=HAWebSocket):
         # If save fails the empty dashboard may remain. Never silently delete
         # or retry by overwriting: report the exact path to the installer.
         try:
+            prepare_climate_cards(config,client)
             client.call("lovelace/config/save", url_path=url_path, config=config)
         except Exception as exc:
             raise PublishError("Dashboard creata ma configurazione non salvata (" + url_path + "): " + str(exc)[:140]) from exc
@@ -345,6 +348,7 @@ def update_existing(payload, layout, entities, client_factory=HAWebSocket, backu
         if _digest(client.call('lovelace/config', url_path=path)) != _digest(current):
             raise PublishError('Dashboard cambiata durante il backup: nessuna scrittura')
         try:
+            prepare_climate_cards(config,client)
             client.call('lovelace/config/save', url_path=path, config=config)
             stored = client.call('lovelace/config', url_path=path)
             if stored != config:

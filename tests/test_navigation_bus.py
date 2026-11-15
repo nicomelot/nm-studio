@@ -1,6 +1,7 @@
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from nm_bridge.lab_dashboard import preview, publish
 from nm_bridge.bus_recorder import Recorder, addresses
@@ -31,7 +32,9 @@ class NavigationTests(unittest.TestCase):
         self.assertTrue(all(v.get('subview') for v in views[3:]))
         self.assertNotIn('Antifurto', json.dumps(views))
         client = FakeClient()
-        publish({**request, 'confirm': True, 'expected_fingerprint': result['fingerprint']}, inventory(request), lambda: client)
+        with patch('nm_bridge.dashboard_publisher.prepare_climate_cards') as prepare:
+            publish({**request, 'confirm': True, 'expected_fingerprint': result['fingerprint']}, inventory(request), lambda: client)
+            prepare.assert_called_once()
         self.assertGreater(len(client.saved['views']), 8)
 
 

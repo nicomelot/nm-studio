@@ -91,3 +91,6 @@ COPY control-buttons.js /app/control-buttons.js
 
 COPY control_network.py /app/control_network.py
 COPY control-network.js /app/control-network.js
+
+COPY climate_cards.py /app/climate_cards.py
+COPY nm-climate-card.js /app/nm-climate-card.js
