@@ -54,4 +54,5 @@ class ClimateCardsTests(unittest.TestCase):
             c.prepare(card,ws,root,root);c.prepare(card,ws,root,root)
             self.assertEqual(len(ws.created),9);self.assertEqual(len(card['schedule']['days']),7)
             self.assertEqual(card['filter_alarm'],'binary_sensor.manual')
-            self.assertTrue((Path(root)/'www/nm-control/nm-climate-card-5.34.0.js').exists())
+            self.assertTrue((Path(root)/'www/nm-control/nm-climate-card-5.34.1.js').exists())
+
