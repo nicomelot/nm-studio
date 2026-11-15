@@ -34,7 +34,7 @@ def write(data, root):
 
 
 def install_resource(ws, root='/homeassistant'):
-    name='nm-climate-card-5.34.0.js';url='/local/nm-control/'+name
+    name='nm-climate-card-5.34.1.js';url='/local/nm-control/'+name
     directory=Path(root)/'www'/'nm-control';directory.mkdir(parents=True,exist_ok=True)
     (directory/name).write_bytes(Path(__file__).with_name('nm-climate-card.js').read_bytes())
     resources=ws.call('lovelace/resources')
@@ -129,7 +129,9 @@ def setup(engine, payload):
         c=config(project,entity,widget['name']);path='nm-studio-clima-'+ident
         with engine.connection_factory() as ws:
             dashboards=ws.call('lovelace/dashboards/list')
-            if any(d['url_path']==path for d in dashboards):return {'url_path':path,'existing':True}
+            if any(d['url_path']==path for d in dashboards):
+                install_resource(ws)
+                return {'url_path':path,'existing':True}
             if payload.get('simulated_options'):
                 if not entity.startswith('climate.nm_lab_'+project[:12]+'_'):raise ValueError('Le opzioni simulate sono riservate a un termostato NM LAB del progetto')
                 with LOCK:

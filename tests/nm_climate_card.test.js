@@ -12,3 +12,13 @@ test('missing day is an empty editable draft and values are escaped',()=>{
  assert.equal(vm.runInContext('ncEscape("<script>")',ctx), '&lt;script&gt;');
  assert.ok(!source.includes('SUPERVISOR_TOKEN'));assert.ok(!source.includes('hassio/'));
 });
+test('new text helpers accept initial writes, offline helpers and unknown climates remain blocked',async()=>{
+ const service=vm.runInContext('NMClimateCard.prototype.service',ctx),calls=[];
+ const card={available:()=>false,state:()=>({state:'unknown'}),_hass:{callService:async(...a)=>calls.push(a)}};
+ await service.call(card,'input_text.week','set_value',{value:'{}'});
+ assert.equal(calls.length,1);
+ await assert.rejects(service.call(card,'climate.demo','set_temperature',{temperature:22}),/non disponibile/);
+ card.state=()=>({state:'unavailable'});
+ await assert.rejects(service.call(card,'input_text.week','set_value',{value:'{}'}),/non disponibile/);
+ assert.equal(calls.length,1);
+});
