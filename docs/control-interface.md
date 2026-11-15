@@ -57,3 +57,10 @@ Sinottici → Da modello propone tre schemi: generatore e circuito diretto, accu
 Crea e personalizza apre una copia in Modifica. Puoi cambiare etichette, simboli, posizioni, soglie e collegamenti, aggiungere o rimuovere punti e sostituire lo sfondo con PDF/PNG/JPG. Salva e usa conferma il salvataggio. Riutilizza schema esegue lo stesso flusso su un sinottico già salvato: conserva grafica e soglie, genera nuovi identificativi e richiede di scegliere i collegamenti della copia. L’originale resta invariato.
 
 I tracciati dei modelli sono uno sfondo grafico statico e indicativo, non un progetto idraulico esecutivo né una regolazione automatica. I modelli sono convertiti localmente in PNG e conservati nell’archivio standard del progetto, senza nuove dipendenze o accessi esterni.
+
+
+### Decision Model (5.30)
+
+La nuova voce legge le decisioni simulate già esposte in Home Assistant con il contratto di `intelligence.py`. Non genera decisioni nuove né inventa un destinatario: l'operatore seleziona un dispositivo simulato del progetto e il comando che interpreta il suggerimento. L'anteprima confronta stato attuale e valore richiesto; solo una conferma esplicita applica il comando.
+
+L'applicazione è limitata alle entità `nm_lab_<prefisso progetto>_*`. Il server verifica nuovamente scadenza, contenuto della decisione, progetto, revisione, stato e capacità del dispositivo. L'anteprima ha un token monouso di 120 secondi. Ogni coppia decisione/proposta viene registrata in modo persistente prima dell'invio; non si ritenta automaticamente un esito ambiguo. Le prove browser usano `tests/control_preview.py` e dati sintetici, senza accesso al bus.

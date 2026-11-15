@@ -6,8 +6,12 @@ durably claimed before any service call: ambiguous sends are not retried.
 import copy
 try:
     from .control_features import ControlFeatures
+    from .control_decisions import ControlDecisions, simulated
+    from .intelligence import summarize
 except ImportError:
     from control_features import ControlFeatures
+    from control_decisions import ControlDecisions, simulated
+    from intelligence import summarize
 import hashlib
 import json
 import logging
@@ -264,6 +268,7 @@ class ControlEngine:
         self.stop_event = threading.Event()
         self.worker = None
         self.features = ControlFeatures(self, binding)
+        self.decisions = ControlDecisions(self)
         self.health = {'running': False, 'last_check': None, 'error': None}
 
     def read(self):
@@ -319,6 +324,8 @@ class ControlEngine:
             return {'project': layout.get('project', ''), 'fingerprint': digest(layout), 'revision': raw['revision'],
                     'rooms': list(dict.fromkeys(layout.get('rooms', []) + [w['room'] for w in combined['widgets']])),
                     'devices': catalog(combined, states, config.get('unit_system', {}).get('temperature') or '°C'), 'widget_candidates': self.features.candidates(states), 'release_error':self.features.last_release_error, 'lab_candidates': lab_candidates(layout, states),
+                    'decision_model': summarize(states),
+                    'decision_devices': [binding(w) for w in layout.get('widgets', []) if simulated(w.get('entity_id'), layout.get('project',''))],
                     'records': records, 'logs': self.history(layout.get('project', '')),
                     'ha_error': error, 'time_zone': config.get('time_zone'),
                     'location_name': config.get('location_name'),

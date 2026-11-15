@@ -1,3 +1,9 @@
+## 5.30.0
+
+- Decision Model nella nuova interfaccia: suggerimenti, motivazioni e selezione esplicita di dispositivo/comando simulato.
+- Anteprima prima/dopo, conferma e registro esecuzioni; controlli su progetto, scadenza, stato cambiato e reinvio.
+- Applicazione limitata ai dispositivi del laboratorio del progetto. Il modello esterno resta una fonte di suggerimenti, non di comandi automatici.
+
 # 5.29.0
 
 - Planimetria Home Assistant con popup sul posto, adattamento allo schermo, zoom, trascinamento e pinch. Simboli da 44 px e selettore dispositivi per accesso rapido da telefono.
