@@ -1,3 +1,7 @@
+## 5.35.1
+
+- Il riepilogo e il calendario NM mostrano il comando effettivo di ogni fascia delle card HA, con indicazioni valide anche per luci e tapparelle.
+
 ## 5.35.0
 
 - Card luci e tapparelle con popup coerente con il termostato: comandi supportati, luminosità e apertura percentuale.
