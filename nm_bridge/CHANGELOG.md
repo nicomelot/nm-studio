@@ -1,3 +1,9 @@
+## 5.32.0
+- Entità importate da HA utilizzabili negli scenari e nelle programmazioni settimanali/solari, inclusi volume, sorgente e silenzioso audio.
+- Scenari → Pulsanti: trigger nativi dei dispositivi HA (ZHA/MQTT), entità evento e input_button simulati; anteprima, conferma, pausa e verifica dopo modifiche.
+- Ascolto persistente nell’add-on con riconnessione, registro e protezione dalle ripetizioni; nessun recupero di pressioni perse durante le disconnessioni.
+- Campi numerici dei comandi sincronizzati durante la digitazione.
+
 ## 5.31.0
 
 - Importazione ricercabile di entità Home Assistant già esistenti: luci, relè, pulsanti, audio e sensori/eventi.

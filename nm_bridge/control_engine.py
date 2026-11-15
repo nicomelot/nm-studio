@@ -5,13 +5,15 @@ durably claimed before any service call: ambiguous sends are not retried.
 """
 import copy
 try:
+    from .control_buttons import ControlButtons
     from .control_features import ControlFeatures
-    from .control_ha import HomeAssistantWidgets, actions as ha_actions, ATTRIBUTES as HA_ATTRIBUTES
+    from .control_ha import HomeAssistantWidgets, actions as ha_actions, ATTRIBUTES as HA_ATTRIBUTES, plan as ha_plan, clean_value as ha_clean_value
     from .control_decisions import ControlDecisions, simulated, review_summary
     from .intelligence import summarize
 except ImportError:
+    from control_buttons import ControlButtons
     from control_features import ControlFeatures
-    from control_ha import HomeAssistantWidgets, actions as ha_actions, ATTRIBUTES as HA_ATTRIBUTES
+    from control_ha import HomeAssistantWidgets, actions as ha_actions, ATTRIBUTES as HA_ATTRIBUTES, plan as ha_plan, clean_value as ha_clean_value
     from control_decisions import ControlDecisions, simulated, review_summary
     from intelligence import summarize
 import hashlib
@@ -68,7 +70,7 @@ def catalog(layout, states, temperature_unit='°C'):
                        'type': w['type'], 'entity_id': w.get('entity_id', ''),
                        'visible': w.get('visible', True), 'fields': w['fields'],
                        'ha_actions': ha_actions(state) if w['type']=='homeassistant' else [],
-                       'actions': ['off'] if w.get('command_mode') == 'off_only' else ACTIONS.get(w['type'], []),
+                       'actions': ha_actions(state) if w['type']=='homeassistant' else ['off'] if w.get('command_mode') == 'off_only' else ACTIONS.get(w['type'], []),
                        'state': state.get('state', 'unavailable'),
                        'attributes': {k: attrs[k] for k in ('brightness', 'current_position', 'current_temperature',
                            'temperature', 'min_temp', 'max_temp', 'temperature_unit', 'hvac_modes', 'hvac_action', 'unit_of_measurement', 'device_class', *HA_ATTRIBUTES) if k in attrs}})
@@ -104,7 +106,7 @@ def clean_actions(raw, layout):
             raise ValueError('Dispositivo cambiato, mancante o duplicato: aggiorna il progetto')
         w = matches[0]
         entity = w.get('entity_id', '')
-        if not ENTITY.fullmatch(entity):
+        if not ENTITY.fullmatch(entity) and not (w['type']=='homeassistant' and re.fullmatch(r'(light|switch|input_boolean|button|input_button|media_player)\.[a-z0-9_]+', entity)):
             raise ValueError('Associa prima il dispositivo a una entità Home Assistant')
         # Multiple actions for the same climate are valid (mode then setpoint).
         key = (entity, a.get('action'))
@@ -112,6 +114,9 @@ def clean_actions(raw, layout):
             raise ValueError('Azione duplicata per lo stesso dispositivo')
         targets.add(key)
         action, value = a.get('action'), a.get('value')
+        if w['type'] == 'homeassistant':
+            clean.append({'device': binding(w), 'action': action, 'value': ha_clean_value(entity, action, value)})
+            continue
         if action not in ACTIONS.get(w['type'], []):
             raise ValueError('Azione incompatibile con il dispositivo')
         if w.get('command_mode') == 'off_only' and action != 'off':
@@ -170,7 +175,7 @@ def clean_triggers(raw):
 def slot_actions(record, trigger=None):
     actions = copy.deepcopy(record['actions'])
     if trigger and 'value' in trigger:
-        if len(actions) != 1 or actions[0]['action'] not in ('temperature', 'brightness', 'position'):
+        if len(actions) != 1 or actions[0]['action'] not in ('temperature', 'brightness', 'position', 'volume'):
             raise ValueError('Un valore per fascia richiede una singola azione numerica')
         actions[0]['value'] = trigger['value']
     return actions
@@ -221,6 +226,9 @@ def service_plan(layout, actions, ws, states=None):
     for a in actions:
         index, w = next((i, w) for i, w in enumerate(layout['widgets']) if binding(w) == a['device'])
         ident, kind, action = w['entity_id'], w['type'], a['action']
+        if kind == 'homeassistant':
+            calls.append(ha_plan(w, action, a['value'], states)[0])
+            continue
         domain = ident.split('.')[0]
         expected = {'light': {'light', 'switch'}, 'dimmer': {'light'}, 'cover': {'cover'}, 'climate': {'climate'}}[kind]
         if domain not in expected:
@@ -273,6 +281,7 @@ class ControlEngine:
         self.features = ControlFeatures(self, binding)
         self.decisions = ControlDecisions(self)
         self.ha_widgets = HomeAssistantWidgets(self, binding)
+        self.buttons = ControlButtons(self)
         self.health = {'running': False, 'last_check': None, 'error': None}
 
     def read(self):
@@ -302,6 +311,9 @@ class ControlEngine:
     def records(self, raw, project):
         return raw['projects'].get(project, [])
 
+    def combined(self, layout, raw):
+        return {**layout, 'widgets': layout.get('widgets', []) + self.features.widgets(layout.get('project', ''), raw)}
+
     def snapshot(self):
         with LAYOUT_LOCK, self.lock:
             layout, raw = self.layout_provider(), self.read()
@@ -316,7 +328,7 @@ class ControlEngine:
             for r in records:
                 r['next_runs'], r['warning'] = [], None
                 try:
-                    clean_actions(r['actions'], layout)
+                    clean_actions(r['actions'], self.combined(layout, raw))
                     if r['kind'] == 'schedule':
                         clean_triggers(r['triggers'])
                         r['next_runs'] = [d.isoformat() for d, _, _ in occurrences(r['triggers'], config, current) if d >= current][:8]
@@ -330,6 +342,8 @@ class ControlEngine:
                     'devices': catalog(combined, states, config.get('unit_system', {}).get('temperature') or '°C'), 'widget_candidates': self.features.candidates(states), 'release_error':self.features.last_release_error, 'lab_candidates': lab_candidates(layout, states),
                     'decision_model': review_summary(states),
                     'decision_devices': [binding(w) for w in layout.get('widgets', []) if simulated(w.get('entity_id'), layout.get('project',''))],
+                    'button_links': [{**r, 'active': r in self.buttons.active(layout, raw)} for r in self.buttons.rules(raw, layout.get('project',''))],
+                    'button_listener': copy.deepcopy(self.buttons.health),
                     'records': records, 'logs': self.history(layout.get('project', '')),
                     'ha_error': error, 'time_zone': config.get('time_zone'),
                     'location_name': config.get('location_name'),
@@ -348,6 +362,7 @@ class ControlEngine:
         with LAYOUT_LOCK, self.lock:
             layout, raw = self.layout_provider(), self.read()
             self.guard(payload, layout, raw)
+            layout = self.combined(layout, raw)
             record = payload.get('record')
             if not isinstance(record, dict):
                 raise ValueError('Configurazione non valida')
@@ -379,6 +394,7 @@ class ControlEngine:
         with LAYOUT_LOCK, self.lock:
             layout, raw = self.layout_provider(), self.read()
             self.guard(payload, layout, raw)
+            layout = self.combined(layout, raw)
             records = self.records(raw, layout['project'])
             source = next((r for r in records if r['id'] == payload.get('id')), None)
             if not source or source['kind'] != 'schedule' or len(source['actions']) != 1 or source['actions'][0]['action'] != 'temperature':
@@ -432,6 +448,7 @@ class ControlEngine:
         with LAYOUT_LOCK, self.lock:
             layout, raw = self.layout_provider(), self.read()
             self.guard(payload, layout, raw)
+            layout = self.combined(layout, raw)
             record = next((r for r in self.records(raw, layout['project']) if r['id'] == payload.get('id')), None)
             if record is None:
                 raise ValueError('Scenario o programma non trovato')
@@ -476,6 +493,7 @@ class ControlEngine:
         with LAYOUT_LOCK, self.lock:
             layout, raw = self.layout_provider(), self.read()
             self.guard(payload, layout, raw)
+            layout = self.combined(layout, raw)
             record = next((r for r in self.records(raw, layout['project']) if r['id'] == payload.get('id')), None)
             if not record or record['kind'] != 'schedule' or type(payload.get('enabled')) is not bool:
                 raise ValueError('Programmazione non valida')
@@ -505,6 +523,7 @@ class ControlEngine:
         with LAYOUT_LOCK, self.lock:
             layout, raw = self.layout_provider(), self.read()
             self.guard(payload, layout, raw)
+            layout = self.combined(layout, raw)
             actions = clean_actions(payload.get('actions'), layout)
             with self.connection_factory() as ws:
                 calls = service_plan(layout, actions, ws)
@@ -515,6 +534,7 @@ class ControlEngine:
         with LAYOUT_LOCK, self.lock:
             layout, raw = self.layout_provider(), self.read()
             self.guard(payload, layout, raw)
+            layout = self.combined(layout, raw)
             actions = clean_actions(payload.get('actions'), layout)
             if payload.get('preview_hash') != digest({'layout': layout, 'actions': actions}):
                 raise ValueError('Rivedi l’anteprima del comando')
@@ -555,6 +575,7 @@ class ControlEngine:
         with LAYOUT_LOCK, self.lock:
             layout, raw = self.layout_provider(), self.read()
             self.guard(payload, layout, raw)
+            layout = self.combined(layout, raw)
             record = next((r for r in self.records(raw, layout['project']) if r['id'] == payload.get('id')), None)
             if not record or record['kind'] != 'scene':
                 raise ValueError('Scenario non trovato')
@@ -622,6 +643,7 @@ class ControlEngine:
         now = now or datetime.now(UTC)
         with LAYOUT_LOCK, self.lock:
             layout, raw = self.layout_provider(), self.read()
+            layout = self.combined(layout, raw)
             active = [r for r in self.records(raw, layout.get('project', '')) if r.get('enabled') and r['kind'] == 'schedule']
             if not active:
                 return
@@ -634,6 +656,7 @@ class ControlEngine:
 
     def start(self):
         self.features.start()
+        self.buttons.start()
         if self.worker and self.worker.is_alive():
             return
         def loop():

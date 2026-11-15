@@ -29,7 +29,7 @@ Il backup completo dell'add-on include entrambi i file. L'esportazione diagnosti
 
 ## Verifica
 
-`python -m unittest discover -s tests` e `node --test tests/*.test.js` verificano il progetto. `python tests/control_preview.py --port 8766` apre un laboratorio locale con dati sintetici e servizi simulati, senza programmatore in esecuzione. Non è un server di produzione. Il collaudo su HA con dispositivi fisici resta distinto dai test simulati.
+`python -m unittest discover -s tests` e `node --test tests/*.test.js` verificano il progetto. `python tests/control_preview.py --port 8766` apre un laboratorio locale con dati sintetici e servizi simulati, con programmatore e ascolto pulsanti in esecuzione su dati sintetici. Non è un server di produzione. Il collaudo su HA con dispositivi fisici resta distinto dai test simulati.
 
 
 ## Sinottici, planimetrie e widget aggiuntivi (5.24)
@@ -68,6 +68,15 @@ L'applicazione è limitata alle entità `nm_lab_<prefisso progetto>_*`. Il serve
 
 ### Entità Home Assistant (5.31)
 
-Dispositivi → Da Home Assistant permette di cercare e collegare entità già esistenti, scegliendo nome e ambiente. Supporta luci (on/off e luminosità), relè/interruttori, pulsanti HA, sensori/eventi e lettori multimediali (riproduzione, pausa, volume, silenzioso, sorgente e alimentazione quando dichiarati supportati). Non installa Hue, Sonoff o WiiM: usa le integrazioni HA già configurate. I pulsanti fisici esposti come eventi sono in sola lettura; i loro trigger vanno configurati nelle automazioni HA. Questi widget usano comandi manuali confermati e sono collegabili ai simboli degli schemi; non sono ancora azioni delle programmazioni NM.
+Dispositivi → Da Home Assistant permette di cercare e collegare entità già esistenti, scegliendo nome e ambiente. Supporta luci (on/off e luminosità), relè/interruttori, pulsanti HA, sensori/eventi e lettori multimediali (riproduzione, pausa, volume, silenzioso, sorgente e alimentazione quando dichiarati supportati). Non installa Hue, Sonoff o WiiM: usa le integrazioni HA già configurate. Dalla 5.32 questi widget sono anche azioni degli scenari e delle programmazioni NM; i pulsanti si collegano in Scenari → Pulsanti.
 
 L'aggiunta non invia servizi e non modifica l'entità HA. Il comando ha anteprima monouso con verifica dello stato, delle capacità e del progetto, e scrittura preventiva nel registro. Il Decision Model accetta rinnovi identici senza invalidare l'anteprima; nuove condizioni, proposte o stati richiedono una nuova verifica.
+
+
+### Programmazioni HA e pulsanti (5.32)
+
+Dal widget importato scegliere Orari, oppure Programmazioni → Nuovo programma. Sono disponibili orario fisso, alba/tramonto, giorni della settimana, copia giorno e modifica rapida delle fasce. I comandi dipendono dalle capacità dell’entità: luminosità, on/off, volume, sorgente, silenzioso, riproduzione/pausa o pressione di un pulsante HA. Il volume supporta valori diversi per fascia. Sensori ed eventi sono sorgenti in lettura e non azioni programmabili. Salvataggio in pausa, anteprima e attivazione restano separati. Ogni esecuzione ricontrolla le capacità e viene registrata una sola volta.
+
+Scenari → Pulsanti → Collega pulsante: scegliere un dispositivo HA (trigger nativi ZHA/MQTT esposti dall’integrazione) oppure una entità event/input_button, leggere le pressioni disponibili, scegliere lo scenario, verificare e confermare. Non vengono installate nuove integrazioni, né accettati trigger o servizi arbitrari dal browser. Alcune integrazioni non espongono trigger compatibili: l’interfaccia lo segnala. Il supporto dipende dall’integrazione HA, non dal marchio Sonoff. Le entità evento devono esporre event_types. I pulsanti input_button permettono un collaudo senza hardware. Un evento ripetuto con un nuovo timestamp vale come una nuova pressione.
+
+L’add-on mantiene la sottoscrizione anche a browser chiuso; dopo disconnessione si riconnette senza recuperare le pressioni perse. Il collegamento si può mettere in pausa, modificare e riattivare con una nuova anteprima. Cambi di scenario o configurazione dei dispositivi sospendono l’esecuzione fino alla nuova verifica. Scenari richiamati dai pulsanti non possono premere altri pulsanti, per evitare circuiti di richiamo. Le API subscribe_trigger richiedono il ruolo HA previsto da Home Assistant; in caso di rifiuto l’interfaccia mostra l’errore e non attiva il collegamento.
