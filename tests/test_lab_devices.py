@@ -27,6 +27,10 @@ def inventory(payload):
 
 
 class LabDevicesTests(unittest.TestCase):
+    def setUp(self):
+        provisioning=patch('nm_bridge.dashboard_publisher.prepare_climate_cards')
+        provisioning.start();self.addCleanup(provisioning.stop)
+
     def test_building_common_floor_and_ambiguous_locations(self):
         data = {'devices': [{'id': 'd1', 'ets_id': 'ets1'}, {'id': 'd2', 'ets_id': 'ets2'}],
                 'building': [{'path': 'FR / MAGAZZINO PRIMO / PULSANTIERA', 'devices': ['ets1']},

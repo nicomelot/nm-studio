@@ -70,7 +70,7 @@ def preview(payload, entities):
                 'tap_action': {'action': 'more-info'},
                 'icon_tap_action': {'action': 'more-info'},
                 'hold_action': {'action': 'more-info'}}
-        if item['kind']=='climate':card=climate_card_config(plan['project'],ident,item['name'])
+        if item['kind'] in ('climate','light','dimmer','cover'):card=climate_card_config(plan['project'],ident,item['name'])
         rooms.setdefault(item['room'], []).append(card)
         category = {'light': 'Luci', 'dimmer': 'Luci', 'cover': 'Motorizzazioni',
                     'climate': 'Clima', 'scene': 'Scene'}.get(item['kind'], 'Sensori')

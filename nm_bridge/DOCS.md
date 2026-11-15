@@ -1,5 +1,11 @@
 # NM Studio – Home Assistant
 
+## Luci e tapparelle nella dashboard esistente (5.35)
+
+In **Dispositivi → Card nella dashboard HA**, seleziona una plancia e i dispositivi del progetto. L’anteprima elenca le aggiunte; **Conferma inserimento** aggiunge la vista **NM · Dispositivi**, conservando le altre viste e salvando una copia della configurazione precedente. Una seconda esecuzione non duplica le card già inserite. Le card si possono poi spostare nell’editor HA. La nuova Panoramica automatica di HA (/home) non ammette viste aggiuntive: scegli una normale plancia HA personalizzabile, che può contenere insieme card standard e card NM. La Panoramica classica (/lovelace), se ancora presente, deve essere già modificabile. NM non converte automaticamente le dashboard.
+
+Clicca la card per aprire i comandi e **Programmazione settimanale**. Ogni fascia sceglie Orario, Alba o Tramonto, l’eventuale anticipo/ritardo in minuti e l’azione. Luminosità e posizione compaiono solo se supportate e associate. Copia il giorno sugli altri, salva in pausa e conferma l’attivazione. La posizione geografica e il fuso sono quelli di HA; i giorni delle fasce solari si riferiscono al giorno dell’alba/tramonto, anche quando uno scostamento attraversa mezzanotte. Programmi NM già attivi sul dispositivo hanno precedenza; l’avviso compare nella card. Il programma continua a browser chiuso, con HA e add-on accesi.
+
 ## Termostati e sinottici nelle plance Home Assistant (5.34)
 
 In NM Control → Dispositivi → **Card HA termostato**, scegliere il termostato del progetto e creare la pagina. Per i termostati NM LAB, l’opzione simulazione aggiunge gli ingressi filtro, palette e ventola automatica. Anche le nuove plance autogenerate utilizzano la card NM Termostato. Le plance già esistenti richiedono il normale aggiornamento con confronto e conferma.

@@ -94,3 +94,6 @@ COPY control-network.js /app/control-network.js
 
 COPY climate_cards.py /app/climate_cards.py
 COPY nm-climate-card.js /app/nm-climate-card.js
+
+COPY nm-device-card.js /app/nm-device-card.js
+COPY device_card_dashboard.py /app/device_card_dashboard.py

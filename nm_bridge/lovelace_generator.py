@@ -74,9 +74,10 @@ def generate(layout, entities):
                 card["icon_tap_action"] = {"action": "more-info"}
                 card["grid_options"] = {"columns": 12}
                 if ident.startswith("cover."):
-                    card["features"] = [{"type": "cover-open-close"}]
-                elif ident.startswith("climate."):
+                    card["features"]=[{"type":"cover-open-close"}]
+                if re.fullmatch("[a-f0-9]{64}",layout.get("project","")) and ident.split(".")[0] in ("light","cover","switch","climate"):
                     card=climate_card_config(layout.get('project',''),ident,w['name'])
+                    if w['type']=='light':card['actions']=['on','off']
                 if w.get('command_mode') == 'off_only':
                     card = {'type': 'button', 'name': w['name'], 'icon': 'mdi:power',
                             'show_state': False, 'grid_options': {'columns': 12},

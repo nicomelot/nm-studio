@@ -23,10 +23,10 @@ class RoomDashboardTests(unittest.TestCase):
         self.assertEqual(zone_link['name'], 'Bagno')
         zone = views[zone_link['tap_action']['navigation_path'].split('/')[-1]]
         self.assertTrue(zone['back_path'].endswith('/' + floor['path']))
-        tiles = [c for c in cards(zone) if c['type'] in ('tile','custom:nm-climate-card')]
+        tiles = [c for c in cards(zone) if c['type'] in ('tile','custom:nm-climate-card','custom:nm-device-card')]
         self.assertEqual({c['entity'] for c in tiles}, {m['entity_id'] for m in build(request)['manifest']})
         for card in tiles:
-            if card['type']=='custom:nm-climate-card':
+            if card['type'] in ('custom:nm-climate-card','custom:nm-device-card'):
                 self.assertEqual(card['project'],request['project']);continue
             self.assertEqual(card['tap_action'], {'action': 'more-info'})
             self.assertEqual(card['icon_tap_action'], {'action': 'more-info'})
