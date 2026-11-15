@@ -74,3 +74,6 @@ COPY control-theme.css /app/control-theme.css
 COPY control-templates.js /app/control-templates.js
 
 COPY control-pipes.js /app/control-pipes.js
+
+COPY control-technical.js /app/control-technical.js
+COPY diagram_publisher.py /app/diagram_publisher.py

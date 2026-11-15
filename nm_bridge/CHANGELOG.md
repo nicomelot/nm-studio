@@ -1,3 +1,9 @@
+# 5.28.0
+
+- Schede tecniche rete (rack, patch panel, porte e switch) e DALI (linea, indirizzo ECG, gruppi).
+- Etichette su passaggio mouse, focus o selezione; opzione per mostrarle tutte. Clic apre la scheda anche per punti collegati, con accesso separato ai comandi.
+- Creazione esplicita di una nuova pagina nativa Home Assistant con voce laterale, suggerimenti e sottopagine tecniche. Copia dello schema salvato, stati HA aggiornati, nessuna sovrascrittura di pagine esistenti.
+
 # 5.27.0
 
 - Tubazioni modificabili: disegno ortogonale, punti trascinabili, colore, spessore e annulla/ripeti. Nuovi modelli con tubi separati dallo sfondo; conversione esplicita dei modelli precedenti.
