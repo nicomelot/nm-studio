@@ -93,6 +93,10 @@ class SessionTests(unittest.TestCase):
 
 
 class DashboardUpdateTests(unittest.TestCase):
+    def setUp(self):
+        provisioning=patch('nm_bridge.lab_dashboard.prepare_climate_cards')
+        provisioning.start();self.addCleanup(provisioning.stop)
+
     def test_update_with_backup_and_stale_guard(self):
         request = project(); states = inventory(request)
         generated = preview(request, states)

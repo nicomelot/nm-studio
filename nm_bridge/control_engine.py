@@ -177,6 +177,8 @@ def clean_triggers(raw):
 
 
 def slot_actions(record, trigger=None):
+    if record.get('source')=='ha_card' and trigger and trigger['id'] in record.get('slot_actions',{}):
+        return copy.deepcopy(record['slot_actions'][trigger['id']])
     actions = copy.deepcopy(record['actions'])
     if trigger and 'value' in trigger:
         if len(actions) != 1 or actions[0]['action'] not in ('temperature', 'brightness', 'position', 'volume'):
@@ -658,7 +660,7 @@ class ControlEngine:
                 for record in card_records:
                     conflicts=[r for r in active if any(a['device']==record['actions'][0]['device'] for a in r['actions'])]
                     if conflicts:
-                        record['enabled']=False;record['warning']='Sospesa: altro programma NM attivo sul termostato'
+                        record['enabled']=False;record['warning']='Sospesa: altro programma NM attivo sul dispositivo'
                     message=record.get('warning') or ('Ultimo controllo: attiva' if record['enabled'] else 'Ultimo controllo: in pausa')
                     if record.get('status_entity'):
                         old=next((s for s in states if s['entity_id']==record['status_entity']),None)

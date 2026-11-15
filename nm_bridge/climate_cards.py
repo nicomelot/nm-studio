@@ -20,7 +20,7 @@ def key(project, entity):
 
 
 def config(project, entity, name):
-    return {'type':CARD,'entity':entity,'project':project,'name':name,'grid_options':{'columns':12}}
+    return {'type':CARD if entity.startswith('climate.') else 'custom:nm-device-card','entity':entity,'project':project,'name':name,'grid_options':{'columns':12}}
 
 
 def read(root='/data'):
@@ -42,13 +42,20 @@ def install_resource(ws, root='/homeassistant'):
     if old:
         if old['url']!=url:ws.call('lovelace/resources/update',resource_id=old['id'],res_type='module',url=url)
     else:ws.call('lovelace/resources/create',res_type='module',url=url)
+    device_name='nm-device-card-5.35.0.js';device_url='/local/nm-control/'+device_name
+    (directory/device_name).write_bytes(Path(__file__).with_name('nm-device-card.js').read_bytes())
+    old=next((r for r in resources if r.get('url','').startswith('/local/nm-control/nm-device-card-')),None)
+    if old:
+        if old['url']!=device_url:ws.call('lovelace/resources/update',resource_id=old['id'],res_type='module',url=device_url)
+    else:ws.call('lovelace/resources/create',res_type='module',url=device_url)
+
 
 
 def prepare(config_, ws, root='/data', config_root='/homeassistant'):
     cards=[]
     def walk(v):
         if isinstance(v,dict):
-            if v.get('type')==CARD:cards.append(v)
+            if v.get('type') in (CARD,'custom:nm-device-card'):cards.append(v)
             for x in v.values():walk(x)
         elif isinstance(v,list):
             for x in v:walk(x)
@@ -58,7 +65,7 @@ def prepare(config_, ws, root='/data', config_root='/homeassistant'):
         data=read(root)
         for c in cards:
             project,entity=c.get('project',''),c.get('entity','')
-            if not re.fullmatch('[a-f0-9]{64}',project) or not re.fullmatch(r'climate\.[a-z0-9_]+',entity):raise ValueError('Identità card clima non valida')
+            if not re.fullmatch('[a-f0-9]{64}',project) or not re.fullmatch(r'(climate|light|switch|cover)\.[a-z0-9_]+',entity):raise ValueError('Identità card clima non valida')
             ident=key(project,entity)
             row=data.setdefault(ident,{'project':project,'entity':entity,'days':[]})
             # Persist each helper so a failed installation can resume without duplicates.
@@ -76,14 +83,30 @@ def prepare(config_, ws, root='/data', config_root='/homeassistant'):
         install_resource(ws,config_root)
 
 
+def device_command(entity, value, widget):
+    domain=entity.split('.')[0]
+    allowed=('open','close','stop') if domain=='cover' else ('on','off')
+    if value in allowed:
+        if widget.get('command_mode')=='off_only' and value!='off':raise ValueError('Solo spegnimento consentito')
+        return {'action':value,'value':None}
+    if isinstance(value,str) and re.fullmatch(r'(position|brightness):\d{1,3}',value):
+        action,percent=value.split(':');percent=int(percent)
+        if percent>100 or (action=='position')!=(domain=='cover') or domain not in ('cover','light'):raise ValueError('Percentuale incompatibile')
+        if widget.get('command_mode')=='off_only':raise ValueError('Solo spegnimento consentito')
+        if action=='brightness' and widget['type'] not in ('dimmer','homeassistant'):raise ValueError('Luminosità non associata')
+        return {'action':action,'value':percent}
+    raise ValueError('Comando programmato non valido')
+
+
 def records(root, layout, states, binding):
     inventory={s['entity_id']:s for s in states};result=[]
     for ident,row in read(root).items():
         if row['project']!=layout.get('project'):continue
-        widgets=[w for w in layout['widgets'] if w.get('entity_id')==row['entity'] and w['type']=='climate']
+        widgets=[w for w in layout['widgets'] if w.get('entity_id')==row['entity'] and w['type'] in ('climate','light','dimmer','cover','homeassistant')]
         if len(widgets)!=1:continue
         w=widgets[0]
-        record={'id':'haweek_'+ident,'kind':'schedule','name':'Settimana HA · '+w['name'],'room':w['room'],'enabled':False,'source':'ha_card','status_entity':row.get('status'),'actions':[{'device':binding(w),'action':'temperature','value':20}],'triggers':[],'warning':None,'activated_at':datetime.now(timezone.utc).isoformat()}
+        climate=row['entity'].startswith('climate.')
+        record={'id':'haweek_'+ident,'kind':'schedule','name':'Settimana HA · '+w['name'],'room':w['room'],'enabled':False,'source':'ha_card','status_entity':row.get('status'),'actions':[{'device':binding(w),'action':'temperature' if climate else 'close' if row['entity'].startswith('cover.') else 'off','value':20 if climate else None}],'triggers':[],'slot_actions':{},'warning':None,'activated_at':datetime.now(timezone.utc).isoformat()}
         try:
             commit=json.loads(inventory.get(row['commit'],{}).get('state',''))
             if not isinstance(commit,dict) or type(commit.get('enabled')) is not bool:raise ValueError('Settimana non ancora salvata')
@@ -97,11 +120,23 @@ def records(root, layout, states, binding):
                 seen=set()
                 for slot in slots:
                     if not isinstance(slot,list) or len(slot)!=2:raise ValueError('Fascia non valida')
-                    time,temp=slot
-                    if not isinstance(time,str) or not re.fullmatch(r'([01]\d|2[0-3]):[0-5]\d',time) or time in seen:raise ValueError('Orario non valido o duplicato')
-                    seen.add(time)
-                    if type(temp) not in (int,float) or not -50<=temp<=100:raise ValueError('Temperatura non valida')
-                    record['triggers'].append({'id':f'd{day}_{len(seen)}','kind':'time','time':time,'days':[day],'value':temp})
+                    when,val=slot
+                    if not isinstance(when,str) or when in seen:raise ValueError('Orario non valido o duplicato')
+                    seen.add(when)
+                    trigger={'id':f'd{day}_{len(seen)}','days':[day]}
+                    if re.fullmatch(r'([01]\d|2[0-3]):[0-5]\d',when):trigger.update(kind='time',time=when)
+                    elif not climate and re.fullmatch(r'(sunrise|sunset):-?\d{1,3}',when):
+                        kind,offset=when.split(':');offset=int(offset)
+                        if not -180<=offset<=180:raise ValueError('Scostamento solare tra -180 e 180 minuti')
+                        trigger.update(kind=kind,offset=offset)
+                    else:raise ValueError('Orario non valido')
+                    if climate:
+                        if type(val) not in (int,float) or not -50<=val<=100:raise ValueError('Temperatura non valida')
+                        trigger['value']=val
+                    else:
+                        command=device_command(row['entity'],val,w)
+                        record['slot_actions'][trigger['id']]=[{'device':binding(w),**command}]
+                    record['triggers'].append(trigger)
             if not record['triggers']:raise ValueError('Aggiungi almeno una fascia')
             # HA timestamp, not a client-supplied clock. Never replay older slots after activation.
             record['activated_at']=inventory[row['commit']]['last_changed']

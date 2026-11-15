@@ -1,3 +1,10 @@
+## 5.35.0
+
+- Card luci e tapparelle con popup coerente con il termostato: comandi supportati, luminosità e apertura percentuale.
+- Settimana direttamente nelle card, con orari, alba/tramonto e scostamenti fino a 180 minuti; copia giorni, salvataggio in pausa e conferma di attivazione.
+- Inserimento con anteprima delle card nella dashboard HA esistente, preservando le altre viste, con controllo modifiche concorrenti e backup.
+- Autogenerazione aggiornata per usare le nuove card nei progetti associati.
+
 ## 5.34.1
 
 - Corregge lo zoom iniziale desktop dei sinottici quando HA monta la card prima di assegnarle la larghezza.
