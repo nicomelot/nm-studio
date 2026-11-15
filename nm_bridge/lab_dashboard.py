@@ -1,6 +1,10 @@
 """Dedicated virtual dashboard; never reads or writes the real widget layout."""
 
 import hashlib
+try:
+    from .climate_cards import config as climate_card_config, prepare as prepare_climate_cards
+except ImportError:
+    from climate_cards import config as climate_card_config, prepare as prepare_climate_cards
 import json
 import os
 import threading
@@ -66,6 +70,7 @@ def preview(payload, entities):
                 'tap_action': {'action': 'more-info'},
                 'icon_tap_action': {'action': 'more-info'},
                 'hold_action': {'action': 'more-info'}}
+        if item['kind']=='climate':card=climate_card_config(plan['project'],ident,item['name'])
         rooms.setdefault(item['room'], []).append(card)
         category = {'light': 'Luci', 'dimmer': 'Luci', 'cover': 'Motorizzazioni',
                     'climate': 'Clima', 'scene': 'Scene'}.get(item['kind'], 'Sensori')
@@ -210,6 +215,7 @@ def update(payload, entities, client_factory=HAWebSocket, backup_root=None):
             json.dump(current, stream, ensure_ascii=False, indent=2)
             stream.flush()
             os.fsync(stream.fileno())
+        prepare_climate_cards(generated['dashboard'],client)
         client.call('lovelace/config/save', url_path=generated['url_path'], config=generated['dashboard'])
         stored = client.call('lovelace/config', url_path=generated['url_path'])
         if not isinstance(stored, dict) or stored.get('views') != generated['dashboard']['views']:

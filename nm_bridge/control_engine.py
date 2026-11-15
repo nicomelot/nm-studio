@@ -5,6 +5,7 @@ durably claimed before any service call: ambiguous sends are not retried.
 """
 import copy
 try:
+    from .climate_cards import records as climate_card_records
     from .control_network import readings as network_readings
     from .control_buttons import ControlButtons
     from .control_features import ControlFeatures
@@ -12,6 +13,7 @@ try:
     from .control_decisions import ControlDecisions, simulated, review_summary
     from .intelligence import summarize
 except ImportError:
+    from climate_cards import records as climate_card_records
     from control_network import readings as network_readings
     from control_buttons import ControlButtons
     from control_features import ControlFeatures
@@ -326,9 +328,10 @@ class ControlEngine:
             except Exception as exc:
                 error = 'Home Assistant non disponibile: ' + str(exc)[:160]
             records = copy.deepcopy(self.records(raw, layout.get('project', '')))
+            records += climate_card_records(self.root,self.combined(layout,raw),states,binding)
             current = datetime.now(UTC)
             for r in records:
-                r['next_runs'], r['warning'] = [], None
+                r['next_runs'], r['warning'] = [], r.get('warning')
                 try:
                     clean_actions(r['actions'], self.combined(layout, raw))
                     if r['kind'] == 'schedule':
@@ -370,6 +373,7 @@ class ControlEngine:
             if not isinstance(record, dict):
                 raise ValueError('Configurazione non valida')
             ident = record.get('id') or str(uuid.uuid4())
+            if str(ident).startswith('haweek_'):raise ValueError('Modifica la settimana dalla card Home Assistant')
             name, kind = record.get('name'), record.get('kind')
             if not IDENT.fullmatch(ident) or not isinstance(name, str) or not 1 <= len(name.strip()) <= 80 or kind not in ('scene', 'schedule'):
                 raise ValueError('Nome o tipo non valido')
@@ -648,9 +652,19 @@ class ControlEngine:
             layout, raw = self.layout_provider(), self.read()
             layout = self.combined(layout, raw)
             active = [r for r in self.records(raw, layout.get('project', '')) if r.get('enabled') and r['kind'] == 'schedule']
-            if not active:
-                return
             with self.connection_factory() as ws:
+                states=ws.call('get_states')
+                card_records=climate_card_records(self.root,layout,states,binding)
+                for record in card_records:
+                    conflicts=[r for r in active if any(a['device']==record['actions'][0]['device'] for a in r['actions'])]
+                    if conflicts:
+                        record['enabled']=False;record['warning']='Sospesa: altro programma NM attivo sul termostato'
+                    message=record.get('warning') or ('Ultimo controllo: attiva' if record['enabled'] else 'Ultimo controllo: in pausa')
+                    if record.get('status_entity'):
+                        old=next((s for s in states if s['entity_id']==record['status_entity']),None)
+                        if old and old.get('state')!=message:ws.call('call_service',domain='input_text',service='set_value',target={'entity_id':record['status_entity']},service_data={'value':message[:255]})
+                active += [r for r in card_records if r['enabled']]
+                if not active:return
                 config = ws.call('get_config')
             for r in active:
                 for instant, trigger, occurrence in occurrences(r['triggers'], config, now, horizon=2):

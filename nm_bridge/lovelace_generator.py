@@ -5,6 +5,10 @@ Never write Home Assistant storage, register entities, or call services.
 
 import re
 import hashlib
+try:
+    from .climate_cards import config as climate_card_config, prepare as prepare_climate_cards
+except ImportError:
+    from climate_cards import config as climate_card_config, prepare as prepare_climate_cards
 import json
 
 try:
@@ -72,7 +76,7 @@ def generate(layout, entities):
                 if ident.startswith("cover."):
                     card["features"] = [{"type": "cover-open-close"}]
                 elif ident.startswith("climate."):
-                    card["features"] = [{"type": "climate-hvac-modes"}]
+                    card=climate_card_config(layout.get('project',''),ident,w['name'])
                 if w.get('command_mode') == 'off_only':
                     card = {'type': 'button', 'name': w['name'], 'icon': 'mdi:power',
                             'show_state': False, 'grid_options': {'columns': 12},

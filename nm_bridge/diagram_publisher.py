@@ -1,4 +1,5 @@
 """Create-only native HA page from one saved NM diagram, with technical subviews."""
+import base64
 import html
 import hashlib
 import json
@@ -18,20 +19,21 @@ def safe(value):
     return html.escape(str(value)).replace('{','&#123;').replace('}','&#125;')
 
 def generate(plan, devices, url_path):
-    if plan['kind']!='floorplan' or not plan.get('background'):raise PublishError('Carica e salva uno sfondo prima di pubblicare')
-    if plan.get('pipes'):raise PublishError('La pagina planimetrica non include tubazioni')
+    if plan['kind'] not in ('floorplan','schematic'):raise PublishError('Tipo schema non valido')
+    if plan['kind']=='floorplan' and not plan.get('background'):raise PublishError('Carica e salva uno sfondo prima di pubblicare')
+    background=plan.get('background') or ('data:image/svg+xml;base64,'+base64.b64encode(b'<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800"><rect width="1200" height="800" fill="#12251e"/></svg>').decode())
     by_id={d['id']:d for d in devices}
     points=[]
     for p in plan['points']:
         d=by_id.get(p.get('device'),{})
-        points.append({'label':p['label'],'x':p['x'],'y':p['y'],'icon':ICONS.get(p['symbol'],'mdi:map-marker'),'entity':d.get('entity_id',''),'notes':p.get('notes',''),'network':p.get('network',{}),'technical':p.get('technical',{}),'rows':[[n,p['technical'][k]] for k,n in FIELDS.items() if p.get('technical',{}).get(k)]})
-    return {'title':plan['name'],'views':[{'title':plan['name'],'path':'mappa','type':'panel','cards':[{'type':'custom:nm-floorplan-card','title':plan['name'],'image':plan['background'],'points':points}]}]}
+        points.append({'label':p['label'],'x':p['x'],'y':p['y'],'icon':ICONS.get(p['symbol'],'mdi:map-marker'),'entity':d.get('entity_id',''),'notes':p.get('notes',''),'symbol':p['symbol'],'temp_low':p.get('temp_low',18),'temp_high':p.get('temp_high',28),'network':p.get('network',{}),'technical':p.get('technical',{}),'rows':[[n,p['technical'][k]] for k,n in FIELDS.items() if p.get('technical',{}).get(k)]})
+    return {'title':plan['name'],'views':[{'title':plan['name'],'path':'mappa','type':'panel','cards':[{'type':'custom:nm-floorplan-card','title':plan['name'],'image':background,'points':points,'pipes':plan.get('pipes',[]),'kind':plan['kind']}]}]}
 
 def digest(config):
     return hashlib.sha256(json.dumps(config,sort_keys=True).encode()).hexdigest()
 
 def install_resource(client, config_root='/homeassistant'):
-    name='nm-floorplan-card-5.33.0.js';url='/local/nm-control/'+name
+    name='nm-floorplan-card-5.34.0.js';url='/local/nm-control/'+name
     directory=Path(config_root)/'www'/'nm-control';directory.mkdir(parents=True,exist_ok=True)
     content=Path(__file__).with_name('nm-floorplan-card.js').read_bytes()
     target=directory/name;temp=directory/(name+'.tmp');temp.write_bytes(content);os.replace(temp,target)
