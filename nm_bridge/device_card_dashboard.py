@@ -18,7 +18,7 @@ def integration(engine,payload):
         with engine.connection_factory() as ws:
             dashboards=ws.call('lovelace/dashboards/list')
             if payload.get('operation')=='list':
-                return {'dashboards':[{'url_path':'lovelace','title':'Panoramica originale (se modificabile)'}]+[{'url_path':d['url_path'],'title':d['title']} for d in dashboards if d.get('mode','storage')=='storage']}
+                return {'dashboards':[{'url_path':'lovelace','title':'Panoramica classica /lovelace (se presente)'}]+[{'url_path':d['url_path'],'title':d['title']} for d in dashboards if d.get('mode','storage')=='storage']}
             path=payload.get('url_path')
             if path!='lovelace' and not any(d['url_path']==path and d.get('mode','storage')=='storage' for d in dashboards):raise ValueError('Scegli una dashboard esistente modificabile')
             selected=payload.get('entities')
@@ -33,7 +33,7 @@ def integration(engine,payload):
                 cards.append(c)
             args={} if path=='lovelace' else {'url_path':path}
             try:current=ws.call('lovelace/config',**args)
-            except Exception as exc:raise ValueError('Dashboard automatica o non modificabile: in HA scegli Modifica plancia e Prendi il controllo, oppure seleziona una plancia già modificabile. Nessuna modifica applicata.') from exc
+            except Exception as exc:raise ValueError('Dashboard automatica o non modificabile: seleziona una plancia HA personalizzabile. La nuova Panoramica automatica non ammette viste aggiuntive. Nessuna modifica applicata.') from exc
             if not isinstance(current,dict) or not isinstance(current.get('views'),list):raise ValueError('Dashboard senza configurazione modificabile')
             updated=copy.deepcopy(current);view_path='nm-dispositivi-'+layout['project'][:12]
             view=next((v for v in updated['views'] if v.get('path')==view_path),None)
