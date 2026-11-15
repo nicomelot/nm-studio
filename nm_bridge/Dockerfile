@@ -70,3 +70,5 @@ COPY control-diagrams.css /app/control-diagrams.css
 
 COPY control-visuals.js /app/control-visuals.js
 COPY control-theme.css /app/control-theme.css
+
+COPY control-templates.js /app/control-templates.js

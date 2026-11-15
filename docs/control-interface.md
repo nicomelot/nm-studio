@@ -49,3 +49,11 @@ I simboli SVG condividono colori e stile con i widget e la configurazione impian
 Le sonde usano soglie grafiche di 18/28 °C; nel componente del sinottico si possono cambiare (ad esempio 35/65 °C per una mandata). Le letture Fahrenheit/Kelvin vengono convertite per il confronto. Sono rispettate le preferenze di riduzione delle animazioni.
 
 In Modifica si possono aggiungere rapidamente pompe, sonde e valvole, cercare un dispositivo, cambiare simbolo e duplicare un punto con lo stesso collegamento. Salva e usa salva e torna alla supervisione in un passaggio. In Uso, gli stati sono riletti ogni 5 secondi; durante modifiche e finestre aperte la rilettura è sospesa. Le dashboard native già pubblicate in HA conservano il proprio tema.
+
+### Modelli di centrale 5.26
+
+Sinottici → Da modello propone tre schemi: generatore e circuito diretto, accumulo e due zone, due generatori e accumulo. Scegli il modello, assegna un nome e collega i componenti ai dispositivi del progetto. Nessuna associazione è scelta automaticamente: Collega in seguito lascia il punto non collegato. Le sonde propongono solo widget temperatura/clima; i comandi propongono tipi coerenti. Le entità non disponibili sono indicate e possono essere predisposte per un collegamento successivo.
+
+Crea e personalizza apre una copia in Modifica. Puoi cambiare etichette, simboli, posizioni, soglie e collegamenti, aggiungere o rimuovere punti e sostituire lo sfondo con PDF/PNG/JPG. Salva e usa conferma il salvataggio. Riutilizza schema esegue lo stesso flusso su un sinottico già salvato: conserva grafica e soglie, genera nuovi identificativi e richiede di scegliere i collegamenti della copia. L’originale resta invariato.
+
+I tracciati dei modelli sono uno sfondo grafico statico e indicativo, non un progetto idraulico esecutivo né una regolazione automatica. I modelli sono convertiti localmente in PNG e conservati nell’archivio standard del progetto, senza nuove dipendenze o accessi esterni.
