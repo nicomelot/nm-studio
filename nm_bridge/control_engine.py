@@ -6,11 +6,13 @@ durably claimed before any service call: ambiguous sends are not retried.
 import copy
 try:
     from .control_features import ControlFeatures
-    from .control_decisions import ControlDecisions, simulated
+    from .control_ha import HomeAssistantWidgets, actions as ha_actions, ATTRIBUTES as HA_ATTRIBUTES
+    from .control_decisions import ControlDecisions, simulated, review_summary
     from .intelligence import summarize
 except ImportError:
     from control_features import ControlFeatures
-    from control_decisions import ControlDecisions, simulated
+    from control_ha import HomeAssistantWidgets, actions as ha_actions, ATTRIBUTES as HA_ATTRIBUTES
+    from control_decisions import ControlDecisions, simulated, review_summary
     from intelligence import summarize
 import hashlib
 import json
@@ -65,10 +67,11 @@ def catalog(layout, states, temperature_unit='°C'):
         result.append({'id': binding(w), 'index': i, 'name': w['name'], 'room': w['room'],
                        'type': w['type'], 'entity_id': w.get('entity_id', ''),
                        'visible': w.get('visible', True), 'fields': w['fields'],
+                       'ha_actions': ha_actions(state) if w['type']=='homeassistant' else [],
                        'actions': ['off'] if w.get('command_mode') == 'off_only' else ACTIONS.get(w['type'], []),
                        'state': state.get('state', 'unavailable'),
                        'attributes': {k: attrs[k] for k in ('brightness', 'current_position', 'current_temperature',
-                           'temperature', 'min_temp', 'max_temp', 'temperature_unit', 'hvac_modes', 'hvac_action', 'unit_of_measurement', 'device_class') if k in attrs}})
+                           'temperature', 'min_temp', 'max_temp', 'temperature_unit', 'hvac_modes', 'hvac_action', 'unit_of_measurement', 'device_class', *HA_ATTRIBUTES) if k in attrs}})
     return result
 
 
@@ -269,6 +272,7 @@ class ControlEngine:
         self.worker = None
         self.features = ControlFeatures(self, binding)
         self.decisions = ControlDecisions(self)
+        self.ha_widgets = HomeAssistantWidgets(self, binding)
         self.health = {'running': False, 'last_check': None, 'error': None}
 
     def read(self):
@@ -324,7 +328,7 @@ class ControlEngine:
             return {'project': layout.get('project', ''), 'fingerprint': digest(layout), 'revision': raw['revision'],
                     'rooms': list(dict.fromkeys(layout.get('rooms', []) + [w['room'] for w in combined['widgets']])),
                     'devices': catalog(combined, states, config.get('unit_system', {}).get('temperature') or '°C'), 'widget_candidates': self.features.candidates(states), 'release_error':self.features.last_release_error, 'lab_candidates': lab_candidates(layout, states),
-                    'decision_model': summarize(states),
+                    'decision_model': review_summary(states),
                     'decision_devices': [binding(w) for w in layout.get('widgets', []) if simulated(w.get('entity_id'), layout.get('project',''))],
                     'records': records, 'logs': self.history(layout.get('project', '')),
                     'ha_error': error, 'time_zone': config.get('time_zone'),
@@ -526,7 +530,7 @@ class ControlEngine:
             rows = db.execute('SELECT name,time,status,detail FROM runs WHERE project=? ORDER BY rowid DESC LIMIT 100', (project,)).fetchall()
         return [dict(zip(('name', 'time', 'status', 'detail'), row)) for row in rows]
 
-    def execute(self, layout, record, actions, key):
+    def execute(self, layout, record, actions, key, planner=service_plan):
         with self.db() as db:
             try:
                 db.execute('INSERT INTO runs VALUES(?,?,?,?,?,?)', (key, layout['project'], record['name'], datetime.now(UTC).isoformat(), 'in_progress', 'Invio iniziato; esito non ancora confermato'))
@@ -535,7 +539,7 @@ class ControlEngine:
         sent = 0
         try:
             with self.connection_factory() as ws:
-                calls = service_plan(layout, actions, ws)
+                calls = planner(layout, actions, ws)
                 for call in calls:
                     ws.call('call_service', **call)
                     sent += 1

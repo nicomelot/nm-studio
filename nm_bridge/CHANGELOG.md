@@ -1,3 +1,9 @@
+## 5.31.0
+
+- Importazione ricercabile di entità Home Assistant già esistenti: luci, relè, pulsanti, audio e sensori/eventi.
+- Comandi espliciti con anteprima, conferma, capacità verificate e registro; volume, sorgente, riproduzione e silenzioso per i lettori compatibili.
+- Decision Model: etichette leggibili e anteprima conservata durante rinnovi identici del modello, invalidata quando cambiano proposta, condizioni o dispositivo.
+
 ## 5.30.0
 
 - Decision Model nella nuova interfaccia: suggerimenti, motivazioni e selezione esplicita di dispositivo/comando simulato.

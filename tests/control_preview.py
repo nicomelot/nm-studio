@@ -40,6 +40,12 @@ if __name__=='__main__':
                     'proposal_only':True,'requires_confirmation':True} for name,reason in [
                     ('Riduci illuminazione','Stanza simulata non occupata'),('Regola tapparella','Protezione solare simulata'),
                     ('Imposta comfort','Temperatura simulata sotto obiettivo')]]}})
+    ha.states.extend([
+        {'entity_id':'light.philips_demo','state':'off','attributes':{'friendly_name':'DEMO Philips','supported_color_modes':['brightness']}},
+        {'entity_id':'switch.sonoff_demo','state':'off','attributes':{'friendly_name':'DEMO Sonoff'}},
+        {'entity_id':'media_player.wiim_demo','state':'paused','attributes':{'friendly_name':'DEMO WiiM','supported_features':16384+1+4+8+2048,'volume_level':.2,'source_list':['Wi-Fi','Line In']}},
+        {'entity_id':'event.sonoff_demo','state':'unknown','attributes':{'friendly_name':'DEMO pulsante Sonoff','event_type':'single'}}
+    ])
     ha.config['location_name']='Laboratorio QA (dati sintetici)'
     original=ha.call
     def call(method,**params):
@@ -51,6 +57,11 @@ if __name__=='__main__':
                 state['state']='on'
                 if 'brightness_pct' in data:state['attributes']['brightness']=round(data['brightness_pct']*255/100)
             elif service=='turn_off':state['state']='off'
+            elif service=='volume_set':state['attributes']['volume_level']=data['volume_level']
+            elif service=='media_play':state['state']='playing'
+            elif service=='media_pause':state['state']='paused'
+            elif service=='select_source':state['attributes']['source']=data['source']
+            elif service=='volume_mute':state['attributes']['is_volume_muted']=data['is_volume_muted']
             elif service=='set_cover_position':state['attributes']['current_position']=data['position']
             elif service=='set_temperature':state['attributes']['temperature']=data['temperature']
         return result

@@ -64,3 +64,10 @@ I tracciati dei modelli sono uno sfondo grafico statico e indicativo, non un pro
 La nuova voce legge le decisioni simulate già esposte in Home Assistant con il contratto di `intelligence.py`. Non genera decisioni nuove né inventa un destinatario: l'operatore seleziona un dispositivo simulato del progetto e il comando che interpreta il suggerimento. L'anteprima confronta stato attuale e valore richiesto; solo una conferma esplicita applica il comando.
 
 L'applicazione è limitata alle entità `nm_lab_<prefisso progetto>_*`. Il server verifica nuovamente scadenza, contenuto della decisione, progetto, revisione, stato e capacità del dispositivo. L'anteprima ha un token monouso di 120 secondi. Ogni coppia decisione/proposta viene registrata in modo persistente prima dell'invio; non si ritenta automaticamente un esito ambiguo. Le prove browser usano `tests/control_preview.py` e dati sintetici, senza accesso al bus.
+
+
+### Entità Home Assistant (5.31)
+
+Dispositivi → Da Home Assistant permette di cercare e collegare entità già esistenti, scegliendo nome e ambiente. Supporta luci (on/off e luminosità), relè/interruttori, pulsanti HA, sensori/eventi e lettori multimediali (riproduzione, pausa, volume, silenzioso, sorgente e alimentazione quando dichiarati supportati). Non installa Hue, Sonoff o WiiM: usa le integrazioni HA già configurate. I pulsanti fisici esposti come eventi sono in sola lettura; i loro trigger vanno configurati nelle automazioni HA. Questi widget usano comandi manuali confermati e sono collegabili ai simboli degli schemi; non sono ancora azioni delle programmazioni NM.
+
+L'aggiunta non invia servizi e non modifica l'entità HA. Il comando ha anteprima monouso con verifica dello stato, delle capacità e del progetto, e scrittura preventiva nel registro. Il Decision Model accetta rinnovi identici senza invalidare l'anteprima; nuove condizioni, proposte o stati richiedono una nuova verifica.

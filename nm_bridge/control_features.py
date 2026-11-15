@@ -13,8 +13,10 @@ import threading
 import time
 
 try:
+    from .control_ha import DOMAINS
     from .floorplan import _image, read as legacy_plans
 except ImportError:
+    from control_ha import DOMAINS
     from floorplan import _image, read as legacy_plans
 
 ID = re.compile(r'^[a-zA-Z0-9_-]{1,80}$')
@@ -40,7 +42,7 @@ class ControlFeatures:
     def candidates(self, states):
         return [{'entity_id': s['entity_id'], 'name': s.get('attributes', {}).get('friendly_name', s['entity_id']),
                  'state': s.get('state', 'unavailable'), 'temperature':s.get('attributes',{}).get('device_class')=='temperature', 'unit': s.get('attributes', {}).get('unit_of_measurement', '')}
-                for s in states if s['entity_id'].split('.')[0] in ('sensor', 'switch', 'input_boolean', 'light')]
+                for s in states if s['entity_id'].split('.')[0] in DOMAINS]
 
     def add_widget(self, payload):
         e = self.engine
@@ -48,14 +50,16 @@ class ControlFeatures:
             layout, raw = e.layout_provider(), e.read()
             e.guard(payload, layout, raw)
             kind, entity, name, room = (payload.get(k) for k in ('type','entity_id','name','room'))
-            if kind not in ('temperature', 'momentary') or not isinstance(name, str) or not 1 <= len(name.strip()) <= 80 or not isinstance(room, str) or not 1 <= len(room.strip()) <= 240:
+            if kind not in ('temperature', 'momentary', 'homeassistant') or not isinstance(name, str) or not 1 <= len(name.strip()) <= 80 or not isinstance(room, str) or not 1 <= len(room.strip()) <= 240:
                 raise ValueError('Tipo, nome o ambiente non valido')
             with e.connection_factory() as ws:
                 states = ws.call('get_states')
             state = next((s for s in states if s['entity_id'] == entity), None)
-            if not state or state.get('state') in ('unavailable', 'unknown'):
+            if not state or (kind != 'homeassistant' and state.get('state') in ('unavailable', 'unknown')):
                 raise ValueError('Entità non disponibile')
             domain = entity.split('.')[0]
+            if kind == 'homeassistant' and (domain not in DOMAINS or any(w.get('entity_id')==entity for w in layout.get('widgets',[]))):
+                raise ValueError('Entità non supportata o già collegata al progetto')
             if kind == 'temperature' and (domain != 'sensor' or state.get('attributes', {}).get('device_class') != 'temperature'):
                 raise ValueError('Seleziona una sonda di temperatura Home Assistant')
             if kind == 'momentary' and domain not in ('switch','input_boolean','light'):

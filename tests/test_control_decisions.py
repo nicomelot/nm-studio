@@ -72,3 +72,11 @@ class DecisionTests(unittest.TestCase):
         self.layout['widgets'][0]['fields']['command']='9/9/9'
         with self.assertRaises(ValueError):self.e.decisions.apply(p)
         self.assertFalse(self.ha.writes())
+
+    def test_identical_model_renewal_keeps_preview_valid(self):
+        p=self.payload()
+        p['proposal_key']=self.e.snapshot()['decision_model']['proposals'][0]['key']
+        self.model['decision_id']='renewed-before-preview'
+        p['token']=self.e.decisions.preview(p)['token']
+        self.model['decision_id']='renewed-after-preview'
+        self.assertEqual(self.e.decisions.apply(p)['status'],'accepted')
