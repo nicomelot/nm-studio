@@ -101,3 +101,13 @@ class FeatureTests(unittest.TestCase):
             bad=copy.deepcopy(plan);bad['points'][0].update(change)
             with self.assertRaises(ValueError):self.f.save_diagrams(self.ctx(plans=[bad],diagram_fingerprint=saved['fingerprint']))
         self.assertEqual(self.f.diagrams(self.ctx())['fingerprint'],saved['fingerprint'])
+
+    def test_structured_technical_fields_roundtrip_and_validation(self):
+        plan={'id':'tech','kind':'floorplan','name':'Technical','background':None,'points':[{'id':'ecg','symbol':'dali','label':'ECG','device':'','x':25,'y':30,'technical':{'rack':'A','patch_panel':'1','patch_port':'12','switch':'SW1','switch_port':'24','dali_line':'1','dali_address':'63','dali_groups':'0, 15'}}]}
+        original=self.f.diagrams(self.ctx())
+        self.f.save_diagrams(self.ctx(plans=[plan],diagram_fingerprint=original['fingerprint']))
+        saved=self.f.diagrams(self.ctx());self.assertEqual(saved['plans'][0]['points'],plan['points'])
+        for fields in [{'dali_address':'64'},{'dali_groups':'16'},{'dali_groups':'1,x'},{'rack':'x'*81},{'unknown':'x'}]:
+            bad=copy.deepcopy(plan);bad['points'][0]['technical']=fields
+            with self.assertRaises(ValueError):self.f.save_diagrams(self.ctx(plans=[bad],diagram_fingerprint=saved['fingerprint']))
+        self.assertEqual(self.ha.writes(),[])

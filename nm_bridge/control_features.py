@@ -166,6 +166,18 @@ class ControlFeatures:
             except (ValueError,OSError):result['legacy']=[]
             return result
 
+    def publish_diagram(self,payload):
+        try:
+            from .diagram_publisher import publish
+        except ImportError:
+            from diagram_publisher import publish
+        with self.engine.lock:
+            archive=self.diagrams(payload)
+            if archive['fingerprint']!=payload.get('diagram_fingerprint'):raise ValueError('Schemi modificati altrove: riapri prima di pubblicare')
+            plan=next((p for p in archive['plans'] if p['id']==payload.get('plan_id')),None)
+            if not plan:raise ValueError('Planimetria non presente nel progetto')
+            return publish(payload,plan,self.engine.snapshot()['devices'])
+
     def save_diagrams(self,payload):
         e=self.engine
         with e.lock:
@@ -197,6 +209,15 @@ class ControlFeatures:
                     if 'layer' in t:
                         if t['layer'] not in LAYERS:raise ValueError('Livello tecnico non valido')
                         pin['layer']=t['layer']
+                    if 'technical' in t:
+                        fields=t['technical']
+                        allowed={'rack','patch_panel','patch_port','switch','switch_port','dali_line','dali_address','dali_groups'}
+                        if not isinstance(fields,dict) or set(fields)-allowed or any(not isinstance(v,str) or len(v)>80 for v in fields.values()):raise ValueError('Dati tecnici non validi: massimo 80 caratteri per campo')
+                        for key,limit in [('dali_address',63),('dali_groups',15)]:
+                            value=fields.get(key,'').strip()
+                            values=value.split(',') if key=='dali_groups' else [value]
+                            if value and any(not v.strip().isdigit() or not 0<=int(v.strip())<=limit for v in values):raise ValueError('Indirizzo DALI 0–63; gruppi 0–15 separati da virgole')
+                        pin['technical']={k:v.strip() for k,v in fields.items()}
                     if 'notes' in t:
                         if not isinstance(t['notes'],str) or len(t['notes'])>500:raise ValueError('Note massimo 500 caratteri')
                         pin['notes']=t['notes'].strip()
