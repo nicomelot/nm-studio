@@ -48,7 +48,7 @@ const PLANT_MODELS = [
   }
 ];
 
-function plantBackground(model) {
+function plantBackground(model, includePipes=false) {
   const canvas=document.createElement('canvas');canvas.width=1600;canvas.height=1000;
   const c=canvas.getContext('2d');c.fillStyle='#111d1a';c.fillRect(0,0,1600,1000);
   c.strokeStyle='#20332b';c.lineWidth=1;
@@ -56,7 +56,7 @@ function plantBackground(model) {
   for(let y=40;y<1000;y+=40){c.beginPath();c.moveTo(0,y);c.lineTo(1600,y);c.stroke()}
   c.fillStyle='#c2d4ca';c.font='600 28px system-ui';c.fillText(model.name,70,80);
   c.font='18px system-ui';c.fillStyle='#94aa9e';c.fillText('Schema di supervisione · personalizza componenti e collegamenti',70,116);
-  for(const pipe of model.pipes){c.strokeStyle=pipe.tone==='supply'?'#c58d71':'#699fb6';c.lineWidth=7;c.lineJoin='round';c.beginPath();pipe.xy.forEach(([x,y],i)=>i?c.lineTo(x*16,y*10):c.moveTo(x*16,y*10));c.stroke()}
+  for(const pipe of includePipes?model.pipes:[]){c.strokeStyle=pipe.tone==='supply'?'#c58d71':'#699fb6';c.lineWidth=7;c.lineJoin='round';c.beginPath();pipe.xy.forEach(([x,y],i)=>i?c.lineTo(x*16,y*10):c.moveTo(x*16,y*10));c.stroke()}
   for(const a of model.areas){c.fillStyle='#21382c';c.fillRect(a.x*16,a.y*10,a.w*16,a.h*10);c.strokeStyle='#6a8c78';c.lineWidth=2;c.strokeRect(a.x*16,a.y*10,a.w*16,a.h*10);c.fillStyle='#dce8e0';c.font='600 19px system-ui';c.textAlign='center';c.fillText(a.text,(a.x+a.w/2)*16,(a.y+a.h/2)*10+6)}
   c.textAlign='left';c.font='18px system-ui';c.fillStyle='#c58d71';c.fillText('MANDATA',70,945);c.fillStyle='#699fb6';c.fillText('RITORNO',230,945);c.fillStyle='#94aa9e';c.fillText('Tracciati grafici indicativi · nessuna regolazione automatica',430,945);
   return canvas.toDataURL('image/png');
@@ -69,7 +69,7 @@ function templateCandidates(point, devices) {
 
 function instantiatePlant(source,name,bindings,devices,makeId) {
   if(!name.trim()||name.trim().length>80)throw Error('Inserisci un nome da 1 a 80 caratteri.');
-  return {id:makeId(),name:name.trim(),kind:'schematic',background:source.background,points:source.points.map((p,i)=>{
+  return {id:makeId(),name:name.trim(),kind:'schematic',background:source.background,pipes:modelPipePaths(source,makeId),points:source.points.map((p,i)=>{
     const target=bindings[i]||'';
     if(target&&!templateCandidates(p,devices).some(d=>d.id===target))throw Error('Un dispositivo selezionato non è più disponibile nel progetto.');
     return {...p,id:makeId(),device:target};
@@ -80,7 +80,7 @@ let plantDraft=null;
 function openPlantModels() {
   if(diagramDirty){toast('Salva prima lo schema corrente.');return}
   if(diagramArchive.plans.length>=15){toast('Il progetto contiene già il massimo di 15 schemi.');return}
-  modal('Scegli un modello di centrale',`<p>1. Scegli lo schema · 2. Collega i dispositivi · 3. Personalizza</p><div class="plant-models">${PLANT_MODELS.map(m=>`<article class="plant-model"><div class="plant-preview"><img src="${plantBackground(m)}" alt="Schema ${esc(m.name)}">${m.points.map(p=>`<span style="left:${p.x}%;top:${p.y}%">${controlIcon(p.symbol)}</span>`).join('')}</div><h3>${esc(m.name)}</h3><p>${esc(m.description)}</p><small>${m.points.length} componenti · collegamenti da scegliere</small><button class="primary" data-plant-model="${m.id}">Usa questo modello</button></article>`).join('')}</div><p class="small muted">Schemi indicativi per la supervisione. Puoi sostituire lo sfondo con il progetto del termotecnico; i tracciati del modello sono parte dello sfondo.</p>`,'');
+  modal('Scegli un modello di centrale',`<p>1. Scegli lo schema · 2. Collega i dispositivi · 3. Personalizza</p><div class="plant-models">${PLANT_MODELS.map(m=>`<article class="plant-model"><div class="plant-preview"><img src="${plantBackground(m,true)}" alt="Schema ${esc(m.name)}">${m.points.map(p=>`<span style="left:${p.x}%;top:${p.y}%">${controlIcon(p.symbol)}</span>`).join('')}</div><h3>${esc(m.name)}</h3><p>${esc(m.description)}</p><small>${m.points.length} componenti · collegamenti da scegliere</small><button class="primary" data-plant-model="${m.id}">Usa questo modello</button></article>`).join('')}</div><p class="small muted">Schemi indicativi per la supervisione. Puoi sostituire lo sfondo con il progetto del termotecnico; le tubazioni del modello sono modificabili direttamente nello schema.</p>`,'');
 }
 
 function plantBindingForm(source) {

@@ -72,3 +72,5 @@ COPY control-visuals.js /app/control-visuals.js
 COPY control-theme.css /app/control-theme.css
 
 COPY control-templates.js /app/control-templates.js
+
+COPY control-pipes.js /app/control-pipes.js
