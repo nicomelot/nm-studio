@@ -198,7 +198,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.respond(200, "application/json; charset=utf-8", json.dumps(CONTROL.snapshot(), ensure_ascii=False).encode())
             except (ValueError, OSError, KeyError, TypeError) as exc:
                 self.respond(400, "application/json", json.dumps({'error': str(exc)[:180]}).encode())
-        elif path in ("/control.js", "/control.css", "/control-dark.css", "/control-diagrams.js", "/control-diagrams.css", "/control-visuals.js", "/control-theme.css"):
+        elif path in ("/control.js", "/control.css", "/control-dark.css", "/control-diagrams.js", "/control-diagrams.css", "/control-visuals.js", "/control-theme.css", "/control-templates.js"):
             self.respond(200, "text/javascript; charset=utf-8" if path.endswith('.js') else "text/css; charset=utf-8",
                          Path(__file__).with_name(path[1:]).read_bytes())
         elif path == "/advanced":

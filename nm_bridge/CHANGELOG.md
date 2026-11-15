@@ -1,3 +1,10 @@
+## 5.26.0
+
+- Libreria di tre modelli di centrale termica con sfondi e componenti pronti.
+- Collegamento guidato ai dispositivi del progetto, con possibilità di associare in seguito.
+- Riutilizza schema crea una copia indipendente con nuovi collegamenti da scegliere, conservando sfondo, posizioni e soglie.
+- Le copie si personalizzano nel consueto editor e vengono salvate solo con Salva e usa.
+
 ## 5.25.0
 
 - Simboli vettoriali coerenti, pompe animate sullo stato letto, valvole con apertura e direzione, sonde con colori e soglie regolabili.
