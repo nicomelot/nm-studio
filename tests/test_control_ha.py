@@ -64,3 +64,37 @@ class HAWidgetTests(unittest.TestCase):
         p['token']=self.e.ha_widgets.preview(p)['token']
         self.e.ha_widgets.apply(p)
         self.assertEqual(self.ha.writes()[0]['service'],'press')
+
+    def test_imported_schedule_runs_and_revalidates_capabilities(self):
+        from datetime import datetime, timezone
+        key=self.add('media_player.wiim')
+        now=datetime.now(timezone.utc).replace(second=0,microsecond=0)
+        from zoneinfo import ZoneInfo
+        local=now.astimezone(ZoneInfo('Europe/Rome'))
+        record={'id':'audio','name':'Audio mattino','kind':'schedule','room':'Test',
+                'actions':[{'device':key,'action':'volume','value':25}],
+                'triggers':[{'id':'morning','kind':'time','time':local.strftime('%H:%M'),'days':[local.weekday()],'value':35}]}
+        self.e.save(self.ctx(record=record))
+        self.assertFalse(self.ha.writes())
+        preview=self.e.preview(self.ctx(id='audio'))
+        self.assertEqual(preview['calls'][0]['service_data'],{'volume_level':.25})
+        self.e.activate(self.ctx(id='audio',enabled=True,preview_hash=preview['preview_hash']))
+        raw=self.e.read();raw['projects'][self.layout['project']][0]['activated_at']=now.isoformat();self.e.write(raw)
+        self.e.tick(now);self.e.tick(now)
+        self.assertEqual(len(self.ha.writes()),1)
+        self.assertEqual(self.ha.writes()[0]['service_data'],{'volume_level':.35})
+        self.ha.states[5]['attributes']['supported_features']=0
+        with self.assertRaises(ValueError):self.e.preview(self.ctx(id='audio'))
+
+    def test_mixed_scene_and_values(self):
+        from nm_bridge.control_engine import clean_actions
+        light=self.add('light.philips');audio=self.add('media_player.wiim')
+        record={'id':'mixed','name':'Serata','kind':'scene','room':'Test','actions':[
+            {'device':light,'action':'brightness','value':40},{'device':audio,'action':'source','value':'Line In'},
+            {'device':audio,'action':'mute','value':False}]}
+        self.e.save(self.ctx(record=record));p=self.e.preview(self.ctx(id='mixed'))
+        result=self.e.run(self.ctx(id='mixed',preview_hash=p['preview_hash'],request_id='once'))
+        self.assertEqual(result['sent'],3)
+        self.assertEqual(self.ha.writes()[1]['service_data'],{'source':'Line In'})
+        for action,value in [('volume',101),('mute','false'),('source','')]:
+            with self.assertRaises(ValueError):clean_actions([{'device':audio,'action':action,'value':value}],self.e.combined(self.layout,self.e.read()))

@@ -7,6 +7,8 @@ import argparse
 import copy
 import sys
 import tempfile
+import queue
+import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from http.server import ThreadingHTTPServer
@@ -44,8 +46,9 @@ if __name__=='__main__':
         {'entity_id':'light.philips_demo','state':'off','attributes':{'friendly_name':'DEMO Philips','supported_color_modes':['brightness']}},
         {'entity_id':'switch.sonoff_demo','state':'off','attributes':{'friendly_name':'DEMO Sonoff'}},
         {'entity_id':'media_player.wiim_demo','state':'paused','attributes':{'friendly_name':'DEMO WiiM','supported_features':16384+1+4+8+2048,'volume_level':.2,'source_list':['Wi-Fi','Line In']}},
-        {'entity_id':'event.sonoff_demo','state':'unknown','attributes':{'friendly_name':'DEMO pulsante Sonoff','event_type':'single'}}
+        {'entity_id':'event.sonoff_demo','state':'unknown','attributes':{'friendly_name':'DEMO pulsante Sonoff','event_type':'single','event_types':['single','double','hold']}}
     ])
+    ha.states.append({'entity_id':'input_button.sonoff_sim','state':'unknown','attributes':{'friendly_name':'SIM Sonoff · pressione'}})
     ha.config['location_name']='Laboratorio QA (dati sintetici)'
     original=ha.call
     def call(method,**params):
@@ -56,6 +59,12 @@ if __name__=='__main__':
             if service=='turn_on':
                 state['state']='on'
                 if 'brightness_pct' in data:state['attributes']['brightness']=round(data['brightness_pct']*255/100)
+            elif service=='press':
+                old=copy.deepcopy(state);state['state']=datetime.now(timezone.utc).isoformat()
+                for client in list(clients):
+                    for sid,trigger in list(client.subs.items()):
+                        if trigger.get('entity_id')==state['entity_id']:
+                            client.events.put({'id':sid,'type':'event','event':{'variables':{'trigger':{'from_state':old,'to_state':copy.deepcopy(state)}},'context':{'id':state['state']}}})
             elif service=='turn_off':state['state']='off'
             elif service=='volume_set':state['attributes']['volume_level']=data['volume_level']
             elif service=='media_play':state['state']='playing'
@@ -66,14 +75,32 @@ if __name__=='__main__':
             elif service=='set_temperature':state['attributes']['temperature']=data['temperature']
         return result
     ha.call=call
+    clients=[]
+    class Session:
+        def __init__(self):self.sequence=0;self.events=queue.Queue();self.subs={};self.connection=self
+        def __enter__(self):clients.append(self);return self
+        def __exit__(self,*args):clients.remove(self)
+        def settimeout(self,value):pass
+        def send(self,data):
+            p=json.loads(data);self.events.put({'id':p['id'],'type':'pong'})
+        def _receive(self):
+            try:return self.events.get(timeout=.2)
+            except queue.Empty:raise TimeoutError()
+        def call(self,method,**args):
+            self.sequence+=1
+            if method=='config/device_registry/list':return []
+            if method=='subscribe_trigger':self.subs[self.sequence]=args['trigger'];return None
+            if method=='unsubscribe_events':self.subs.pop(args['subscription'],None);return None
+            return ha.call(method,**args)
+
     def save(payload):
         current.clear();current.update(copy.deepcopy({k:v for k,v in payload.items() if k!='confirm'}));return {'saved':True}
     control_engine.save_layout=save
     with tempfile.TemporaryDirectory() as root:
-        engine=control_engine.ControlEngine(root,lambda:copy.deepcopy(current),lambda:ha)
+        engine=control_engine.ControlEngine(root,lambda:copy.deepcopy(current),lambda:Session())
         engine.health={'running':False,'last_check':None,'error':'Anteprima QA: programmatore disattivato, servizi HA simulati'}
         bridge.CONTROL=engine
-        engine.features.start()
+        engine.start()
         class Local(bridge.Handler):
             def do_GET(self):
                 self.client_address=(bridge.INGRESS_PROXY,self.client_address[1]);super().do_GET()

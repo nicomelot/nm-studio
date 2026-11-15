@@ -9,6 +9,27 @@ ATTRIBUTES = ('brightness', 'supported_color_modes', 'supported_features', 'volu
               'is_volume_muted', 'source', 'source_list', 'media_title', 'unit_of_measurement',
               'device_class', 'event_type')
 
+STATIC_ACTIONS = {'light': ['on', 'off', 'brightness'], 'switch': ['on', 'off'],
+                  'input_boolean': ['on', 'off'], 'button': ['press'], 'input_button': ['press'],
+                  'media_player': ['on', 'off', 'play', 'pause', 'volume', 'mute', 'source']}
+
+
+def clean_value(entity, action, value):
+    if action not in STATIC_ACTIONS.get(entity.split('.')[0], []):
+        raise ValueError('Comando non supportato dal dispositivo Home Assistant')
+    if action in ('brightness', 'volume'):
+        if type(value) is not int or not 0 <= value <= 100:
+            raise ValueError('Inserisci una percentuale intera da 0 a 100')
+    elif action == 'mute':
+        if type(value) is not bool:
+            raise ValueError('Stato silenzioso non valido')
+    elif action == 'source':
+        if not isinstance(value, str) or not 1 <= len(value) <= 200:
+            raise ValueError('Sorgente non valida')
+    else:
+        value = None
+    return value
+
 
 def actions(state):
     domain = state.get('entity_id', '').split('.')[0]

@@ -85,3 +85,6 @@ COPY control-decisions.js /app/control-decisions.js
 
 COPY control_ha.py /app/control_ha.py
 COPY control-ha.js /app/control-ha.js
+
+COPY control_buttons.py /app/control_buttons.py
+COPY control-buttons.js /app/control-buttons.js
