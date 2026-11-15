@@ -1,5 +1,7 @@
 ## 5.34.1
 
+- Corregge lo zoom iniziale desktop dei sinottici quando HA monta la card prima di assegnarle la larghezza.
+
 - Consente il primo salvataggio della settimana negli aiutanti HA appena creati, mantenendo il blocco per le entità indisponibili.
 - Aggiorna subito i controlli dopo un comando e aggiorna la risorsa della card anche riaprendo una pagina già creata.
 
