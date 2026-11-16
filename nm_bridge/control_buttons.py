@@ -10,6 +10,11 @@ import threading
 import time
 import uuid
 
+try:
+    from .widget_layout import LAYOUT_LOCK
+except ImportError:
+    from widget_layout import LAYOUT_LOCK
+
 
 def digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
@@ -26,7 +31,7 @@ class ControlButtons:
 
     def sources(self, payload):
         e = self.e
-        with e.lock:
+        with LAYOUT_LOCK, e.lock:
             layout, raw = e.layout_provider(), e.read()
             e.guard(payload, layout, raw)
         with e.connection_factory() as ws:
@@ -74,14 +79,14 @@ class ControlButtons:
 
     def triggers(self, payload):
         e = self.e
-        with e.lock:
+        with LAYOUT_LOCK, e.lock:
             e.guard(payload, e.layout_provider(), e.read())
         with e.connection_factory() as ws:
             return {'options': self.options(ws, payload.get('source'))}
 
     def review(self, payload, save=False):
         e = self.e
-        with e.lock:
+        with LAYOUT_LOCK, e.lock:
             layout, raw = e.layout_provider(), e.read()
             e.guard(payload, layout, raw)
             scene = next((r for r in e.records(raw, layout['project']) if r['id']==payload.get('scene') and r['kind']=='scene'), None)
@@ -130,7 +135,7 @@ class ControlButtons:
 
     def pause(self, payload):
         e = self.e
-        with e.lock:
+        with LAYOUT_LOCK, e.lock:
             layout, raw = e.layout_provider(), e.read()
             e.guard(payload, layout, raw)
             rule = next((r for r in self.rules(raw,layout['project']) if r['id']==payload.get('id')), None)
@@ -158,7 +163,7 @@ class ControlButtons:
                 return
             if rule['option'].get('event_type') and new.get('attributes',{}).get('event_type') != rule['option']['event_type']:
                 return
-        with e.lock:
+        with LAYOUT_LOCK, e.lock:
             layout, raw = e.layout_provider(), e.read()
             if layout.get('project') != project or rule not in self.active(layout,raw):
                 return
@@ -173,7 +178,7 @@ class ControlButtons:
         def loop():
             while not self.e.stop_event.is_set():
                 try:
-                    with self.e.lock:
+                    with LAYOUT_LOCK, self.e.lock:
                         layout, raw = self.e.layout_provider(), self.e.read()
                         active = copy.deepcopy(self.active(layout,raw))
                         generation = (layout.get('project'), digest(layout), raw['revision'])
@@ -191,7 +196,7 @@ class ControlButtons:
                         pending_ping = None
                         self.health.update(connected=True,error=None,listening=len(subscriptions))
                         while not self.e.stop_event.is_set():
-                            with self.e.lock:
+                            with LAYOUT_LOCK, self.e.lock:
                                 current, data = self.e.layout_provider(), self.e.read()
                                 if generation != (current.get('project'),digest(current),data['revision']):
                                     break

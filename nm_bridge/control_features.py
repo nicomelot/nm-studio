@@ -13,9 +13,11 @@ import threading
 import time
 
 try:
+    from .widget_layout import LAYOUT_LOCK
     from .control_ha import DOMAINS
     from .floorplan import _image, read as legacy_plans
 except ImportError:
+    from widget_layout import LAYOUT_LOCK
     from control_ha import DOMAINS
     from floorplan import _image, read as legacy_plans
 
@@ -46,7 +48,7 @@ class ControlFeatures:
 
     def add_widget(self, payload):
         e = self.engine
-        with e.lock:
+        with LAYOUT_LOCK, e.lock:
             layout, raw = e.layout_provider(), e.read()
             e.guard(payload, layout, raw)
             kind, entity, name, room = (payload.get(k) for k in ('type','entity_id','name','room'))
@@ -113,7 +115,7 @@ class ControlFeatures:
                 return {'released':True}
             if previous:
                 return {'duplicate':True, 'released':previous[2]=='closed'}
-            with e.lock:
+            with LAYOUT_LOCK, e.lock:
                 layout, raw = e.layout_provider(), e.read()
                 e.guard(payload,layout,raw)
                 matches = [w for w in self.widgets(project,raw) if self.binding(w)==device and w['type']=='momentary']
@@ -161,7 +163,7 @@ class ControlFeatures:
 
     def diagrams(self, payload):
         e=self.engine
-        with e.lock:
+        with LAYOUT_LOCK, e.lock:
             layout,raw=e.layout_provider(),e.read();e.guard(payload,layout,raw)
             path=self.diagram_path(layout['project'])
             saved=json.loads(path.read_text(encoding='utf-8')) if path.exists() else {'plans':[]}
@@ -175,7 +177,7 @@ class ControlFeatures:
             from .diagram_publisher import publish
         except ImportError:
             from diagram_publisher import publish
-        with self.engine.lock:
+        with LAYOUT_LOCK, self.engine.lock:
             archive=self.diagrams(payload)
             if archive['fingerprint']!=payload.get('diagram_fingerprint'):raise ValueError('Schemi modificati altrove: riapri prima di pubblicare')
             plan=next((p for p in archive['plans'] if p['id']==payload.get('plan_id')),None)
@@ -184,7 +186,7 @@ class ControlFeatures:
 
     def save_diagrams(self,payload):
         e=self.engine
-        with e.lock:
+        with LAYOUT_LOCK, e.lock:
             current=self.diagrams(payload)
             if current['fingerprint']!=payload.get('diagram_fingerprint'):raise ValueError('Schemi modificati altrove: riapri prima di salvare')
             plans=payload.get('plans')
