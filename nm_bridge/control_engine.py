@@ -679,6 +679,16 @@ class ControlEngine:
             for r in active:
                 for instant, trigger, occurrence in occurrences(r['triggers'], config, now, horizon=2):
                     if 0 <= (now - instant).total_seconds() <= 60 and instant >= max(datetime.fromisoformat(r['activated_at']),datetime.fromisoformat(trigger.get('not_before',r['activated_at']))):
+                        if r.get('source') == 'ha_card':
+                            # The slot's position is not its identity: moving a
+                            # completed slot to a future time must run it again,
+                            # while reordering slots must not replay commands.
+                            legacy_key = f"scheduled:{layout['project']}:{r['id']}:{occurrence}"
+                            with self.db() as db:
+                                legacy = db.execute('SELECT time FROM runs WHERE key=?', (legacy_key,)).fetchone()
+                            if legacy and 0 <= (datetime.fromisoformat(legacy[0]) - instant).total_seconds() <= 60:
+                                continue
+                            occurrence = f"calendar:{trigger['profile']}:{instant.isoformat()}"
                         self.execute(layout, r, slot_actions(r, trigger), f"scheduled:{layout['project']}:{r['id']}:{occurrence}")
 
     def start(self):

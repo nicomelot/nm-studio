@@ -1,3 +1,8 @@
+## 5.39.1
+
+- Una fascia spostata a un nuovo orario viene eseguita anche dopo un’altra esecuzione nella stessa giornata.
+- Riordinare le fasce non ripete comandi già inviati; compatibilità con il registro esistente.
+
 ## 5.39.0
 
 - Ferie su più dispositivi dai popup HA: selezione con ricerca, date comuni e fino a 8 fasce per tipo (luci, tapparelle, clima).

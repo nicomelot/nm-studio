@@ -68,3 +68,19 @@ class CalendarTests(unittest.TestCase):
   self.profile('f',[['08:00',19]]);self.profile('v',[['08:00',17]])
   record=self.engine.snapshot()['records'][0]
   self.assertIsNone(record['warning'])
+ def test_rescheduled_vacation_slot_runs_again_at_new_time_same_day(self):
+  self.profile('v',[['08:00',17]]);self.engine.tick(self.now)
+  self.profile('v',[['09:00',18]])
+  self.engine.tick(self.now+timedelta(hours=1));self.engine.tick(self.now+timedelta(hours=1,seconds=5))
+  self.assertEqual([c['service_data']['temperature'] for c in self.physical()],[17,18])
+ def test_reordering_slots_does_not_replay_completed_instant(self):
+  self.profile('v',[['08:00',17],['09:00',18]]);self.engine.tick(self.now)
+  self.profile('v',[['09:00',18],['08:00',17]]);self.engine.tick(self.now+timedelta(seconds=5))
+  self.assertEqual(len(self.physical()),1)
+ def test_upgrade_honours_old_journal_at_same_instant_but_not_later_slot(self):
+  self.profile('v',[['08:00',17]])
+  with self.engine.db() as db:
+   db.execute('INSERT INTO runs VALUES(?,?,?,?,?,?)',(f"scheduled:{self.layout['project']}:haweek_a:v_1:2026-11-16",self.layout['project'],'Old run',self.now.isoformat(),'accepted','done'))
+  self.engine.tick(self.now);self.assertEqual(self.physical(),[])
+  self.profile('v',[['09:00',18]]);self.engine.tick(self.now+timedelta(hours=1))
+  self.assertEqual([c['service_data']['temperature'] for c in self.physical()],[18])
