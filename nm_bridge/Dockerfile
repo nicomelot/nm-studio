@@ -100,3 +100,6 @@ COPY device_card_dashboard.py /app/device_card_dashboard.py
 
 COPY overview_generator.py /app/overview_generator.py
 COPY control-overview.js /app/control-overview.js
+
+COPY schedule_calendar.py /app/schedule_calendar.py
+COPY nm-calendar.js /app/nm-calendar.js
