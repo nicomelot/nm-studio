@@ -1,3 +1,8 @@
+## 5.42.0
+
+- Stellina nelle card HA per aggiungere e rimuovere preferiti senza editor. Preferenze condivise per progetto e salvate in HA.
+- Card raccolta preferiti dinamica; conservazione dei preferiti statici iniziali e nessun comando ai dispositivi.
+
 ## 5.41.0
 
 - Icone compatte nelle card HA per luci, tapparelle e termostati, con colore legato allo stato.

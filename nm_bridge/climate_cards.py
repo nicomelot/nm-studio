@@ -38,7 +38,7 @@ def write(data, root):
 
 
 def install_resource(ws, root='/homeassistant'):
-    name='nm-climate-card-5.41.0.js';url='/local/nm-control/'+name
+    name='nm-climate-card-5.42.0.js';url='/local/nm-control/'+name
     directory=Path(root)/'www'/'nm-control';directory.mkdir(parents=True,exist_ok=True)
     (directory/name).write_bytes(Path(__file__).with_name('nm-climate-card.js').read_bytes() + b'\n' + Path(__file__).with_name('nm-calendar.js').read_bytes() + b'\n' + Path(__file__).with_name('nm-vacation.js').read_bytes())
     resources=ws.call('lovelace/resources')
@@ -46,7 +46,7 @@ def install_resource(ws, root='/homeassistant'):
     if old:
         if old['url']!=url:ws.call('lovelace/resources/update',resource_id=old['id'],res_type='module',url=url)
     else:ws.call('lovelace/resources/create',res_type='module',url=url)
-    device_name='nm-device-card-5.41.0.js';device_url='/local/nm-control/'+device_name
+    device_name='nm-device-card-5.42.0.js';device_url='/local/nm-control/'+device_name
     (directory/device_name).write_bytes(Path(__file__).with_name('nm-device-card.js').read_bytes())
     old=next((r for r in resources if r.get('url','').startswith('/local/nm-control/nm-device-card-')),None)
     if old:
@@ -210,4 +210,40 @@ def upgrade(ws, root='/data'):
         data=read(root)
         if data:
             provision(data,ws,root,write)
+            provision_favorites(ws,data)
             install_resource(ws)
+
+
+def provision_favorites(ws, data):
+    """One HA boolean per registered card. Never rewrites dashboards or weeks."""
+    states = {s['entity_id']: s for s in ws.call('get_states')}
+    existing = {'input_boolean.' + h['id'] for h in ws.call('input_boolean/list')}
+    seeds = set()
+    for dashboard in ws.call('lovelace/dashboards/list'):
+        if dashboard.get('mode', 'storage') != 'storage':
+            continue
+        path = dashboard.get('url_path', '')
+        if not path.startswith('nm-studio-'):
+            continue
+        dashboard_config = ws.call('lovelace/config', url_path=path)
+        for view in dashboard_config.get('views', []):
+            if view.get('path') != 'preferiti':
+                continue
+            for section in view.get('sections', []):
+                for card in section.get('cards', []):
+                    if card.get('type') in (CARD, 'custom:nm-device-card'):
+                        seeds.add(key(card.get('project', ''), card.get('entity', '')))
+    for row in data.values():
+        if not re.fullmatch('[a-f0-9]{64}', row.get('project', '')):
+            continue
+        ident = key(row['project'], row['entity'])
+        entity = 'input_boolean.nm_favorite_' + ident
+        if entity in states or entity in existing:
+            continue
+        result = ws.call('input_boolean/create', name='nm_favorite_' + ident, icon='mdi:star')
+        actual = 'input_boolean.' + result['id']
+        if actual != entity:
+            raise ValueError('Identità preferito diversa: ' + actual)
+        existing.add(entity)
+        if ident in seeds:
+            ws.call('call_service', domain='input_boolean', service='turn_on', target={'entity_id': entity}, service_data={})
