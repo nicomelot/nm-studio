@@ -9,7 +9,7 @@ function harness(){
  const $=id=>ids[id]??=( {disabled:true,textContent:'',innerHTML:'',value:''} );
  const snapshot={project:'magazzino',widgets:[{name:'L5',type:'light',fields:{command:'1/1/8'},entity_id:'light.nm_lab_old'}]};
  const calls=[];
- const context={$,document:{querySelectorAll:()=>[]},setPage:p=>calls.push({page:p}),
+ const context={$,location:{href:''},document:{querySelectorAll:()=>[]},setPage:p=>calls.push({page:p}),
   widgetDirty:false,structureDirty:false,matchData:null,matchSnapshot:null,matchSelections:{},
   savedWidgetLayout:snapshot,widgetDrafts:[{kind:'light',fields:{command:'1/1/8'},entity_id:'light.nm_lab_old'}],
   etsData:{project_key:'magazzino'},nmDashboardDraft:{},confirm:()=>true,message:()=>{},
@@ -30,7 +30,7 @@ test('save all associations reuses real IDs and enables publication after persis
  assert.equal(JSON.parse(writes[0].opts.body).widgets[0].entity_id,'light.fuori_ufficio_l5');
  assert.equal(h.context.widgetDrafts[0].entity_id,'light.fuori_ufficio_l5');
  assert.equal(h.ids['match-next'].disabled,false);
- h.ids['match-next'].onclick();assert.equal(h.calls.at(-1).page,'dashboard-export');
+ h.ids['match-next'].onclick();assert.equal(h.context.location.href,'./?generate=overview');
  assert.equal(h.calls.some(c=>c.path?.includes('lab/')||c.path?.includes('create-one')),false);
 });
 

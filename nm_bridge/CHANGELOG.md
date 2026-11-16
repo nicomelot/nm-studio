@@ -1,3 +1,10 @@
+## 5.36.0
+
+- Generatore Panoramica HA con selezione per ambiente, dispositivi e schemi salvati, ricerca e anteprima.
+- Conserva le viste modificate o rimosse in HA; backup prima degli aggiornamenti e controllo delle modifiche concorrenti.
+- Nessuna card per entità assenti e nessun collegamento a schemi non presenti. Card standard e NM, altezza automatica e programmi condivisi.
+- Percorso ETS → funzioni → associazioni → Panoramica con strumenti avanzati facoltativi.
+
 ## 5.35.1
 
 - Il riepilogo e il calendario NM mostrano il comando effettivo di ogni fascia delle card HA, con indicazioni valide anche per luci e tapparelle.
