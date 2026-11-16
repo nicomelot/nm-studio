@@ -1,3 +1,7 @@
+## 5.40.2
+
+- Uniformato l’ordine di accesso a progetto e motore anche per pulsanti e sinottici: evita il blocco delle pagine durante il controllo della presenza simulata.
+
 ## 5.40.1
 
 - Corregge il blocco possibile aggiornando lo stato della presenza mentre il programmatore legge il progetto.

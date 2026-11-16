@@ -1,6 +1,8 @@
 import copy
 import tempfile
 import unittest
+import threading
+from unittest.mock import patch
 from nm_bridge.control_engine import ControlEngine, binding, digest
 from tests.test_control_engine import FakeHA, layout
 
@@ -77,3 +79,27 @@ class ButtonTests(unittest.TestCase):
         self.assertFalse(self.ha.writes())
         raw=self.e.read();raw['projects'][self.layout['project']][0]['actions']=[{'device':'any','action':'press'}];self.e.write(raw)
         with self.assertRaises(ValueError):self.e.buttons.review(self.ctx(name='Cycle',source=r['source'],option=r['option']['id'],scene=r['scene']))
+
+    def test_listener_and_snapshot_share_lock_order(self):
+        layout_lock, engine_lock = threading.RLock(), threading.RLock()
+        attempted = threading.Event()
+        class LayoutLock:
+            def __enter__(self):
+                attempted.set(); layout_lock.acquire()
+            def __exit__(self, *args): layout_lock.release()
+        self.e.lock = engine_lock
+        def provider():
+            attempted.set()
+            with layout_lock:
+                self.e.stop_event.set()
+                return copy.deepcopy(self.layout)
+        self.e.layout_provider = provider
+        with patch('nm_bridge.control_buttons.LAYOUT_LOCK', LayoutLock()):
+            with layout_lock:
+                self.e.buttons.start()
+                self.assertTrue(attempted.wait(2))
+                acquired = engine_lock.acquire(timeout=.5)
+                if acquired: engine_lock.release()
+            self.e.buttons.worker.join(2)
+        self.assertFalse(self.e.buttons.worker.is_alive())
+        self.assertTrue(acquired, 'Button listener acquired engine before layout')
