@@ -34,3 +34,11 @@ Aggiungere fino a 8 fasce distinte per luci, tapparelle e termostati. Ogni dispo
 Scegliere salvataggio disabilitato oppure salvataggio e abilitazione, leggere **Anteprima ferie di gruppo** e confermare. I profili ferie precedenti selezionati vengono sostituiti. Le sette giornate, i festivi e l’attivazione del programma principale rimangono invariati: un programma in pausa non viene riattivato. Alla fine delle ferie torna applicabile la settimana (o un festivo abilitato).
 
 Il salvataggio è sequenziale, non una transazione HA: prima vengono salvati tutti i profili disabilitati, poi eventualmente abilitati. Un errore interrompe il gruppo e indica quanti profili sono stati salvati e quali abilitati. Non ripetere alla cieca: controllare gli esiti indicati e rifare l’anteprima. Nessun comando fisico immediato viene inviato dal pulsante.
+
+## Terminare le ferie su più dispositivi (5.40)
+
+Aprire un popup e scegliere **Termina ferie**. Selezionare i profili ferie abilitati da disattivare (anche quelli futuri), eventualmente usando la ricerca e **Seleziona tutti i risultati**. Le selezioni già fatte restano anche se nascoste dal filtro; l’anteprima elenca tutti i destinatari.
+
+Premere **Anteprima fine ferie**, leggere l’elenco e confermare. Viene modificato soltanto il flag di abilitazione ferie; date, fasce, settimane, festivi e stato del programma principale restano salvati. Un programma in pausa resta in pausa; eventuali festivi abilitati hanno ancora precedenza sulla settimana. La ripresa riguarda le fasce future: non vengono inviati comandi immediati né recuperati orari trascorsi.
+
+Un dispositivo offline non impedisce di disattivarne le ferie se Home Assistant può salvare il relativo profilo. In caso di interruzione viene indicato quali dispositivi hanno confermato il salvataggio: verificare i restanti prima di ripetere l’operazione.
