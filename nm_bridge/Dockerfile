@@ -97,3 +97,6 @@ COPY nm-climate-card.js /app/nm-climate-card.js
 
 COPY nm-device-card.js /app/nm-device-card.js
 COPY device_card_dashboard.py /app/device_card_dashboard.py
+
+COPY overview_generator.py /app/overview_generator.py
+COPY control-overview.js /app/control-overview.js

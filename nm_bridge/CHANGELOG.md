@@ -1,3 +1,10 @@
+## 5.37.0
+
+- Generatore Panoramica HA con selezione per ambiente, dispositivi e schemi salvati, ricerca e anteprima.
+- Conserva le viste modificate o rimosse in HA; backup prima degli aggiornamenti e controllo delle modifiche concorrenti.
+- Nessuna card per entità assenti e nessun collegamento a schemi non presenti. Card standard e NM, altezza automatica e programmi condivisi.
+- Percorso ETS → funzioni → associazioni → Panoramica con strumenti avanzati facoltativi.
+
 ## 5.36.0
 
 - Creazione stanza dal widget con aggiornamento della struttura condivisa, scelta edificio/piano e annullamento senza perdere l’assegnazione.
