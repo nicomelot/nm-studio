@@ -150,7 +150,7 @@ function wireClearWidgetFlow(){
  const controls=$('widget-export').closest('.card');
  const tools=document.createElement('details');tools.innerHTML='<summary>Aggiunta manuale e strumenti avanzati</summary><p class="small">Per funzioni già riconosciute usa i pulsanti Aggiungi nel confronto ETS. Qui puoi preparare funzioni personalizzate.</p>';
  controls.prepend(tools);
- const bar=$('widget-export').closest('.bar');tools.append(bar);
+ tools.append($('widget-export')); // Keep widget creation visible outside advanced tools.
  $('widget-export').classList.remove('primary');
  const bulk=$('widget-bulk-room')?.closest('.card');if(bulk)tools.append(bulk);
  document.querySelectorAll('.widget-proposal').forEach(row=>{
@@ -333,4 +333,130 @@ function wireKnxPrerequisite(){
  if(!$('knx-prerequisite-refresh'))return;
  $('knx-prerequisite-refresh').onclick=checkKnxPrerequisite;
  checkKnxPrerequisite();
+}
+
+
+function createWidgetRoom(widget, name, parentId, buildingName='') {
+ name=name.trim();buildingName=buildingName.trim();
+ if(!name||name.length>80||name.includes('/')||name==='Da assegnare')throw Error('Inserisci un nome stanza di 1–80 caratteri, senza /.');
+ let parent=structureDraft.find(n=>n.id===parentId),pending=[];
+ const newId=()=>{let i=1;while([...structureDraft,...pending].some(n=>n.id==='manual_room_'+i))i++;return 'manual_room_'+i;};
+ if(!structureDraft.length){
+  if(!buildingName||buildingName.length>80||buildingName.includes('/'))throw Error('Inserisci il nome dell’edificio (massimo 80 caratteri, senza /).');
+  parent={id:newId(),parent:null,type:'building',name:buildingName,active:true,source:'manual'};pending.push(parent);
+ }else if(!parent||!['building','floor'].includes(parent.type)||!structureAncestorsActive(parent.id))throw Error('Scegli un edificio o piano attivo.');
+ const existing=structureDraft.find(n=>n.parent===parent.id&&n.name.toLocaleLowerCase()===name.toLocaleLowerCase());
+ if(existing&&(existing.type!=='room'||!structureAncestorsActive(existing.id)))throw Error('Questo nome è già usato da un elemento diverso o nascosto.');
+ if(!existing){
+  if(structureDraft.length+pending.length+1>250||structureDraft.filter(n=>n.type==='room').length>=200)throw Error('Limite di stanze o elementi edificio raggiunto.');
+  pending.push({id:newId(),parent:parent.id,type:'room',name,active:true,source:'manual'});
+ }
+ const room=existing||pending.at(-1),path=nodePath(room.id,[...structureDraft,...pending]);
+ if(path.length>240)throw Error('Percorso stanza troppo lungo: abbrevia il nome.');
+ structureDraft.push(...pending);widget.room=path;refreshEditableRooms();return path;
+}
+function assignManualWidgetGA(widget, field, value){
+ const ga=value.trim();
+ if(!/^(?:[0-9]|[12][0-9]|3[01])\/[0-7]\/(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$/.test(ga))throw Error('GA non valido. Usa principale 0–31 / intermedio 0–7 / gruppo 0–255, per esempio 1/2/3.');
+ if(!widgetFields[widget.kind]?.some(f=>f[0]===field))throw Error('Campo widget non valido.');
+ widget.fields[field]=ga;widgetDirty=true;return ga;
+}
+function revealWidgetEditor(index){
+ functionSearch='';renderKeepingScroll();
+ const row=document.querySelector(`.widget-proposal[data-index="${index}"]`);
+ if(!row)return;row.hidden=false;const details=row.querySelector('details');if(details)details.open=true;
+ row.scrollIntoView({block:'center'});row.querySelector('.widget-name')?.focus({preventScroll:true});
+}
+function wireInlineWidgetEditor(){
+ if(!etsData)return;
+ document.querySelectorAll('.widget-add').forEach(button=>button.onclick=()=>{
+  if(widgetDrafts.length>=200)return message('Massimo 200 widget KNX',true);
+  widgetDrafts.push(newWidget(button.dataset.kind));widgetDirty=true;revealWidgetEditor(widgetDrafts.length-1);
+ });
+ document.querySelectorAll('.widget-proposal').forEach(row=>{
+  const index=Number(row.dataset.index),widget=widgetDrafts[index];
+  const select=row.querySelector('.widget-room'),box=row.querySelector('.widget-custom-row');
+  select.querySelector('option[value="__custom__"]').textContent='+ Crea stanza nell’edificio…';
+  const parents=structureDraft.filter(n=>['building','floor'].includes(n.type)&&structureAncestorsActive(n.id));
+  // Replace the legacy text-only custom room with a shared building node.
+  const editor=document.createElement('div');editor.className='widget-custom-row';editor.hidden=true;
+  editor.innerHTML=`${structureDraft.length?`<label>Edificio o piano<select class="new-room-parent"><option value="">Scegli collocazione…</option>${parents.map(n=>`<option value="${escapeHTML(n.id)}">${escapeHTML(nodePath(n.id))}</option>`).join('')}</select></label>`:'<label>Nome edificio<input class="new-room-building" maxlength="80" placeholder="Es. Negozio"></label>'}<label>Nome stanza<input class="new-room-name" maxlength="80" placeholder="Es. Ripostiglio"></label><div class="bar"><button class="new-room-create">Crea stanza e assegna</button><button class="new-room-cancel">Annulla</button></div><p class="small new-room-status" role="status">La stanza sarà disponibile anche in Edificio ETS e negli altri widget. Premi Salva bozza per conservarla.</p>`;
+  box.replaceWith(editor);
+  select.onchange=()=>{if(select.value==='__custom__'){editor.hidden=false;editor.querySelector('.new-room-name').focus();}else{editor.hidden=true;widget.room=select.value;widgetDirty=true;row.querySelector('.widget-room-status').textContent='Ambiente: '+widget.room;}};
+  const parentSelect=editor.querySelector('.new-room-parent');
+  if(parentSelect){const current=structureDraft.find(n=>n.type==='room'&&nodePath(n.id)===widget.room);parentSelect.value=current?.parent||(parents.length===1?parents[0].id:'');}
+  editor.querySelector('.new-room-cancel').onclick=()=>{editor.hidden=true;select.value=widget.room;};
+  editor.querySelector('.new-room-create').onclick=()=>{
+   try{const path=createWidgetRoom(widget,editor.querySelector('.new-room-name').value,parentSelect?.value,editor.querySelector('.new-room-building')?.value||'');renderKeepingScroll();message('Stanza '+path+' creata e assegnata. Salva bozza per conservarla.');}
+   catch(e){editor.querySelector('.new-room-status').textContent=e.message;}
+  };
+  row.querySelectorAll('.widget-ga').forEach(gaSelect=>{
+   const manual=document.createElement('details');
+   manual.innerHTML='<summary>Inserisci GA manualmente</summary><label>Indirizzo di gruppo<input class="manual-ga-value" placeholder="1/2/3" maxlength="8"></label><button class="manual-ga-assign">Associa GA</button><p class="small manual-ga-status" role="status">Salva l’associazione in NM Control. Il GA e i collegamenti ai dispositivi devono essere configurati anche in ETS; nessun telegramma viene inviato.</p>';
+   gaSelect.after(manual);
+   manual.querySelector('button').onclick=()=>{try{assignManualWidgetGA(widget,gaSelect.dataset.field,manual.querySelector('input').value);revealWidgetEditor(index);message('GA associato in bozza. Verifica DPT e collegamenti in ETS prima della creazione delle entità.');}catch(e){manual.querySelector('.manual-ga-status').textContent=e.message;}};
+  });
+ });
+}
+
+// Prepare every copy before mutating drafts. Addresses never wrap between levels.
+function planWidgetCopies(widget, count, offsets){
+ if(!widgetFields[widget.kind]||!Number.isInteger(count)||count<1||count>50||widgetDrafts.length+count>200)throw Error('Scegli da 1 a 50 copie, entro il limite di 200 widget.');
+ if(!Array.isArray(offsets)||offsets.length!==3||offsets.some(n=>!Number.isInteger(n)||Math.abs(n)>255)||offsets.every(n=>n===0))throw Error('Indica almeno un incremento non nullo nei tre livelli GA.');
+ const addresses=new Map((etsData?.addresses||[]).map(a=>[a.address,a]));
+ const commands=new Set(widgetDrafts.map(w=>w.fields.command).filter(Boolean)),copies=[];
+ for(let i=1;i<=count;i++){
+  const fields={},warnings=[];
+  for(const [key,label,expected] of widgetFields[widget.kind]){
+   const ga=widget.fields[key]||'';fields[key]='';if(!ga)continue;
+   if(!/^(?:[0-9]|[12][0-9]|3[01])\/[0-7]\/(?:[0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$/.test(ga))throw Error('GA sorgente non valido: '+ga);
+   const parts=ga.split('/').map((n,k)=>Number(n)+offsets[k]*i);
+   if(parts.some((n,k)=>n<0||n>[31,7,255][k]))throw Error('Copia '+i+': incremento fuori intervallo per '+ga+'. Nessuna copia creata.');
+   const target=parts.join('/');fields[key]=target;
+   const evidence=addresses.get(target);
+   if(!evidence){warnings.push(label+': '+target+' assente in ETS');continue;}
+   const raw=evidence.dpt||'';
+   const match=raw.match(/^(?:DPST-|DPT-)?(\d+)[.-](\d+)$/);
+   const dpt=match?Number(match[1])+'.'+match[2].padStart(3,'0'):'';
+   const allowed=expected?.match(/\d+\.\d{3}/g)||[];
+   if(dpt&&allowed.length&&!allowed.includes(dpt))throw Error('Copia '+i+', '+label+' ('+target+'): '+raw+' incompatibile con '+expected+'. Verifica il GA.');
+   if(!dpt||!allowed.length)warnings.push(label+': codifica da verificare');
+   if(!evidence.linked)warnings.push(label+': GA senza oggetti collegati');
+  }
+  if(!fields.command)throw Error('Associa prima il GA principale del widget sorgente.');
+  if(commands.has(fields.command))throw Error('Comando '+fields.command+' già utilizzato: cambia incremento o numero di copie.');
+  commands.add(fields.command);
+  const name=widget.name.slice(0,65)+' · copia '+i;
+  copies.push({kind:widget.kind,name,room:widget.room,fields,entity_id:'',visible:widget.visible!==false,command_mode:widget.command_mode||'toggle',warnings});
+ }
+ return copies;
+}
+function applyWidgetCopies(widget,count,offsets){
+ const copies=planWidgetCopies(widget,count,offsets);
+ widgetDrafts.push(...copies.map(c=>newWidget(c.kind,c.name,c.fields,'Duplicato · GA e DPT da verificare',c.room,'',c.visible,c.command_mode)));
+ widgetDirty=true;return copies;
+}
+function wireWidgetDuplication(){
+ document.querySelectorAll('.widget-proposal').forEach(row=>{
+  const widget=widgetDrafts[Number(row.dataset.index)],box=document.createElement('details');
+  box.innerHTML='<summary>Duplica con incremento GA</summary><p class="small">Crea copie in bozza senza collegamenti HA. Gli incrementi si applicano a tutti i GA compilati, una volta per copia.</p><div class="bar"><label>Copie<input class="copy-count" type="number" min="1" max="50" value="1"></label><label>Principale<input class="copy-offset" type="number" min="-31" max="31" value="0"></label><label>Intermedio<input class="copy-offset" type="number" min="-7" max="7" value="1"></label><label>Gruppo<input class="copy-offset" type="number" min="-255" max="255" value="0"></label></div><button class="copy-review">Verifica anteprima</button><div class="copy-result" role="status"></div><label class="copy-consent-label" hidden><input type="checkbox" class="copy-consent">Ho verificato gli indirizzi proposti; completo i dati segnalati prima dell’installazione.</label><button class="copy-apply" hidden>Crea copie in bozza</button>';
+  row.append(box);let proof='';
+  const inputs=()=>[Number(box.querySelector('.copy-count').value),[...box.querySelectorAll('.copy-offset')].map(e=>e.value===''?NaN:Number(e.value))];
+  const signature=()=>JSON.stringify([widget,widgetDrafts,etsData?.addresses,inputs()]);
+  const result=box.querySelector('.copy-result'),apply=box.querySelector('.copy-apply'),consentLabel=box.querySelector('.copy-consent-label'),consent=box.querySelector('.copy-consent');
+  const invalidate=()=>{proof='';apply.hidden=true;consentLabel.hidden=true;consent.checked=false;result.textContent='';};
+  box.querySelectorAll('input[type="number"]').forEach(e=>e.oninput=invalidate);
+  box.querySelector('.copy-review').onclick=()=>{
+   invalidate();try{
+    const copies=planWidgetCopies(widget,...inputs());
+    result.innerHTML=copies.map(c=>`<p><b>${escapeHTML(c.name)}</b> · ${escapeHTML(c.room)}</p><ul>${Object.entries(c.fields).filter(([,v])=>v).map(([key,ga])=>`<li>${escapeHTML(widgetFields[c.kind].find(f=>f[0]===key)[1])}: ${escapeHTML(widget.fields[key])} → <b>${escapeHTML(ga)}</b></li>`).join('')}</ul>${c.warnings.length?`<p class="warning">${c.warnings.map(escapeHTML).join('<br>')}</p>`:''}`).join('');
+    proof=signature();apply.hidden=false;consentLabel.hidden=false;
+   }catch(e){result.textContent=e.message;}
+  };
+  apply.onclick=()=>{try{
+   if(!proof||proof!==signature())throw Error('Configurazione cambiata: verifica nuovamente l’anteprima.');
+   if(!consent.checked)throw Error('Conferma la verifica degli indirizzi proposti.');
+   const first=widgetDrafts.length,copies=applyWidgetCopies(widget,...inputs());revealWidgetEditor(first);message(copies.length+' copie in bozza. Assegna le stanze e salva le funzioni.');
+  }catch(e){result.textContent=e.message;}};
+ });
 }
