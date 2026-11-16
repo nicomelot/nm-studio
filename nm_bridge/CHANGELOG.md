@@ -1,3 +1,9 @@
+## 5.36.0
+
+- Creazione stanza dal widget con aggiornamento della struttura condivisa, scelta edificio/piano e annullamento senza perdere l’assegnazione.
+- GA manuali validati e conservati nei selettori, senza modificare il progetto ETS.
+- Duplicazione con incremento dei tre livelli GA, anteprima completa, verifica limiti/conflitti/DPT e copie prive di associazioni HA.
+
 ## 5.35.1
 
 - Il riepilogo e il calendario NM mostrano il comando effettivo di ogni fascia delle card HA, con indicazioni valide anche per luci e tapparelle.
