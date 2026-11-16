@@ -1,3 +1,8 @@
+## 5.41.0
+
+- Icone compatte nelle card HA per luci, tapparelle e termostati, con colore legato allo stato.
+- Icona personalizzabile nell’editor HA; vengono rispettate le icone delle entità. Le card esistenti si aggiornano senza rigenerare la plancia.
+
 ## 5.40.2
 
 - Uniformato l’ordine di accesso a progetto e motore anche per pulsanti e sinottici: evita il blocco delle pagine durante il controllo della presenza simulata.
