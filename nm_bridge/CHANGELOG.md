@@ -1,3 +1,7 @@
+## 5.37.1
+
+- Correzione della ricerca dispositivi nel generatore Panoramica: le righe escluse dal filtro sono nascoste correttamente.
+
 ## 5.37.0
 
 - Generatore Panoramica HA con selezione per ambiente, dispositivi e schemi salvati, ricerca e anteprima.
