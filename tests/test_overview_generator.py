@@ -52,3 +52,14 @@ class OverviewTests(unittest.TestCase):
   for extra in [{'entities':[]},{'plans':['missing']},{'url_path':'../bad'},{'entities':['light.nm_lab_lamp']*2}]:
    with self.assertRaises(ValueError):self.preview(**extra)
   self.assertEqual(self.ha.dashboards,{})
+ def test_preparation_does_not_modify_retained_manual_views(self):
+  self.payload['url_path']='plancia-manuale'
+  manual={'path':'mia','cards':[{'type':'custom:nm-device-card','entity':'light.custom','schedule':{'days':['input_text.custom']}}]}
+  self.ha.dashboards['plancia-manuale']={'views':[copy.deepcopy(manual)]}
+  def mutate(config,ws,root):
+   for view in config['views']:view['prepared']=True
+  o.prepare.side_effect=mutate
+  self.apply()
+  saved=self.ha.dashboards['plancia-manuale']['views']
+  self.assertEqual(saved[0],manual)
+  self.assertTrue(saved[1]['prepared'])

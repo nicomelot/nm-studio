@@ -130,7 +130,11 @@ def integration(engine,payload):
             base_dir.mkdir(parents=True,exist_ok=True)
             if current is not None:
                 with (base_dir/(path+'-'+str(time.time_ns())+'.json')).open('x',encoding='utf-8') as f:json.dump(current,f,ensure_ascii=False)
-            prepare(updated,ws,root=engine.root)
+            # Provision only changed/new views: prepare mutates schedule bindings.
+            # A retained HA view must remain byte-for-byte unchanged, including
+            # any user-selected helper entities and optional controls.
+            retained=(current or {}).get('views',[])
+            prepare({'views':[v for v in updated['views'] if v not in retained]},ws,root=engine.root)
             if any(c.get('type')=='custom:nm-floorplan-card' for v in updated['views'] for c in v.get('cards',[])):install_resource(ws)
             if exists:
                 if ws.call('lovelace/config',url_path=path)!=current:raise ValueError('Dashboard modificata durante la preparazione: ripeti anteprima')
