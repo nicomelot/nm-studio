@@ -9,6 +9,7 @@ try:
     from .schedule_calendar import selected_profile, publish_preview
     from .control_network import readings as network_readings
     from .control_buttons import ControlButtons
+    from .control_presence import ControlPresence
     from .control_features import ControlFeatures
     from .control_ha import HomeAssistantWidgets, actions as ha_actions, ATTRIBUTES as HA_ATTRIBUTES, plan as ha_plan, clean_value as ha_clean_value
     from .control_decisions import ControlDecisions, simulated, review_summary
@@ -18,6 +19,7 @@ except ImportError:
     from schedule_calendar import selected_profile, publish_preview
     from control_network import readings as network_readings
     from control_buttons import ControlButtons
+    from control_presence import ControlPresence
     from control_features import ControlFeatures
     from control_ha import HomeAssistantWidgets, actions as ha_actions, ATTRIBUTES as HA_ATTRIBUTES, plan as ha_plan, clean_value as ha_clean_value
     from control_decisions import ControlDecisions, simulated, review_summary
@@ -292,6 +294,7 @@ class ControlEngine:
         self.decisions = ControlDecisions(self)
         self.ha_widgets = HomeAssistantWidgets(self, binding)
         self.buttons = ControlButtons(self)
+        self.presence = ControlPresence(self)
         self.health = {'running': False, 'last_check': None, 'error': None}
 
     def read(self):
@@ -704,6 +707,12 @@ class ControlEngine:
                     if not upgraded:
                         with self.connection_factory() as ws:upgrade_cards(ws,self.root)
                         upgraded=True
+                    try:
+                        self.presence.tick()
+                        self.presence.error = None
+                    except Exception as exc:
+                        self.presence.error = str(exc)[:180]
+                        LOG.warning('Presence tick failed: %s', type(exc).__name__)
                     self.tick()
                     self.health.update(last_check=datetime.now(UTC).isoformat(), error=None)
                 except Exception as exc:

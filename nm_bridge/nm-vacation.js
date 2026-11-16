@@ -20,6 +20,39 @@
   }
  }
  const methods={
+  vacationEndOpen(){
+   const targets=this.vacationTargets().filter(t=>parse(this.state(t.ids[0])?.state)?.enabled===true),host=this.shadowRoot.querySelector('#calendar-editor');
+   this.vacationEndTargets=targets;
+   host.innerHTML=`<style>[data-end-row][hidden]{display:none!important}</style><h3>Termina ferie</h3><p>Disabilita le ferie sui dispositivi scelti. Le fasce ferie restano salvate per riutilizzarle. Tornano applicabili le settimane esistenti e gli eventuali festivi abilitati, dalle prossime fasce. Nessun comando immediato e nessuna riattivazione dei programmi in pausa.</p><label>Cerca dispositivi per terminare ferie<input id="end-search" type="search" placeholder="Nome o entità"></label><div>${targets.map((t,i)=>{const m=parse(this.state(t.ids[0])?.state),ready=this.state(t.ids[0])?.state!=='unavailable';return `<label data-end-row="${i}" style="flex-direction:row;align-items:center"><input type="checkbox" data-end-target="${i}" ${ready?'':'disabled'}>${e(t.name)} · ${e(m.start||'?')} → ${e(m.end||'?')} · ${parse(this.state(t.commit)?.state)?.enabled?'programma attivo':'programma in pausa'}${this.available(t.entity)?'':' · dispositivo non disponibile, profilo disattivabile'}</label>`}).join('')||'<p>Nessun profilo ferie abilitato in questo progetto.</p>'}</div><button id="end-all" ${targets.length?'':'disabled'}>Seleziona tutti i risultati</button><button id="end-none">Deseleziona tutti</button><button id="end-preview" ${targets.length?'':'disabled'}>Anteprima fine ferie</button><div id="end-preview-content"></div>`;
+   host.querySelector('#end-search').oninput=ev=>{const q=ev.target.value.trim().toLocaleLowerCase();host.querySelectorAll('[data-end-row]').forEach(n=>{const t=targets[Number(n.dataset.endRow)];n.hidden=!(t.name+' '+t.entity).toLocaleLowerCase().includes(q)})};
+   host.querySelector('#end-all').onclick=()=>host.querySelectorAll('[data-end-row]:not([hidden]) input:not(:disabled)').forEach(n=>n.checked=true);
+   host.querySelector('#end-none').onclick=()=>host.querySelectorAll('[data-end-target]').forEach(n=>n.checked=false);
+   host.querySelector('#end-preview').onclick=()=>this.work(()=>this.vacationEndPreview());host.scrollIntoView({block:'nearest'});
+  },
+  vacationEndPlan(){
+   const targets=[...this.shadowRoot.querySelectorAll('[data-end-target]:checked')].map(n=>this.vacationEndTargets[Number(n.dataset.endTarget)]);
+   if(!targets.length)throw Error('Seleziona almeno un dispositivo');
+   return targets.map(t=>{const meta=parse(this.state(t.ids[0])?.state);if(!meta||meta.enabled!==true)throw Error(t.name+': ferie già terminate o profilo cambiato. Riapri Termina ferie');
+    const watch=[...t.ids,t.commit,t.targetId];return {...t,watch,base:watch.map(id=>this.state(id)?.state),value:JSON.stringify({...meta,enabled:false})};
+   });
+  },
+  vacationEndCheck(plan){
+   const ids=new Set();for(const p of plan){if(ids.has(p.ids[0]))throw Error('Profili condivisi: operazione annullata');ids.add(p.ids[0]);if(!this.state(p.ids[0])||this.state(p.ids[0]).state==='unavailable'||JSON.stringify(p.base)!==JSON.stringify(p.watch.map(id=>this.state(id)?.state)))throw Error(p.name+': dati cambiati. Ripeti l’anteprima')}
+  },
+  async vacationEndPreview(){
+   const plan=this.vacationEndPlan();this.vacationEndCheck(plan);
+   this.shadowRoot.querySelector('#end-preview-content').innerHTML=`<h3>Anteprima fine ferie · ${plan.length} dispositivi</h3><ul>${plan.map(p=>`<li><strong>${e(p.name)}</strong>: ferie disabilitate → ${parse(p.base[2])?.enabled?'settimana salvata, salvo eventuali festivi abilitati':'programma ancora in pausa'}</li>`).join('')}</ul><p>Le settimane, i festivi e le fasce ferie restano invariati. Gli orari già trascorsi non vengono recuperati. Il salvataggio è sequenziale: eventuali esiti parziali saranno indicati.</p>`;
+   if(!await this.approve(`Terminare le ferie su ${plan.length} dispositivi selezionati? Le settimane salvate tornano applicabili dalle prossime fasce, salvo festivi abilitati. I programmi in pausa restano in pausa.`))return;
+   await this.vacationEndApply(plan);
+  },
+  async vacationEndApply(plan){
+   this.vacationEndCheck(plan);const done=[];let current;
+   try{for(const p of plan){current=p;this.vacationEndCheck([p]);await this.service(p.ids[0],'set_value',{value:p.value});
+    let verified=false;for(let i=0;i<20;i++){if(this.state(p.ids[0])?.state===p.value){verified=true;break}await new Promise(resolve=>setTimeout(resolve,250))}
+    if(!verified)throw Error('Esito non confermato da Home Assistant: controlla il profilo');done.push(p.name);
+   }}catch(err){throw Error(`Fine ferie interrotta su ${current?.name||'dispositivo'}: ${err.message}. Confermati ${done.length}/${plan.length}: ${done.join(', ')||'nessuno'}. Gli altri dispositivi non sono confermati; controlla i profili prima di riprovare. Settimane intatte.`)}
+   this.message(`Ferie terminate su ${done.length} dispositivi. Settimane e festivi salvati conservati; programmi in pausa invariati. Nessun comando immediato.`);
+  },
   vacationTargets(){
    const states=Object.values(this._hass.states),project=this.config.project||parse(this.calendarEntity('target')?.state)?.p;
    if(!project)return [];
@@ -96,6 +129,6 @@
  };
  Object.assign(NMClimateCard.prototype,methods);
  const mount=NMClimateCard.prototype.calendarMount;
- NMClimateCard.prototype.calendarMount=function(){mount.call(this);const bar=this.shadowRoot.querySelector('dialog .bar');if(!bar)return;const b=document.createElement('button');b.textContent='Ferie su più dispositivi';b.onclick=()=>this.vacationOpen();bar.append(b)};
+ NMClimateCard.prototype.calendarMount=function(){mount.call(this);const bar=this.shadowRoot.querySelector('dialog .bar');if(!bar)return;for(const [label,method] of [['Ferie su più dispositivi','vacationOpen'],['Termina ferie','vacationEndOpen']]){const b=document.createElement('button');b.textContent=label;b.onclick=()=>this[method]();bar.append(b)}};
  window.NMVacation={validateSlots,commands};
 })();

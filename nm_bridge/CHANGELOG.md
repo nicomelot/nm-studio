@@ -1,3 +1,12 @@
+## 5.40.0
+
+- Presenza simulata da Programmazioni: avvio manuale o antifurto fuori casa, luci selezionate e intervalli variabili.
+- Antifurto in sola lettura, ingresso di prova simulato, arresto al rientro e rilascio persistente delle sole luci gestite.
+
+- Pulsante Termina ferie nei popup HA: selezione, ricerca, anteprima e conferma per più dispositivi.
+- Disabilita solo i profili ferie selezionati, preservando fasce, settimane, festivi e pausa del programma principale.
+- Controllo modifiche concorrenti, conferma del salvataggio e segnalazione di esiti parziali. Funziona anche con dispositivo offline se il profilo è raggiungibile.
+
 ## 5.39.1
 
 - Una fascia spostata a un nuovo orario viene eseguita anche dopo un’altra esecuzione nella stessa giornata.

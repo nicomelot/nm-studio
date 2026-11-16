@@ -47,3 +47,28 @@ test('empty vacation allows suspension, solar and duplicate times are validated'
  assert.throws(()=>validate([['08:00','on'],['08:00','off']],states['light.demo']),/duplicato/);
  assert.throws(()=>validate([['sunrise:181','open']],states['cover.demo']),/non valido/);
 });
+function endPlan(card,targets){return targets.map(p=>({...p,base:p.watch.map(id=>card.state(id)?.state),value:JSON.stringify({...JSON.parse(card.state(p.ids[0]).state),enabled:false})}))}
+test('end selected vacations preserves slots, weekly commit, other devices and works offline',async()=>{
+ const {card,states,calls,plan}=setup();await card.vacationApply(plan);calls.length=0;
+ const before=JSON.stringify(states),selected=endPlan(card,plan.slice(0,2));states['light.demo'].state='unavailable';
+ await card.vacationEndApply(selected);
+ assert.deepEqual(calls.map(c=>c.id),selected.map(p=>p.ids[0]));
+ for(const p of selected){assert.equal(JSON.parse(states[p.ids[0]].state).enabled,false);assert.equal(states[p.ids[1]].state,JSON.parse(before)[p.ids[1]].state);assert.equal(states[p.commit].state,JSON.parse(before)[p.commit].state)}
+ assert.equal(JSON.parse(states[plan[2].ids[0]].state).enabled,true);
+});
+test('end vacation detects changes during confirmation before any write',async()=>{
+ const {card,states,calls,plan}=setup();await card.vacationApply(plan);calls.length=0;const ending=endPlan(card,plan);
+ states[plan[1].commit].state=JSON.stringify({enabled:true,v:'b'.repeat(32)});
+ await assert.rejects(card.vacationEndApply(ending),/dati cambiati/);assert.equal(calls.length,0);
+});
+test('end vacation reports partial completion without changing remaining profiles',async()=>{
+ const {card,states,calls,plan}=setup();await card.vacationApply(plan);calls.length=0;const ending=endPlan(card,plan),service=card.service;
+ card.service=async(...args)=>{if(args[0]===plan[1].ids[0])throw Error('Offline');return service(...args)};
+ await assert.rejects(card.vacationEndApply(ending),/Confermati 1\/3/);
+ assert.equal(JSON.parse(states[plan[0].ids[0]].state).enabled,false);assert.equal(JSON.parse(states[plan[1].ids[0]].state).enabled,true);assert.equal(JSON.parse(states[plan[2].ids[0]].state).enabled,true);
+});
+test('cancel end vacation preview never writes',async()=>{
+ const {card,calls,plan}=setup();await card.vacationApply(plan);calls.length=0;
+ card.vacationEndPlan=()=>endPlan(card,plan);card.shadowRoot={querySelector:()=>({innerHTML:''})};card.approve=async()=>false;
+ await card.vacationEndPreview();assert.equal(calls.length,0);
+});
