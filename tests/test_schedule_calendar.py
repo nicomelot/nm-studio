@@ -64,3 +64,7 @@ class CalendarTests(unittest.TestCase):
   self.put('input_text.c',{'v':'a'*32,'enabled':False});self.engine.tick(self.now)
   payload=json.loads(next(c for c in self.ha.writes() if c['target']['entity_id']=='input_text.next')['service_data']['value'])
   self.assertEqual(payload['mode'],'paused');self.assertEqual(payload['profile'],'w')
+ def test_snapshot_allows_same_time_in_mutually_exclusive_profiles(self):
+  self.profile('f',[['08:00',19]]);self.profile('v',[['08:00',17]])
+  record=self.engine.snapshot()['records'][0]
+  self.assertIsNone(record['warning'])

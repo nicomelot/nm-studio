@@ -341,7 +341,9 @@ class ControlEngine:
                 try:
                     clean_actions(r['actions'], self.combined(layout, raw))
                     if r['kind'] == 'schedule':
-                        clean_triggers(r['triggers'])
+                        # Card calendars validate each profile independently;
+                        # equal times in mutually exclusive profiles are valid.
+                        if r.get('source')!='ha_card':clean_triggers(r['triggers'])
                         r['next_runs'] = [d.isoformat() for d, _, _ in occurrences(r['triggers'], config, current) if d >= current][:8]
                         if not r['next_runs']:
                             r['warning'] = 'Nessuna occorrenza nei prossimi 8 giorni'
