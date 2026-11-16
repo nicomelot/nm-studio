@@ -1,7 +1,7 @@
 <!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <style>body{background:#141619;color:#eee;font:16px system-ui;padding:20px}main{max-width:900px;margin:auto;display:grid;gap:16px}ha-card{display:block;background:#252830;border-radius:12px}button,input,select{font:inherit}h1{font-size:24px}</style>
 <h1>Calendario popup · simulatore locale</h1><main><nm-climate-card></nm-climate-card><nm-device-card></nm-device-card></main>
-<script src="../nm_bridge/nm-climate-card.js"></script><script src="../nm_bridge/nm-calendar.js"></script><script src="../nm_bridge/nm-device-card.js"></script>
+<script src="../nm_bridge/nm-climate-card.js"></script><script src="../nm_bridge/nm-calendar.js"></script><script src="../nm_bridge/nm-vacation.js"></script><script src="../nm_bridge/nm-device-card.js"></script>
 <script>
 customElements.whenDefined('nm-device-card').then(()=>{
  const states={},cards=[...document.querySelectorAll('nm-climate-card,nm-device-card')],now=new Date().toISOString();
@@ -11,6 +11,7 @@ customElements.whenDefined('nm-device-card').then(()=>{
   put(entity,i?'closed':'heat');Object.assign(states[entity].attributes,i?{supported_features:15,current_position:0}:{hvac_modes:['off','heat'],current_temperature:20,temperature:21,min_temp:7,max_temp:30});
   days.forEach(id=>put(id,{v:'a'.repeat(32),s:[['08:00',i?'open':21]]}));put(commit,{v:'a'.repeat(32),enabled:false});
   for(const ids of Object.values(index))for(const id of ids)put(id,'unknown');
+  put('input_text.target'+i,{e:entity,p:'demo'},'NM target '+commit);
   put('input_text.index'+i,index,'NM index '+commit);put('input_text.today'+i,[['08:00',i?'open':21]],'NM today '+commit);
   put('input_text.next'+i,{checked:now,profile:'w',mode:'paused',at:new Date(Date.now()+3600000).toISOString(),value:i?'open':21},'NM next '+commit);
   card.setConfig({entity,name:i?'SIM Tapparella':'SIM Termostato',schedule:{days,commit}});

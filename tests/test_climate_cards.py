@@ -55,7 +55,7 @@ class ClimateCardsTests(unittest.TestCase):
         ws=Client();card=c.config('b'*64,'climate.other','Other');card['filter_alarm']='binary_sensor.manual'
         with tempfile.TemporaryDirectory() as root:
             c.prepare(card,ws,root,root);c.prepare(card,ws,root,root)
-            self.assertEqual(len(ws.created),16);self.assertEqual(len(card['schedule']['days']),7)
+            self.assertEqual(len(ws.created),17);self.assertEqual(len(card['schedule']['days']),7)
             self.assertEqual(card['filter_alarm'],'binary_sensor.manual')
-            self.assertTrue((Path(root)/'www/nm-control/nm-climate-card-5.38.0.js').exists())
+            self.assertTrue((Path(root)/'www/nm-control/nm-climate-card-5.39.0.js').exists())
 

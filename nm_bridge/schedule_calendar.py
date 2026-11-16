@@ -82,7 +82,7 @@ def provision(data, ws, root, save):
                 helper = ws.call('input_text/create', name=f'nm_p_{ident}_{kind}_{len(ids)}', max=255)
                 ids.append('input_text.' + helper['id'])
                 save(data, root)
-        for field in ('index', 'today', 'next'):
+        for field in ('index', 'today', 'next', 'target'):
             if field not in cal:
                 helper = ws.call('input_text/create', name=f'NM {field} {row["commit"]}', max=255)
                 cal[field] = 'input_text.' + helper['id']
@@ -91,6 +91,10 @@ def provision(data, ws, root, save):
         if len(encoded) > 255:
             raise ValueError('Identificativi profili troppo lunghi')
         ws.call('call_service', domain='input_text', service='set_value', target={'entity_id': cal['index']}, service_data={'value': encoded})
+        target = json.dumps({'e': row['entity'], 'p': row['project']}, separators=(',', ':'))
+        if len(target) > 255:
+            raise ValueError('Identificativo dispositivo troppo lungo')
+        ws.call('call_service', domain='input_text', service='set_value', target={'entity_id': cal['target']}, service_data={'value': target})
 
 
 def publish_preview(record, config, now, ws, states, occurrences):

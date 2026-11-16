@@ -24,3 +24,13 @@ L'anteprima considera i successivi 31 giorni; oltre questo intervallo viene indi
 Test automatici: priorità ferie/festivi, ritorno alla settimana, profilo vuoto, pausa globale, scrittura incompleta, modifiche concorrenti durante conferma, assenza di recuperi retroattivi, data non valida, cambio ora e corrispondenza fra anteprima solare ed esecuzione.
 
 Simulatore locale: `tests/calendar_preview.html`, con termostato e tapparella; i servizi scrivono soltanto helper in memoria. Il collaudo HA usa i dispositivi NM LAB e al termine lascia il programma in pausa.
+
+## Ferie su più dispositivi (5.39)
+
+Dal popup scegliere **Ferie su più dispositivi**, impostare le date comuni e selezionare i dispositivi dello stesso progetto. La ricerca non cancella le selezioni. Sono elencate le card predisposte da NM Control anche se non presenti nella pagina corrente; dispositivi indisponibili non selezionabili.
+
+Aggiungere fino a 8 fasce distinte per luci, tapparelle e termostati. Ogni dispositivo selezionato riceve le fasce del proprio tipo. Nessuna fascia significa nessun comando durante le ferie. Orari solari disponibili per luci e tapparelle; capacità e limiti temperatura vengono verificati per ogni destinatario.
+
+Scegliere salvataggio disabilitato oppure salvataggio e abilitazione, leggere **Anteprima ferie di gruppo** e confermare. I profili ferie precedenti selezionati vengono sostituiti. Le sette giornate, i festivi e l’attivazione del programma principale rimangono invariati: un programma in pausa non viene riattivato. Alla fine delle ferie torna applicabile la settimana (o un festivo abilitato).
+
+Il salvataggio è sequenziale, non una transazione HA: prima vengono salvati tutti i profili disabilitati, poi eventualmente abilitati. Un errore interrompe il gruppo e indica quanti profili sono stati salvati e quali abilitati. Non ripetere alla cieca: controllare gli esiti indicati e rifare l’anteprima. Nessun comando fisico immediato viene inviato dal pulsante.

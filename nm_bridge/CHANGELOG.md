@@ -1,3 +1,9 @@
+## 5.39.0
+
+- Ferie su più dispositivi dai popup HA: selezione con ricerca, date comuni e fino a 8 fasce per tipo (luci, tapparelle, clima).
+- Anteprima e conferma, verifica delle capacità e delle modifiche concorrenti; settimane e pausa principale conservate.
+- Salvataggio dei profili disabilitati prima dell’abilitazione, con segnalazione esplicita degli esiti parziali.
+
 ## 5.38.0
 
 - Popup luci, tapparelle e clima: programma di oggi, prossima fascia e stato attivo/in pausa/non aggiornato.
