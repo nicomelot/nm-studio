@@ -46,13 +46,16 @@ class ClimateCardsTests(unittest.TestCase):
             def __init__(self):self.created=[]
             def call(self,method,**args):
                 if method=='input_text/create':self.created.append(args);return {'id':args['name']}
+                if method=='call_service':
+                    assert args['domain']=='input_text'
+                    return {}
                 if method=='lovelace/resources':return []
                 if method=='lovelace/resources/create':return {}
                 raise AssertionError(method)
         ws=Client();card=c.config('b'*64,'climate.other','Other');card['filter_alarm']='binary_sensor.manual'
         with tempfile.TemporaryDirectory() as root:
             c.prepare(card,ws,root,root);c.prepare(card,ws,root,root)
-            self.assertEqual(len(ws.created),9);self.assertEqual(len(card['schedule']['days']),7)
+            self.assertEqual(len(ws.created),16);self.assertEqual(len(card['schedule']['days']),7)
             self.assertEqual(card['filter_alarm'],'binary_sensor.manual')
-            self.assertTrue((Path(root)/'www/nm-control/nm-climate-card-5.34.1.js').exists())
+            self.assertTrue((Path(root)/'www/nm-control/nm-climate-card-5.38.0.js').exists())
 

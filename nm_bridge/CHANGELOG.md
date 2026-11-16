@@ -1,3 +1,10 @@
+## 5.38.0
+
+- Popup luci, tapparelle e clima: programma di oggi, prossima fascia e stato attivo/in pausa/non aggiornato.
+- Profili ferie per intervallo e festivi per date selezionate, con precedenza esplicita e settimana conservata.
+- Migrazione automatica delle card già pubblicate, senza riscrivere settimane o attivarle.
+- Anteprime calcolate dal programmatore, comprese alba/tramonto, e protezione da salvataggi incompleti o concorrenti.
+
 ## 5.37.1
 
 - Correzione della ricerca dispositivi nel generatore Panoramica: le righe escluse dal filtro sono nascoste correttamente.

@@ -5,7 +5,8 @@ durably claimed before any service call: ambiguous sends are not retried.
 """
 import copy
 try:
-    from .climate_cards import records as climate_card_records
+    from .climate_cards import records as climate_card_records, upgrade as upgrade_cards
+    from .schedule_calendar import selected_profile, publish_preview
     from .control_network import readings as network_readings
     from .control_buttons import ControlButtons
     from .control_features import ControlFeatures
@@ -13,7 +14,8 @@ try:
     from .control_decisions import ControlDecisions, simulated, review_summary
     from .intelligence import summarize
 except ImportError:
-    from climate_cards import records as climate_card_records
+    from climate_cards import records as climate_card_records, upgrade as upgrade_cards
+    from schedule_calendar import selected_profile, publish_preview
     from control_network import readings as network_readings
     from control_buttons import ControlButtons
     from control_features import ControlFeatures
@@ -199,6 +201,8 @@ def occurrences(triggers, config, now, horizon=8):
     for day_offset in range(-1, horizon):
         date = today + timedelta(days=day_offset)
         for t in triggers:
+            if 'calendar' in t and selected_profile(t['calendar'],date)!=t['profile']:
+                continue
             if date.weekday() not in t['days']:
                 continue
             if t['kind'] == 'time':
@@ -657,6 +661,7 @@ class ControlEngine:
             with self.connection_factory() as ws:
                 states=ws.call('get_states')
                 card_records=climate_card_records(self.root,layout,states,binding)
+                config = ws.call('get_config') if card_records else None
                 for record in card_records:
                     conflicts=[r for r in active if any(a['device']==record['actions'][0]['device'] for a in r['actions'])]
                     if conflicts:
@@ -665,12 +670,13 @@ class ControlEngine:
                     if record.get('status_entity'):
                         old=next((s for s in states if s['entity_id']==record['status_entity']),None)
                         if old and old.get('state')!=message:ws.call('call_service',domain='input_text',service='set_value',target={'entity_id':record['status_entity']},service_data={'value':message[:255]})
+                    publish_preview(record,config,now,ws,states,occurrences)
                 active += [r for r in card_records if r['enabled']]
                 if not active:return
                 config = ws.call('get_config')
             for r in active:
                 for instant, trigger, occurrence in occurrences(r['triggers'], config, now, horizon=2):
-                    if 0 <= (now - instant).total_seconds() <= 60 and instant >= datetime.fromisoformat(r['activated_at']):
+                    if 0 <= (now - instant).total_seconds() <= 60 and instant >= max(datetime.fromisoformat(r['activated_at']),datetime.fromisoformat(trigger.get('not_before',r['activated_at']))):
                         self.execute(layout, r, slot_actions(r, trigger), f"scheduled:{layout['project']}:{r['id']}:{occurrence}")
 
     def start(self):
@@ -680,8 +686,12 @@ class ControlEngine:
             return
         def loop():
             self.health['running'] = True
+            upgraded=False
             while not self.stop_event.is_set():
                 try:
+                    if not upgraded:
+                        with self.connection_factory() as ws:upgrade_cards(ws,self.root)
+                        upgraded=True
                     self.tick()
                     self.health.update(last_check=datetime.now(UTC).isoformat(), error=None)
                 except Exception as exc:
