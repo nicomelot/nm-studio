@@ -1,3 +1,8 @@
+## 5.40.1
+
+- Corregge il blocco possibile aggiornando lo stato della presenza mentre il programmatore legge il progetto.
+- Il controllo presenza segue lo stesso ordine di accesso al progetto degli altri servizi; aggiunto collaudo concorrente.
+
 ## 5.40.0
 
 - Presenza simulata da Programmazioni: avvio manuale o antifurto fuori casa, luci selezionate e intervalli variabili.

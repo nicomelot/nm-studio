@@ -10,6 +10,10 @@ import random
 import re
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
+try:
+    from .widget_layout import LAYOUT_LOCK
+except ImportError:
+    from widget_layout import LAYOUT_LOCK
 
 
 def digest(value):
@@ -72,7 +76,7 @@ class ControlPresence:
 
     def handle(self, payload):
         e = self.e
-        with e.lock:
+        with LAYOUT_LOCK, e.lock:
             original, raw = e.layout_provider(), e.read()
             e.guard(payload, original, raw)
             layout = e.combined(original, raw)
@@ -167,7 +171,7 @@ class ControlPresence:
     def tick(self, now=None):
         now = now or datetime.now(timezone.utc)
         e = self.e
-        with e.lock:
+        with LAYOUT_LOCK, e.lock:
             raw, original = e.read(), e.layout_provider()
             layout = e.combined(original, raw)
             saved = raw.get('presence', {}).get(layout.get('project'), {})

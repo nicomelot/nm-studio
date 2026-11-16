@@ -2,6 +2,7 @@ import copy
 import json
 import tempfile
 import unittest
+import threading
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 from nm_bridge.control_engine import ControlEngine, digest
@@ -98,3 +99,31 @@ class PresenceTests(unittest.TestCase):
         self.assertFalse(in_window(now+timedelta(hours=1),'Europe/Rome','20:00','01:00'))
         self.enable(); self.tick(); self.ha.now=datetime(2026,11,16,22,tzinfo=timezone.utc); self.tick()
         self.assertEqual(self.state('light.nm_lab_lamp')['state'],'off')
+    def test_presence_and_snapshot_lock_order_cannot_deadlock(self):
+        # Another request holds the layout lock before acquiring the engine,
+        # exactly like ControlEngine.snapshot. Presence must use the same order.
+        layout_lock, engine_lock = threading.RLock(), threading.RLock()
+        attempted, finished = threading.Event(), threading.Event()
+        class LayoutLock:
+            def __enter__(self):
+                attempted.set();layout_lock.acquire()
+            def __exit__(self,*args):layout_lock.release()
+        self.e.lock=engine_lock
+        def provider():
+            attempted.set()
+            with layout_lock:return copy.deepcopy(self.layout)
+        self.e.layout_provider=provider
+        errors=[]
+        def run():
+            try:self.p.tick(self.ha.now)
+            except Exception as exc:errors.append(exc)
+            finally:finished.set()
+        with patch('nm_bridge.control_presence.LAYOUT_LOCK',LayoutLock()):
+            with layout_lock:
+                thread=threading.Thread(target=run,daemon=True);thread.start()
+                self.assertTrue(attempted.wait(2))
+                acquired=engine_lock.acquire(timeout=.5)
+                if acquired:engine_lock.release()
+            self.assertTrue(finished.wait(2));thread.join()
+        self.assertTrue(acquired,'Presence acquired engine before layout and blocked snapshot')
+        self.assertEqual(errors,[])
