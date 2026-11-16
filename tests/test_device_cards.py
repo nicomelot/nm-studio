@@ -43,7 +43,7 @@ class DeviceWeekTests(unittest.TestCase):
     raise AssertionError(method)
   ws=WS();card=c.config('a'*64,'light.nm_lab_lamp','Lamp')
   c.prepare(card,ws,self.tmp.name,self.tmp.name);c.prepare(card,ws,self.tmp.name,self.tmp.name)
-  self.assertEqual(ws.calls.count('input_text/create'),16);self.assertEqual(card['type'],'custom:nm-device-card')
+  self.assertEqual(ws.calls.count('input_text/create'),17);self.assertEqual(card['type'],'custom:nm-device-card')
 class DashboardIntegrationTests(unittest.TestCase):
  def test_preserves_original_preview_stale_guard_and_idempotency(self):
   with tempfile.TemporaryDirectory() as root:

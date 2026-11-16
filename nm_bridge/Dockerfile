@@ -103,3 +103,4 @@ COPY control-overview.js /app/control-overview.js
 
 COPY schedule_calendar.py /app/schedule_calendar.py
 COPY nm-calendar.js /app/nm-calendar.js
+COPY nm-vacation.js /app/nm-vacation.js
