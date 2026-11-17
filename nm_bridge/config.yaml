@@ -1,7 +1,7 @@
 name: NM Control
 slug: nm_bridge
 description: NM Control with compact project dashboard, scenes and persistent weekly and solar schedules
-version: 5.42.0
+version: 5.43.0
 arch:
   - amd64
   - aarch64
