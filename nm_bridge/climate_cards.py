@@ -38,7 +38,7 @@ def write(data, root):
 
 
 def install_resource(ws, root='/homeassistant'):
-    name='nm-climate-card-5.42.0.js';url='/local/nm-control/'+name
+    name='nm-climate-card-5.43.0.js';url='/local/nm-control/'+name
     directory=Path(root)/'www'/'nm-control';directory.mkdir(parents=True,exist_ok=True)
     (directory/name).write_bytes(Path(__file__).with_name('nm-climate-card.js').read_bytes() + b'\n' + Path(__file__).with_name('nm-calendar.js').read_bytes() + b'\n' + Path(__file__).with_name('nm-vacation.js').read_bytes())
     resources=ws.call('lovelace/resources')
@@ -46,7 +46,7 @@ def install_resource(ws, root='/homeassistant'):
     if old:
         if old['url']!=url:ws.call('lovelace/resources/update',resource_id=old['id'],res_type='module',url=url)
     else:ws.call('lovelace/resources/create',res_type='module',url=url)
-    device_name='nm-device-card-5.42.0.js';device_url='/local/nm-control/'+device_name
+    device_name='nm-device-card-5.43.0.js';device_url='/local/nm-control/'+device_name
     (directory/device_name).write_bytes(Path(__file__).with_name('nm-device-card.js').read_bytes())
     old=next((r for r in resources if r.get('url','').startswith('/local/nm-control/nm-device-card-')),None)
     if old:
@@ -211,6 +211,7 @@ def upgrade(ws, root='/data'):
         if data:
             provision(data,ws,root,write)
             provision_favorites(ws,data)
+            provision_favorite_order(ws,data)
             install_resource(ws)
 
 
@@ -247,3 +248,20 @@ def provision_favorites(ws, data):
         existing.add(entity)
         if ident in seeds:
             ws.call('call_service', domain='input_boolean', service='turn_on', target={'entity_id': entity}, service_data={})
+
+
+def provision_favorite_order(ws, data):
+    """Persistent ranks; existing order and dashboard configuration are untouched."""
+    existing = {'input_number.' + h['id'] for h in ws.call('input_number/list')}
+    for row in data.values():
+        if not re.fullmatch('[a-f0-9]{64}', row.get('project', '')):
+            continue
+        name = 'nm_favorite_order_' + key(row['project'], row['entity'])
+        entity = 'input_number.' + name
+        if entity in existing:
+            continue
+        result = ws.call('input_number/create', name=name, min=0, max=1000000000,
+                         step=0.000001, mode='box', icon='mdi:sort')
+        if result['id'] != name:
+            raise ValueError('Identità ordine preferiti diversa: ' + result['id'])
+        existing.add(entity)

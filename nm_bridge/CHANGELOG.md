@@ -1,3 +1,9 @@
+## 5.43.0
+
+- Preferiti riordinabili dalla maniglia direttamente nella Panoramica, anche da telefono, senza editor.
+- Ordine persistente in Home Assistant, condiviso tra dispositivi, con comandi da tastiera e messaggi di salvataggio.
+- Personalizzazioni delle dashboard, stelline e programmazioni conservate.
+
 ## 5.42.0
 
 - Stellina nelle card HA per aggiungere e rimuovere preferiti senza editor. Preferenze condivise per progetto e salvate in HA.
