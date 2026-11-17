@@ -1,3 +1,7 @@
+## 5.43.1
+
+- Le card dei preferiti si inizializzano anche quando Home Assistant prepara la vista prima di mostrarla, evitando raccolte vuote al ricaricamento.
+
 ## 5.43.0
 
 - Preferiti riordinabili dalla maniglia direttamente nella Panoramica, anche da telefono, senza editor.

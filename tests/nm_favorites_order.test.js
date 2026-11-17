@@ -30,3 +30,12 @@ test('cancel/no-op, unavailable helper and failed save never issue device comman
  obj._hass.states[obj.orderEntity(cards[0])].state='0';obj._hass.callService=async()=>{throw Error('offline')};
  await obj.saveOrder(cards[2],[cards[2],cards[0],cards[1]].map(ctx.nfKey));assert.match(obj.message,/non salvato: offline/);assert.equal(obj.busy,false);
 });
+const detachedTestSource=fs.readFileSync(require('node:path').join(__dirname,'../nm_bridge/nm-climate-card.js'),'utf8');
+test('HA may initialize the collection while detached: child cards still receive configuration',async()=>{
+ const children=[];const nodes=[];const host={append:()=>{}};const status={};
+ const scope=vm.createContext({HTMLElement:class{},window:{},customElements:{get:()=>true,whenDefined:()=>Promise.resolve()},document:{createElement(name){const el={dataset:{},append:()=>{},setAttribute:()=>{},isConnected:false,setConfig(c){this.config=c;}};nodes.push(el);if(name==='nm-device-card')children.push(el);return el;}}});
+ vm.runInContext(detachedTestSource,scope);
+ const card={type:'custom:nm-device-card',entity:'light.demo',schedule:{commit:'input_text.nm_week_00000000000000000001_commit'}};
+ const obj=Object.create(vm.runInContext('NMFavoritesCard.prototype',scope));obj.config={cards:[card]};obj.shadowRoot={querySelector:s=>s==='.cards'?host:status,querySelectorAll:()=>children};obj._hass={states:{'input_boolean.nm_favorite_00000000000000000001':{state:'on'},'input_number.nm_favorite_order_00000000000000000001':{state:'0'}}};
+ obj.render();await Promise.resolve();assert.equal(children.length,1);assert.equal(children[0].config,card);assert.equal(children[0].hass,obj._hass);
+});
