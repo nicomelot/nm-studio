@@ -53,3 +53,18 @@ function wireImportSummary(){
   }catch(e){$('import-status').textContent=e.message;b.disabled=false;}
  };
 }
+
+
+// Explicit laboratory route: never provision virtual entities from the real import flow.
+function labPage(){
+ return '<section class="card"><h2>Laboratorio senza bus KNX</h2><p>Le entità virtuali sono separate dall’impianto reale. Importa o riprendi un progetto ETS prima di preparare i simulati.</p><p id="ets-progress" role="status"></p></section>';
+}
+async function wireLabPage(){
+ if(!etsData){$('ets-progress').textContent='Nessun progetto aperto. Riprendi Sentire da Avvio guidato oppure importa ETS.';return;}
+ try{
+  if(typeof wireVirtualLab!=='function')await new Promise((resolve,reject)=>{
+   const script=document.createElement('script');script.src='lab_ui.js';script.onload=resolve;script.onerror=()=>reject(Error('Caricamento laboratorio non riuscito'));document.head.append(script);
+  });
+  if(page==='lab')wireVirtualLab();
+ }catch(error){if(page==='lab')$('ets-progress').textContent=error.message;}
+}

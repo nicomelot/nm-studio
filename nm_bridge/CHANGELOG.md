@@ -1,3 +1,7 @@
+## 5.44.2
+
+- Ripristinato l’accesso esplicito a Simulazione LAB dagli strumenti avanzati, separato dall’installazione KNX reale.
+
 ## 5.44.1
 
 - Menu installatore scorrevole nelle finestre basse: il pulsante di azzeramento resta raggiungibile.
