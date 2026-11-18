@@ -1,3 +1,7 @@
+## 5.45.0
+
+- L'anteprima ETS mostra le interfacce di climatizzazione per ambiente, gli oggetti effettivamente collegati e gli indirizzi condivisi tra unità.
+
 ## 5.44.2
 
 - Ripristinato l’accesso esplicito a Simulazione LAB dagli strumenti avanzati, separato dall’installazione KNX reale.

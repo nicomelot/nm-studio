@@ -8,12 +8,14 @@ import xml.etree.ElementTree as ET
 try:
     from .ets_archive import open_project
     from .ets_rooms import extract_functions, room_matches
+    from .ets_hvac_devices import inspect_hvac, known_hvac_addresses
     from .recognition import review_suggestions, hvac_address_inventory
     from .ets_named_functions import descriptive_suggestions
     from .ets_object_functions import enrich_suggestions
 except ImportError:  # The add-on runs the modules directly from /app.
     from ets_archive import open_project
     from ets_rooms import extract_functions, room_matches
+    from ets_hvac_devices import inspect_hvac, known_hvac_addresses
     from recognition import review_suggestions, hvac_address_inventory
     from ets_named_functions import descriptive_suggestions
     from ets_object_functions import enrich_suggestions
@@ -33,6 +35,21 @@ MAX_SPACES = 400
 
 def name_of(tag):
     return tag.rsplit("}", 1)[-1]
+
+
+def individual_addresses(root):
+    result = {}
+    for area in root.iter():
+        if name_of(area.tag) != 'Area' or not re.fullmatch(r'(?:[0-9]|1[0-5])', area.get('Address', '')):
+            continue
+        for line in area:
+            if name_of(line.tag) != 'Line' or not re.fullmatch(r'(?:[0-9]|1[0-5])', line.get('Address', '')):
+                continue
+            for device in line.iter():
+                suffix = device.get('Address', '')
+                if name_of(device.tag) == 'DeviceInstance' and re.fullmatch(r'\d{1,3}', suffix) and int(suffix) <= 255:
+                    result[device] = '.'.join((area.get('Address'), line.get('Address'), str(int(suffix))))
+    return result
 
 
 def extract_spaces(root):
@@ -569,6 +586,7 @@ def preview(raw, password=""):
         building_spaces = []
         function_refs = []
         address_refs = {}
+        device_links = {}
         for info in xmls:
             # Read only declared XML members, without extracting archive paths.
             content = archive.read(info)
@@ -601,6 +619,7 @@ def preview(raw, password=""):
                     local_addresses[node.get("Id").rsplit("_", 1)[-1]] = record
                 if len(addresses) > MAX_ADDRESSES:
                     raise ValueError("Too many group addresses")
+            individual = individual_addresses(root)
             # Links on ComObjectInstanceRef are a direct project-level
             # association, unlike names or DPT guesses. Preserve only a small,
             # bounded inventory per GA; do not load manufacturer catalogues.
@@ -614,6 +633,7 @@ def preview(raw, password=""):
                 device_inventory.append({"id": device_id, "name": dev_label, "address_suffix": device.get("Address"),
                                          "ets_id": (device.get("Id") or "")[:120],
                                          "product_ref": (device.get("ProductRefId") or "")[:140],
+                                         "individual_address": individual.get(device, ""),
                                          "program": program_file or "", "catalog_read": bool(objects),
                                          "connected_objects": 0, "linked_addresses": 0,
                                          "unlinked_objects": [], "unlinked_count": 0,
@@ -642,6 +662,7 @@ def preview(raw, password=""):
                         if record is not None:
                             record["linked"] = True
                             device_inventory[-1]["linked_addresses"] += 1
+                            device_links.setdefault(record['address'], set()).add(device_id)
                             if len(record["connections"]) < 12:
                                 ref_id = (obj.get("RefId") or "")[:100]
                                 details = instance_details(objects.get(catalog_key(ref_id), {}), obj)
@@ -659,8 +680,16 @@ def preview(raw, password=""):
         if not addresses:
             raise ValueError("No group addresses found (check ETS project format)")
         items = sorted(addresses.values(), key=lambda x: tuple(map(int, x["address"].split("/"))))
-        by_name = {}
+        hvac_units = inspect_hvac(device_inventory, items, building_spaces, device_links)
+        hvac_addresses = known_hvac_addresses(hvac_units)
+        function_items = []
         for item in items:
+            if item['address'] in hvac_addresses:
+                item['hvac_unit_point'] = True
+            else:
+                function_items.append(item)
+        by_name = {}
+        for item in function_items:
             if item["role"] in ("command", "feedback"):
                 key = base_name(item["name"])
                 if key:
@@ -679,18 +708,18 @@ def preview(raw, password=""):
                     for endpoint in (cmd, fb):
                         if endpoint["kind"] in ("unknown", "binary"):
                             endpoint["kind"] = kind
-        suggestions.extend(cover_suggestions(items, {x["command"] for x in suggestions}))
-        suggestions.extend(climate_suggestions(items, {x["command"] for x in suggestions}, suggestions))
-        suggestions.extend(climate_zone_suggestions(items, {x["command"] for x in suggestions}))
-        suggestions.extend(channel_suggestions(items, {x["command"] for x in suggestions}))
-        dimmer_fields(items, suggestions)
-        structured, covered_addresses = structured_suggestions(items)
+        suggestions.extend(cover_suggestions(function_items, {x["command"] for x in suggestions}))
+        suggestions.extend(climate_suggestions(function_items, {x["command"] for x in suggestions}, suggestions))
+        suggestions.extend(climate_zone_suggestions(function_items, {x["command"] for x in suggestions}))
+        suggestions.extend(channel_suggestions(function_items, {x["command"] for x in suggestions}))
+        dimmer_fields(function_items, suggestions)
+        structured, covered_addresses = structured_suggestions(function_items)
         suggestions = [s for s in suggestions if s["command"] not in covered_addresses]
         suggestions.extend(structured)
-        descriptive, covered_addresses = descriptive_suggestions(items)
+        descriptive, covered_addresses = descriptive_suggestions(function_items)
         suggestions = [s for s in suggestions if s['command'] not in covered_addresses]
         suggestions.extend(descriptive)
-        suggestions = enrich_suggestions(items, suggestions)
+        suggestions = enrich_suggestions(function_items, suggestions)
         suggestions.sort(key=lambda x: tuple(map(int, x["command"].split("/"))))
         functions = [{"name": item["name"], "space": item["space"],
                       "addresses": list(dict.fromkeys(address_refs[ref] for ref in item["refs"] if ref in address_refs))}
@@ -699,6 +728,7 @@ def preview(raw, password=""):
         return {"project_key": project_key, "addresses": items, "devices": device_inventory, "suggestions": suggestions[:300],
                 "recognition_reviews": review_suggestions(items, suggestions),
                 "hvac_inventory": hvac_address_inventory(items),
+                "hvac_units": hvac_units,
                 "building": building_spaces, "functions": functions, "room_matches": matches, "total": len(items),
                 "warning": "Tipi e abbinamenti sono ipotesi, non verifiche ETS. DPT mancanti da controllare. Nessun dato salvato."}
 

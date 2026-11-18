@@ -1,13 +1,13 @@
-name: NM Control
+name: NM Control - Collaudo Sentire
 slug: nm_bridge
 description: NM Control with compact project dashboard, scenes and persistent weekly and solar schedules
-version: 5.44.2
+version: 5.45.0
 arch:
   - amd64
   - aarch64
 init: false
 startup: application
-boot: auto
+boot: manual
 ingress: true
 ingress_port: 8099
 panel_icon: mdi:lan-connect

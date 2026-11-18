@@ -38,11 +38,52 @@ function organizeInstallerPage(){
 }
 
 // Real project import: persistence and review, without virtual provisioning.
+function hvacUnitLabel(unit){
+ const room=(unit.rooms||[]).map(path=>path.split(' / ').at(-1)).join(' / ');
+ const name=unit.name==='Dispositivo'&&room?'':unit.name;
+ return [name,room,unit.individual_address].filter(Boolean).join(' · ');
+}
+
+function hvacDevicePreview(units){
+ if(!units?.length)return '';
+ const climate=units.filter(unit=>unit.kind==='climate').length;
+ const technical=units.length-climate;
+ const shared=units.filter(unit=>unit.points.some(point=>point.shared_hvac)).length;
+ const linked=units.filter(unit=>unit.points.length).length;
+ const counts=[climate?climate+' KLIC di zona':'',technical?technical+' altre interfacce clima':''].filter(Boolean);
+ return `<section aria-label="Climatizzazione ETS">
+  <h3>Climatizzazione ETS</h3>
+  <p>${escapeHTML(counts.join(' · '))} · ${linked} con indirizzi collegati</p>
+  ${shared?`<p class="warning">${shared} unità condividono uno o più indirizzi. Verifica quali controlli devono funzionare insieme prima di associarle a Home Assistant.</p>`:''}
+  <details><summary>Controlla comandi e stati per unità</summary>
+  ${units.map(unit=>{
+   const points=unit.points;
+   const common=points.filter(point=>point.shared_hvac).length;
+   const location=unit.rooms.length===1?unit.rooms[0]:unit.rooms.length?'Più posizioni ETS: '+unit.rooms.join(' · '):'Ambiente da assegnare';
+   return `<details class="tile" style="margin-top:8px">
+    <summary><b>${escapeHTML(hvacUnitLabel(unit))}</b> · ${escapeHTML(unit.model)} · ${points.length} indirizzi${common?` · <span class="warning">${common} condivisi</span>`:''}</summary>
+    <p class="small muted">${escapeHTML(location)} · ${points.length?'Da associare':'Nessun indirizzo di gruppo collegato nel file ETS'}</p>
+    ${points.length?`<div style="overflow-x:auto"><table><thead><tr><th>Funzione</th><th>Indirizzo e DPT</th><th>Collegamenti</th></tr></thead><tbody>
+     ${points.map(point=>{
+      const others=point.shared_with.map(hvacUnitLabel);
+      const extra=point.peer_count-others.length;
+      const availability=point.shared_hvac?'Condiviso con altre unità':point.peer_count?'Collegato anche a':'Individuale in ETS';
+      return `<tr><td><b>${escapeHTML(point.label)}</b><div class="small muted">${escapeHTML(point.name)}</div></td>
+       <td>${escapeHTML(point.address)}<div class="small muted">${escapeHTML(point.dpt||'DPT da verificare')}</div></td>
+       <td class="${point.shared_hvac?'warning':''}">${availability}
+       ${others.length?`<div class="small">${escapeHTML(others.join(' · '))}${extra>0?' · altri '+extra:''}</div>`:''}</td></tr>`;
+     }).join('')}
+    </tbody></table></div>`:''}</details>`;
+  }).join('')}
+  </details>
+ </section>`;
+}
+
 function wireImportSummary(){
  const host=$('ets-progress')?.closest('.card');
  if(!host||!etsData)return;
  const counts={};for(const s of etsData.suggestions||[])counts[s.kind]=(counts[s.kind]||0)+1;
- host.insertAdjacentHTML('afterend',`<section class="card" id="import-summary"><h2>Progetto analizzato</h2><p>${escapeHTML(Object.entries(counts).map(([k,v])=>v+' '+({light:'luci',dimmer:'dimmer',cover:'tapparelle',climate:'clima'}[k]||k)).join(' · '))}</p><p>${etsRoomPaths().length} stanze ETS. Le proposte richiedono il controllo delle associazioni.</p><label>Nome progetto<input id="project-label" maxlength="80" value="${escapeHTML(etsData.session_label||etsData.building?.find(n=>n.type==='Building')?.name||'Impianto')}"></label><button id="project-continue" class="primary">Salva progetto e controlla le funzioni</button><p id="import-status" role="status"></p></section>`);
+ host.insertAdjacentHTML('afterend',`<section class="card" id="import-summary"><h2>Progetto analizzato</h2><p>${escapeHTML(Object.entries(counts).map(([k,v])=>v+' '+({light:'luci',dimmer:'dimmer',cover:'tapparelle',climate:'clima'}[k]||k)).join(' · '))}</p><p>${etsRoomPaths().length} stanze ETS. Le proposte richiedono il controllo delle associazioni.</p>${hvacDevicePreview(etsData.hvac_units)}<label>Nome progetto<input id="project-label" maxlength="80" value="${escapeHTML(etsData.session_label||etsData.building?.find(n=>n.type==='Building')?.name||'Impianto')}"></label><button id="project-continue" class="primary">Salva progetto e controlla le funzioni</button><p id="import-status" role="status"></p></section>`);
  $('project-continue').onclick=async()=>{
   const b=$('project-continue');b.disabled=true;
   try{

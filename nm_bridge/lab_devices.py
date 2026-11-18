@@ -63,7 +63,7 @@ def candidates(preview):
         used.update(value for value in item.values() if isinstance(value, str) and GA.fullmatch(value))
     for item in preview.get("addresses", []):
         address, dpt = item["address"], item.get("dpt", "")
-        if address in used or not item.get("linked"):
+        if address in used or not item.get("linked") or item.get("hvac_unit_point"):
             continue
         name = item.get("name", address)
         kind = None
