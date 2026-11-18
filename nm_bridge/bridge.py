@@ -52,6 +52,7 @@ from bus_recorder import Recorder
 from project_sessions import Sessions
 from knx_history import query as query_knx_history
 from control_engine import ControlEngine
+from project_reset import ProjectReset
 
 LOG = logging.getLogger("nm_bridge")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -63,6 +64,15 @@ MAX_BODY = 65536
 BUS_RECORDER = Recorder(CONFIG_PATH.parent / "nm_knx_events.sqlite")
 PROJECTS = Sessions(CONFIG_PATH.parent / "nm_projects")
 CONTROL = ControlEngine(CONFIG_PATH.parent)
+from widget_layout import WIDGET_PATH
+from knx_devices import DEVICE_PATH
+from audit_notes import NOTES_PATH
+from nm_link import LINK_PATH
+from floorplan import PATH as FLOORPLAN_PATH
+from module_plan import PATH as MODULE_PATH
+RESET = ProjectReset(CONTROL, PROJECTS, paths={'widgets': WIDGET_PATH, 'layout': CONFIG_PATH,
+    'approved': DEVICE_PATH, 'notes': NOTES_PATH, 'links': LINK_PATH,
+    'floorplans': FLOORPLAN_PATH, 'modules': MODULE_PATH})
 
 
 def get_ha_states():
@@ -197,12 +207,20 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(403)
             return
         path = self.path.split("?", 1)[0].rstrip("/")
-        if path == "/control/snapshot":
+        if path == "/control/reset-backup":
+            try:
+                self.reset_admin()
+                ident = parse_qs(urlsplit(self.path).query).get('id', [''])[0]
+                data = RESET.backup_path(ident).read_bytes()
+                self.respond(200, 'application/zip', data)
+            except (ValueError, OSError):
+                self.send_error(404)
+        elif path == "/control/snapshot":
             try:
                 self.respond(200, "application/json; charset=utf-8", json.dumps(CONTROL.snapshot(), ensure_ascii=False).encode())
             except (ValueError, OSError, KeyError, TypeError) as exc:
                 self.respond(400, "application/json", json.dumps({'error': str(exc)[:180]}).encode())
-        elif path in ("/control.js", "/control.css", "/control-dark.css", "/control-diagrams.js", "/control-diagrams.css", "/control-visuals.js", "/control-theme.css", "/control-templates.js", "/control-pipes.js", "/control-technical.js", "/control-decisions.js", "/control-ha.js", "/control-buttons.js", "/control-network.js", "/control-overview.js", "/control-presence.js"):
+        elif path in ("/control-reset.js", "/control.js", "/control.css", "/control-dark.css", "/control-diagrams.js", "/control-diagrams.css", "/control-visuals.js", "/control-theme.css", "/control-templates.js", "/control-pipes.js", "/control-technical.js", "/control-decisions.js", "/control-ha.js", "/control-buttons.js", "/control-network.js", "/control-overview.js", "/control-presence.js"):
             self.respond(200, "text/javascript; charset=utf-8" if path.endswith('.js') else "text/css; charset=utf-8",
                          Path(__file__).with_name(path[1:]).read_bytes())
         elif path == "/advanced":
@@ -394,8 +412,21 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(payload)
 
     def do_POST(self):
+        with LAYOUT_LOCK, CONTROL.lock:
+            return self._post()
+
+    def reset_admin(self):
+        user_id = self.headers.get('X-Remote-User-Id')
+        if not user_id:
+            raise ValueError('Azzeramento disponibile solo da un accesso amministratore Home Assistant')
+        with CONTROL.connection_factory() as ws:
+            users = ws.call('config/auth/list')
+        if not any(u.get('id') == user_id and u.get('is_active') and (u.get('is_admin') or u.get('is_owner') or 'system-admin' in u.get('group_ids', [])) for u in users):
+            raise ValueError('Per azzerare il progetto occorre un amministratore Home Assistant')
+
+    def _post(self):
         path = self.path.split("?", 1)[0]
-        if self.client_address[0] != INGRESS_PROXY or path not in ("/control/presence", "/control/overview", "/control/device-cards", "/control/climate-card", "/control/network-sources", "/control/button-sources", "/control/button-triggers", "/control/button-preview", "/control/button-save", "/control/button-pause", "/control/ha-preview", "/control/ha-apply", "/control/decision-preview", "/control/decision-apply", "/control/widgets", "/control/hold", "/control/diagrams", "/control/diagram-publish", "/control/diagrams-save", "/control/background", "/control/copy-week", "/control/add-lab", "/control/action-preview", "/control/action-run", "/control/save", "/control/preview", "/control/activate", "/control/run", "/control/assign", "/knx/history", "/lab/dashboard-existing", "/lab/dashboard-update", "/projects/save", "/bus-log/start", "/bus-log/stop", "/layout", "/modules/plan", "/floorplans", "/floorplans/dashboard-publish", "/ets/preview", "/knx/approved", "/audit", "/knx/widgets", "/knx/ha-preview", "/knx/yaml-audit", "/dashboard/missing-ha/review", "/dashboard/deployment-preflight", "/knx/panel-create-plan", "/knx/panel-create-one", "/knx/install-step", "/knx/installation-apply", "/knx/commission-command", "/native/areas-sync", "/dashboard/publish", "/dashboard/update-preview", "/dashboard/update", "/migration/restore", "/nm-link", "/nm-link/preview", "/nm-link/simulate", "/lab/preview", "/lab/install", "/lab/replace", "/lab/packages-preview", "/lab/packages-enable", "/lab/dashboard-preview", "/lab/dashboard-publish"):
+        if self.client_address[0] != INGRESS_PROXY or path not in ("/control/reset", "/control/presence", "/control/overview", "/control/device-cards", "/control/climate-card", "/control/network-sources", "/control/button-sources", "/control/button-triggers", "/control/button-preview", "/control/button-save", "/control/button-pause", "/control/ha-preview", "/control/ha-apply", "/control/decision-preview", "/control/decision-apply", "/control/widgets", "/control/hold", "/control/diagrams", "/control/diagram-publish", "/control/diagrams-save", "/control/background", "/control/copy-week", "/control/add-lab", "/control/action-preview", "/control/action-run", "/control/save", "/control/preview", "/control/activate", "/control/run", "/control/assign", "/knx/history", "/lab/dashboard-existing", "/lab/dashboard-update", "/projects/save", "/bus-log/start", "/bus-log/stop", "/layout", "/modules/plan", "/floorplans", "/floorplans/dashboard-publish", "/ets/preview", "/knx/approved", "/audit", "/knx/widgets", "/knx/ha-preview", "/knx/yaml-audit", "/dashboard/missing-ha/review", "/dashboard/deployment-preflight", "/knx/panel-create-plan", "/knx/panel-create-one", "/knx/install-step", "/knx/installation-apply", "/knx/commission-command", "/native/areas-sync", "/dashboard/publish", "/dashboard/update-preview", "/dashboard/update", "/migration/restore", "/nm-link", "/nm-link/preview", "/nm-link/simulate", "/lab/preview", "/lab/install", "/lab/replace", "/lab/packages-preview", "/lab/packages-enable", "/lab/dashboard-preview", "/lab/dashboard-publish"):
             self.send_error(403)
             return
         # Ingress protects access; these checks also reject cross-site form POSTs.
@@ -414,8 +445,12 @@ class Handler(BaseHTTPRequestHandler):
             if not 0 < n <= max_body:
                 raise ValueError("Invalid length")
             body = self.rfile.read(n)
+            if path == '/control/reset':
+                self.reset_admin()
+            if RESET.pending() and path != '/control/reset':
+                raise ValueError('Azzeramento incompleto: riprendi dalla sezione Azzera progetto')
             if path.startswith('/control/'):
-                operations = {'/control/presence':CONTROL.presence.handle, '/control/overview':lambda p:overview_integration(CONTROL,p), '/control/device-cards':lambda p:device_card_integration(CONTROL,p), '/control/climate-card':lambda p:setup_climate_card(CONTROL,p), '/control/network-sources':lambda p:network_sources(CONTROL,p), '/control/button-sources':CONTROL.buttons.sources, '/control/button-triggers':CONTROL.buttons.triggers, '/control/button-preview':CONTROL.buttons.review, '/control/button-save':lambda p:CONTROL.buttons.review(p,True), '/control/button-pause':CONTROL.buttons.pause, '/control/ha-preview':CONTROL.ha_widgets.preview, '/control/ha-apply':CONTROL.ha_widgets.apply, '/control/decision-preview':CONTROL.decisions.preview, '/control/decision-apply':CONTROL.decisions.apply, '/control/diagram-publish':CONTROL.features.publish_diagram, '/control/widgets':CONTROL.features.add_widget, '/control/hold':CONTROL.features.hold, '/control/diagrams':CONTROL.features.diagrams, '/control/diagrams-save':CONTROL.features.save_diagrams, '/control/background':CONTROL.features.background, '/control/save': CONTROL.save, '/control/preview': CONTROL.preview,
+                operations = {'/control/reset':RESET.handle, '/control/presence':CONTROL.presence.handle, '/control/overview':lambda p:overview_integration(CONTROL,p), '/control/device-cards':lambda p:device_card_integration(CONTROL,p), '/control/climate-card':lambda p:setup_climate_card(CONTROL,p), '/control/network-sources':lambda p:network_sources(CONTROL,p), '/control/button-sources':CONTROL.buttons.sources, '/control/button-triggers':CONTROL.buttons.triggers, '/control/button-preview':CONTROL.buttons.review, '/control/button-save':lambda p:CONTROL.buttons.review(p,True), '/control/button-pause':CONTROL.buttons.pause, '/control/ha-preview':CONTROL.ha_widgets.preview, '/control/ha-apply':CONTROL.ha_widgets.apply, '/control/decision-preview':CONTROL.decisions.preview, '/control/decision-apply':CONTROL.decisions.apply, '/control/diagram-publish':CONTROL.features.publish_diagram, '/control/widgets':CONTROL.features.add_widget, '/control/hold':CONTROL.features.hold, '/control/diagrams':CONTROL.features.diagrams, '/control/diagrams-save':CONTROL.features.save_diagrams, '/control/background':CONTROL.features.background, '/control/save': CONTROL.save, '/control/preview': CONTROL.preview,
                               '/control/activate': CONTROL.activate, '/control/run': CONTROL.run,
                               '/control/assign': CONTROL.assign, '/control/action-preview': CONTROL.action_preview,
                               '/control/action-run': CONTROL.action_run, '/control/add-lab': CONTROL.add_lab, '/control/copy-week': CONTROL.copy_week}

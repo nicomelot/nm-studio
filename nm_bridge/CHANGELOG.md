@@ -1,3 +1,9 @@
+## 5.44.0
+
+- Azzeramento del progetto NM per amministratori, con anteprima, backup verificato da scaricare e conferma scritta.
+- Ripresa dopo interruzioni e protezione delle risorse Home Assistant esterne o di attribuzione incerta.
+- Nessun azzeramento automatico durante l’aggiornamento: dashboard e personalizzazioni restano conservate.
+
 ## 5.43.1
 
 - Le card dei preferiti si inizializzano anche quando Home Assistant prepara la vista prima di mostrarla, evitando raccolte vuote al ricaricamento.

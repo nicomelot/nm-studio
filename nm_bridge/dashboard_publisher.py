@@ -69,7 +69,9 @@ class HAWebSocket:
             if response.get("type") != "result" or not response.get("success"):
                 detail = response.get("error", {})
                 message = detail.get("message", "Operazione rifiutata") if isinstance(detail, dict) else "Operazione rifiutata"
-                raise PublishError("Home Assistant: " + str(message)[:180])
+                error = PublishError("Home Assistant: " + str(message)[:180])
+                error.code = detail.get('code') if isinstance(detail, dict) else None
+                raise error
             return response.get("result")
         raise PublishError("Nessuna conferma da Home Assistant")
 

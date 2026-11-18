@@ -6,6 +6,8 @@ COPY requirements.txt /app/requirements.txt
 RUN /opt/nm-venv/bin/pip install --no-cache-dir -r /app/requirements.txt
 ENV PATH="/opt/nm-venv/bin:$PATH"
 COPY bridge.py /app/bridge.py
+COPY project_reset.py /app/project_reset.py
+COPY control-reset.js /app/control-reset.js
 COPY index.html /app/index.html
 COPY control.html /app/control.html
 COPY control.js /app/control.js

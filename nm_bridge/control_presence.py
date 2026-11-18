@@ -172,6 +172,8 @@ class ControlPresence:
         now = now or datetime.now(timezone.utc)
         e = self.e
         with LAYOUT_LOCK, e.lock:
+            if e.reset_pending():
+                return
             raw, original = e.read(), e.layout_provider()
             layout = e.combined(original, raw)
             saved = raw.get('presence', {}).get(layout.get('project'), {})

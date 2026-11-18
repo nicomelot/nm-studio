@@ -367,7 +367,12 @@ class ControlEngine:
                     'temperature_unit': config.get('unit_system', {}).get('temperature'),
                     'scheduler': copy.deepcopy(self.health)}
 
+    def reset_pending(self):
+        return (self.root / 'nm_reset_pending.json').exists()
+
     def guard(self, payload, layout, raw):
+        if self.reset_pending():
+            raise ValueError('Azzeramento in corso o interrotto: riprendi prima il reset')
         if not isinstance(payload, dict) or payload.get('confirm') is not True:
             raise ValueError('Conferma esplicita richiesta')
         if not layout.get('project') or payload.get('project') != layout['project'] or payload.get('fingerprint') != digest(layout):
@@ -569,6 +574,8 @@ class ControlEngine:
         return [dict(zip(('name', 'time', 'status', 'detail'), row)) for row in rows]
 
     def execute(self, layout, record, actions, key, planner=service_plan):
+        if self.reset_pending():
+            raise ValueError('Comandi sospesi durante l’azzeramento')
         with self.db() as db:
             try:
                 db.execute('INSERT INTO runs VALUES(?,?,?,?,?,?)', (key, layout['project'], record['name'], datetime.now(UTC).isoformat(), 'in_progress', 'Invio iniziato; esito non ancora confermato'))
@@ -660,6 +667,8 @@ class ControlEngine:
     def tick(self, now=None):
         now = now or datetime.now(UTC)
         with LAYOUT_LOCK, self.lock:
+            if self.reset_pending():
+                return
             layout, raw = self.layout_provider(), self.read()
             layout = self.combined(layout, raw)
             active = [r for r in self.records(raw, layout.get('project', '')) if r.get('enabled') and r['kind'] == 'schedule']
@@ -704,9 +713,14 @@ class ControlEngine:
             upgraded=False
             while not self.stop_event.is_set():
                 try:
+                    if self.reset_pending():
+                        self.stop_event.wait(5)
+                        continue
                     if not upgraded:
-                        with self.connection_factory() as ws:upgrade_cards(ws,self.root)
-                        upgraded=True
+                        with LAYOUT_LOCK, self.lock:
+                            if not self.reset_pending():
+                                with self.connection_factory() as ws:upgrade_cards(ws,self.root)
+                                upgraded=True
                     try:
                         self.presence.tick()
                         self.presence.error = None
