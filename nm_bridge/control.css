@@ -5,3 +5,6 @@
 
 /* Search results must override the shared flex checkbox layout. */
 .dialog-body .check[hidden]{display:none!important}
+
+/* Keep installer tools reachable in short desktop windows. */
+@media(min-width:701px){aside{overflow-y:auto;overscroll-behavior:contain}aside>*{flex-shrink:0}.side-bottom{padding-top:16px}.side-bottom [data-reset-project]{display:flex;width:100%;margin-bottom:12px}}

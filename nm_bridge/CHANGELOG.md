@@ -1,3 +1,7 @@
+## 5.44.1
+
+- Menu installatore scorrevole nelle finestre basse: il pulsante di azzeramento resta raggiungibile.
+
 ## 5.44.0
 
 - Azzeramento del progetto NM per amministratori, con anteprima, backup verificato da scaricare e conferma scritta.
