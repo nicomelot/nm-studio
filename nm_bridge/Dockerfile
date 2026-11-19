@@ -17,6 +17,7 @@ COPY control_engine.py /app/control_engine.py
 COPY lab_ui.js /app/lab_ui.js
 COPY ets_import.py /app/ets_import.py
 COPY ets_hvac_devices.py /app/ets_hvac_devices.py
+COPY ets_dashboard.py /app/ets_dashboard.py
 COPY ets_named_functions.py /app/ets_named_functions.py
 COPY ets_object_functions.py /app/ets_object_functions.py
 COPY ets_archive.py /app/ets_archive.py

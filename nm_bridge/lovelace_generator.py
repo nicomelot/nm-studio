@@ -12,10 +12,10 @@ except ImportError:
 import json
 
 try:
-    from .real_dashboard import render_dashboard
+    from .real_dashboard import dashboard_path, render_dashboard
     from .entity_matcher import is_lab_entity
 except ImportError:
-    from real_dashboard import render_dashboard
+    from real_dashboard import dashboard_path, render_dashboard
     from entity_matcher import is_lab_entity
 
 
@@ -100,7 +100,7 @@ def generate(layout, entities):
                           "Entità non assegnata" if not ident else
                           "Dominio HA incompatibile" if not compatible else "Entità non presente nell'inventario HA")
                 reports.append({"room": room, "widget": w["name"], "entity_id": ident, "reason": reason})
-    url_path = 'nm-studio-reale-' + hashlib.sha256(str(layout.get('project', '')).encode()).hexdigest()[:12]
+    url_path = dashboard_path(layout.get('project', ''))
     dashboard = render_dashboard(approved, url_path)
     fingerprint = hashlib.sha256(json.dumps(dashboard, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
     return {"version": 1, "read_only": True, "applied": False,

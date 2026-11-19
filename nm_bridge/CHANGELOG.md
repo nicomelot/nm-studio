@@ -1,5 +1,6 @@
 ## 5.45.0
 
+- La sezione Avvio guidato prepara una plancia Home Assistant dal progetto ETS salvato, con ambienti, funzioni e interfacce clima da associare anche se il bus è scollegato.
 - L'anteprima ETS mostra le interfacce di climatizzazione per ambiente, gli oggetti effettivamente collegati e gli indirizzi condivisi tra unità.
 
 ## 5.44.2
