@@ -88,7 +88,7 @@ def publish(payload, layout, entities, client_factory=HAWebSocket):
     return publish_generated(payload, generate(layout, entities), client_factory)
 
 
-def publish_generated(payload, generated, client_factory=HAWebSocket):
+def publish_generated(payload, generated, client_factory=HAWebSocket, *, offline=False):
     """Publish a server-generated preview, never a client-supplied configuration."""
     if not isinstance(payload, dict) or payload.get("confirm") is not True:
         raise PublishError("Conferma esplicita obbligatoria")
@@ -100,7 +100,7 @@ def publish_generated(payload, generated, client_factory=HAWebSocket):
         raise PublishError("Titolo dashboard non valido")
     if payload.get("expected_fingerprint") != generated["fingerprint"]:
         raise PublishError("Anteprima non aggiornata: rigenera prima di pubblicare")
-    if generated["summary"]["tiles"] == 0:
+    if generated["summary"]["tiles"] == 0 and not (offline and generated["summary"].get("planned")):
         raise PublishError("Nessuna entità HA compatibile: associa almeno un dispositivo reale prima di pubblicare")
     if not 1 <= len(generated["dashboard"]["views"]) <= MAX_VIEWS:
         raise PublishError("Numero viste inatteso")
@@ -128,7 +128,8 @@ def publish_generated(payload, generated, client_factory=HAWebSocket):
         # If save fails the empty dashboard may remain. Never silently delete
         # or retry by overwriting: report the exact path to the installer.
         try:
-            prepare_climate_cards(config,client)
+            if not offline:
+                prepare_climate_cards(config,client)
             client.call("lovelace/config/save", url_path=url_path, config=config)
         except Exception as exc:
             raise PublishError("Dashboard creata ma configurazione non salvata (" + url_path + "): " + str(exc)[:140]) from exc

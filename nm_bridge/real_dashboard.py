@@ -2,6 +2,11 @@
 import hashlib
 import json
 
+
+def dashboard_path(project):
+    return 'nm-studio-reale-' + hashlib.sha256(str(project).encode()).hexdigest()[:12]
+
+
 def _location(room):
     """Short display labels never replace the complete room identity."""
     parts = [p.strip() for p in room.split('/') if p.strip()]
@@ -36,7 +41,7 @@ def _room_icon(name):
     return 'mdi:door-open'
 
 
-def render_dashboard(approved, url_path):
+def render_dashboard(approved, url_path, *, intro=None):
     rooms, categories = {}, {}
     for item in approved:
         card = item['card']
@@ -117,13 +122,14 @@ def render_dashboard(approved, url_path):
     overview = []
     for category, states, title in [('Luci', ['on'], 'Luci accese'),
                                      ('Motorizzazioni', ['open', 'opening'], 'Motorizzazioni aperte')]:
-        ids = [{'entity': c['entity'], 'name': c['name']} for cards in categories.get(category, {}).values() for c in cards]
+        ids = [{'entity': c['entity'], 'name': c['name']}
+               for cards in categories.get(category, {}).values() for c in cards if 'entity' in c]
         if ids:
             overview.append({'type': 'entity-filter', 'entities': ids, 'state_filter': states,
                              'show_empty': False, 'card': {'type': 'entities', 'title': title, 'show_header_toggle': False}})
     dashboard = {'title': 'NM Control', 'views': [
         view('Home', 'panoramica', [grid([
-            {'type': 'markdown', 'content': '# La casa\nImpianto reale · ' + str(total) + ' entità'},
+            {'type': 'markdown', 'content': intro or '# La casa\nImpianto reale · ' + str(total) + ' entità'},
             button('Ambienti', 'ambienti', 'mdi:floor-plan'),
             button('Funzioni', 'funzioni', 'mdi:lightbulb-group-outline')]),
             *([grid(overview)] if overview else [])]),

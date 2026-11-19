@@ -17,6 +17,7 @@ from urllib.request import Request, urlopen
 from urllib.parse import urlsplit, urlunsplit, parse_qs, urlencode
 from native_areas import synchronize_saved
 from ets_import import MAX_ARCHIVE, preview as ets_preview
+from ets_dashboard import preview as ets_dashboard_preview
 from ets_archive import decode_upload, MAX_PASSWORD_BYTES
 from knx_devices import read_devices, confirm_devices
 from audit_notes import read_notes, save_notes
@@ -25,7 +26,7 @@ from backend_checks import inspect_configuration, export_backup
 from ha_generator import generate as ha_knx_preview, validate_evidence
 from nm_link import read_links, save_links, analyze as analyze_links, simulate as simulate_link
 from lovelace_generator import generate as generate_dashboard
-from dashboard_publisher import publish as publish_dashboard, preview_update as preview_dashboard_update, update_existing as update_dashboard_existing
+from dashboard_publisher import publish as publish_dashboard, publish_generated, preview_update as preview_dashboard_update, update_existing as update_dashboard_existing
 from entity_matcher import suggest as suggest_entities
 from missing_ha_generator import preview as preview_missing_ha, review as review_missing_ha
 from deployment_preflight import preflight as deployment_preflight
@@ -225,6 +226,14 @@ class Handler(BaseHTTPRequestHandler):
                          Path(__file__).with_name(path[1:]).read_bytes())
         elif path == "/advanced":
             self.respond(200, "text/html; charset=utf-8", HTML)
+        elif path == "/projects/dashboard":
+            try:
+                project = parse_qs(urlsplit(self.path).query).get("project", [""])[0]
+                data = ets_dashboard_preview(project, PROJECTS.read(project))
+                self.respond(200, "application/json; charset=utf-8", json.dumps(data, ensure_ascii=False).encode())
+            except (ValueError, OSError, KeyError) as exc:
+                error = str(exc) if isinstance(exc, ValueError) else 'Progetto non disponibile'
+                self.respond(400, "application/json; charset=utf-8", json.dumps({'error': error[:160]}).encode())
         elif path in ("/projects", "/projects/resume", "/projects/export"):
             try:
                 key = parse_qs(urlsplit(self.path).query).get("project", [""])[0]
@@ -415,14 +424,17 @@ class Handler(BaseHTTPRequestHandler):
         with LAYOUT_LOCK, CONTROL.lock:
             return self._post()
 
-    def reset_admin(self):
+    def require_admin(self, message):
         user_id = self.headers.get('X-Remote-User-Id')
         if not user_id:
-            raise ValueError('Azzeramento disponibile solo da un accesso amministratore Home Assistant')
+            raise ValueError(message)
         with CONTROL.connection_factory() as ws:
             users = ws.call('config/auth/list')
         if not any(u.get('id') == user_id and u.get('is_active') and (u.get('is_admin') or u.get('is_owner') or 'system-admin' in u.get('group_ids', [])) for u in users):
-            raise ValueError('Per azzerare il progetto occorre un amministratore Home Assistant')
+            raise ValueError(message)
+
+    def reset_admin(self):
+        self.require_admin('Per azzerare il progetto occorre un amministratore Home Assistant')
 
     def _post(self):
         path = self.path.split("?", 1)[0]
@@ -515,7 +527,16 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/dashboard/update":
                 data = update_dashboard_existing(json.loads(body), read_widget_layout(), get_entities())
             elif path == "/dashboard/publish":
-                data = publish_dashboard(json.loads(body), read_widget_layout(), get_entities())
+                request = json.loads(body)
+                if isinstance(request, dict) and request.get('mode') == 'ets_draft':
+                    self.require_admin('Per pubblicare la bozza occorre un amministratore Home Assistant')
+                    project = request.get('project')
+                    draft = ets_dashboard_preview(project, PROJECTS.read(project))
+                    if request.get('url_path') != draft['url_path']:
+                        raise ValueError('Seleziona il percorso della plancia di questo progetto')
+                    data = publish_generated(request, draft, CONTROL.connection_factory, offline=True)
+                else:
+                    data = publish_dashboard(request, read_widget_layout(), get_entities())
             elif path == "/lab/preview":
                 data = inspect_virtual_lab(json.loads(body))
             elif path == "/lab/dashboard-preview":

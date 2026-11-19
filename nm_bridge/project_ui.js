@@ -1,7 +1,7 @@
 // Saved installer sessions remain separate from HA/KNX approval.
 let projectList=[];
 function projectLibrary(){
- return `<section class="card"><div class="workspace-label">NM Control · Installazione</div><h2>Configura un impianto</h2><p>Importa ETS, controlla le funzioni riconosciute e installale in Home Assistant.</p><div class="bar"><button data-wizard-go="ets">1 · Importa ETS</button><button data-wizard-go="widgets">2 · Controlla</button><button data-wizard-go="real">3 · Installa</button></div><h3>Progetti salvati</h3>${projectList.map(p=>`<div class="row"><b>${escapeHTML(p.label)}</b><span>${p.functions} funzioni</span><button data-project-resume="${escapeHTML(p.project)}">Riprendi</button><button data-project-export="${escapeHTML(p.project)}">Scarica backup progetto</button></div>`).join('')||'<p>Importa il progetto ETS per iniziare.</p>'}<p id="project-library-status" aria-live="polite"></p></section>`;
+ return `<section class="card"><div class="workspace-label">NM Control · Installazione</div><h2>Configura un impianto</h2><p>Importa ETS, controlla le funzioni riconosciute e installale in Home Assistant.</p><div class="bar"><button data-wizard-go="ets">1 · Importa ETS</button><button data-wizard-go="widgets">2 · Controlla</button><button data-wizard-go="real">3 · Installa</button></div><h3>Progetti salvati</h3>${projectList.map(p=>`<div class="row"><b>${escapeHTML(p.label)}</b><span>${p.functions} funzioni</span><button data-project-resume="${escapeHTML(p.project)}">Riprendi</button><button data-project-dashboard="${escapeHTML(p.project)}">Prepara plancia offline</button><button data-project-export="${escapeHTML(p.project)}">Scarica backup progetto</button></div>`).join('')||'<p>Importa il progetto ETS per iniziare.</p>'}<p id="project-library-status" aria-live="polite"></p></section>`;
 }
 async function loadProjectLibrary(){projectList=(await api('projects')).projects||[];}
 function acceptProject(data){
@@ -11,6 +11,14 @@ function acceptProject(data){
  etsError='Progetto pronto: '+data.total+' indirizzi. controlla le funzioni prima di installarle.';
 }
 function wireProjectLibrary(){
+ document.querySelectorAll('[data-project-dashboard]').forEach(b=>b.onclick=async()=>{
+  const status=$('project-library-status');
+  b.disabled=true;
+  status.textContent='Preparazione plancia…';
+  try{await showEtsDashboard(b.dataset.projectDashboard,status);status.textContent='';}
+  catch(error){status.textContent=error.message;}
+  finally{b.disabled=false;}
+ });
  document.querySelectorAll('[data-project-resume]').forEach(b=>b.onclick=async()=>{
   b.disabled=true;
   try{acceptProject(await api('projects/resume?project='+encodeURIComponent(b.dataset.projectResume)));setPage('ets');}
@@ -22,6 +30,35 @@ function wireProjectLibrary(){
    const a=document.createElement('a');a.href=url;a.download='nm-project-'+b.dataset.projectExport.slice(0,12)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   }catch(e){$('project-library-status').textContent=e.message;}
  });
+}
+
+async function showEtsDashboard(project, status){
+ const draft=await api('projects/dashboard?project='+encodeURIComponent(project));
+ const counts=draft.summary;
+ $('ets-dashboard-preview')?.remove();
+ status.closest('.card').insertAdjacentHTML('afterend',`<section class="card" id="ets-dashboard-preview">
+  <h2>Anteprima plancia offline</h2>
+  <p>${counts.rooms} ambienti · ${counts.functions} funzioni · ${counts.climate} termostati · ${counts.gateways} interfacce tecniche</p>
+  ${counts.shared?'<p class="warning">'+counts.shared+' unità clima condividono indirizzi ETS. Controlla i collegamenti prima di attivarle.</p>':''}
+  <p>La bozza crea la navigazione per ambiente e funzione con schede «Da associare». Potrai modificarla in Home Assistant e aggiungere i comandi dopo aver collegato le entità.</p>
+  <details><summary>Viste per ambiente</summary><ul>${draft.dashboard.views.filter(v=>v.path.startsWith('stanza-')).map(v=>`<li>${escapeHTML(v.title)}</li>`).join('')}</ul></details>
+  <p>Percorso Home Assistant <code>/${escapeHTML(draft.url_path)}</code></p>
+  <button id="ets-dashboard-publish" class="primary">Crea bozza in Home Assistant</button>
+  <p id="ets-dashboard-status" role="status"></p>
+ </section>`);
+ const panel=$('ets-dashboard-preview'), postStatus=$('ets-dashboard-status');
+ panel.scrollIntoView({block:'nearest'});
+ $('ets-dashboard-publish').onclick=async event=>{
+  const button=event.currentTarget;
+  button.disabled=true;
+  postStatus.textContent='Creazione plancia…';
+  try{
+   const result=await api('dashboard/publish',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({mode:'ets_draft',project,title:draft.title,url_path:draft.url_path,
+     expected_fingerprint:draft.fingerprint,confirm:true})});
+   postStatus.innerHTML=`Plancia creata. <a href="/${encodeURIComponent(result.url_path)}/panoramica" target="_top">Apri ${escapeHTML(result.title)}</a>`;
+  }catch(error){postStatus.textContent=error.message;button.disabled=false;}
+ };
 }
 
 // Keep technical inspection available without mixing it with the guided flow.
@@ -83,16 +120,26 @@ function wireImportSummary(){
  const host=$('ets-progress')?.closest('.card');
  if(!host||!etsData)return;
  const counts={};for(const s of etsData.suggestions||[])counts[s.kind]=(counts[s.kind]||0)+1;
- host.insertAdjacentHTML('afterend',`<section class="card" id="import-summary"><h2>Progetto analizzato</h2><p>${escapeHTML(Object.entries(counts).map(([k,v])=>v+' '+({light:'luci',dimmer:'dimmer',cover:'tapparelle',climate:'clima'}[k]||k)).join(' · '))}</p><p>${etsRoomPaths().length} stanze ETS. Le proposte richiedono il controllo delle associazioni.</p>${hvacDevicePreview(etsData.hvac_units)}<label>Nome progetto<input id="project-label" maxlength="80" value="${escapeHTML(etsData.session_label||etsData.building?.find(n=>n.type==='Building')?.name||'Impianto')}"></label><button id="project-continue" class="primary">Salva progetto e controlla le funzioni</button><p id="import-status" role="status"></p></section>`);
- $('project-continue').onclick=async()=>{
-  const b=$('project-continue');b.disabled=true;
+ host.insertAdjacentHTML('afterend',`<section class="card" id="import-summary"><h2>Progetto analizzato</h2><p>${escapeHTML(Object.entries(counts).map(([k,v])=>v+' '+({light:'luci',dimmer:'dimmer',cover:'tapparelle',climate:'clima'}[k]||k)).join(' · '))}</p><p>${etsRoomPaths().length} stanze ETS. Le proposte richiedono il controllo delle associazioni.</p>${hvacDevicePreview(etsData.hvac_units)}<label>Nome progetto<input id="project-label" maxlength="80" value="${escapeHTML(etsData.session_label||etsData.building?.find(n=>n.type==='Building')?.name||'Impianto')}"></label><div class="bar"><button id="project-continue" class="primary">Salva progetto e controlla le funzioni</button><button id="project-offline">Salva e prepara plancia offline</button></div><p id="import-status" role="status"></p></section>`);
+ const continueButton=$('project-continue'), offlineButton=$('project-offline'), status=$('import-status');
+ async function save(offline){
+  continueButton.disabled=true;
+  if(offlineButton)offlineButton.disabled=true;
   try{
    const label=$('project-label').value.trim();
-   const result=await api('projects/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirm:true,token:etsData.session_token,expected_revision:etsData.session_revision||'',label,reviews:(etsData.lab_candidates||[]).map(d=>({...d,selected:false}))})});
+   const keepSelection=offline&&Boolean(etsData.session_revision);
+   const reviews=(etsData.lab_candidates||[]).map(d=>({...d,selected:keepSelection&&d.selected===true}));
+   const result=await api('projects/save',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({confirm:true,token:etsData.session_token,expected_revision:etsData.session_revision||'',label,reviews})});
    etsData.session_revision=result.revision;etsData.session_label=label;
-   await loadProjectLibrary();setPage('widgets');
-  }catch(e){$('import-status').textContent=e.message;b.disabled=false;}
- };
+   await loadProjectLibrary();
+   if(offline){await showEtsDashboard(result.project,status);status.textContent='Progetto salvato.';}
+   else setPage('widgets');
+  }catch(error){status.textContent=error.message;}
+  finally{continueButton.disabled=false;if(offlineButton)offlineButton.disabled=false;}
+ }
+ continueButton.onclick=()=>save(false);
+ if(offlineButton)offlineButton.onclick=()=>save(true);
 }
 
 
