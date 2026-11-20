@@ -1,6 +1,10 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 function context(){const c=vm.createContext({HTMLElement:class{},customElements:{get:()=>true},window:{},structuredClone,crypto:require('node:crypto').webcrypto,setInterval,clearInterval});
  for(const file of ['nm-climate-card.js','nm-calendar.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../nm_bridge',file),'utf8'),c);return c}
+test('offline commissioning popup does not mount the live calendar',()=>{
+ const mount=vm.runInContext('NMClimateCard.prototype.calendarMount',context());
+ mount.call({config:{commissioning:{}},shadowRoot:{querySelector:()=>assert.fail('Live calendar opened')}});
+});
 test('calendar rejects impossible dates, reversed ranges and duplicate holidays',()=>{
  const c=context(),v=c.window.NMCalendar.validate;
  assert.equal(v({kind:'v',start:'2026-12-24',end:'2027-01-06'}).end,'2027-01-06');

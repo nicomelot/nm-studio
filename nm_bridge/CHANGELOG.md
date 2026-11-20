@@ -1,3 +1,7 @@
+## 5.45.3
+
+- Il popup offline mostra il collegamento richiesto per la programmazione settimanale. Il calendario operativo resta riservato alle card associate.
+
 ## 5.45.2
 
 - Anteprima dei collegamenti clima ETS con indirizzi condivisi, bozza KNX e configurazioni dei popup da scaricare.

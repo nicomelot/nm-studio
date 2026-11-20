@@ -23,6 +23,7 @@
    const [kind,percent]=String(value).split(':');return (this.label?.(kind)||kind)+(percent===undefined?'':` ${percent}%`);
   },
   calendarMount(){
+   if(this.config?.commissioning)return;
    const dialog=this.shadowRoot.querySelector('dialog');if(!dialog)return;
    const host=document.createElement('section');host.id='calendar-summary';host.className='notice';host.setAttribute('aria-label','Programmazione di oggi');
    dialog.insertBefore(host,dialog.querySelector('.bar'));

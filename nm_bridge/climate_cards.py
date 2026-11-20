@@ -38,7 +38,7 @@ def write(data, root):
 
 
 def install_resource(ws, root='/homeassistant', *, climate_only=False):
-    name='nm-climate-card-5.45.2.js';url='/local/nm-control/'+name
+    name='nm-climate-card-5.45.3.js';url='/local/nm-control/'+name
     directory=Path(root)/'www'/'nm-control';directory.mkdir(parents=True,exist_ok=True)
     (directory/name).write_bytes(Path(__file__).with_name('nm-climate-card.js').read_bytes() + b'\n' + Path(__file__).with_name('nm-calendar.js').read_bytes() + b'\n' + Path(__file__).with_name('nm-vacation.js').read_bytes())
     resources=ws.call('lovelace/resources')
