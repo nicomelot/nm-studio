@@ -33,7 +33,7 @@ function wireProjectLibrary(){
 }
 
 async function showEtsDashboard(project, status){
- const draft=await api('projects/dashboard?project='+encodeURIComponent(project));
+ const draft=await api('projects/dashboard?climate=1&project='+encodeURIComponent(project));
  const counts=draft.summary;
  $('ets-dashboard-preview')?.remove();
  status.closest('.card').insertAdjacentHTML('afterend',`<section class="card" id="ets-dashboard-preview">
@@ -45,9 +45,11 @@ async function showEtsDashboard(project, status){
   <p>Percorso Home Assistant <code>/${escapeHTML(draft.url_path)}</code></p>
   <button id="ets-dashboard-publish" class="primary">Crea bozza in Home Assistant</button>
   <p id="ets-dashboard-status" role="status"></p>
+  ${counts.climate ? etsClimateReview(draft.climate_plan) : ''}
  </section>`);
  const panel=$('ets-dashboard-preview'), postStatus=$('ets-dashboard-status');
  panel.scrollIntoView({block:'nearest'});
+ if(counts.climate)wireEtsClimateReview(project,draft);
  $('ets-dashboard-publish').onclick=async event=>{
   const button=event.currentTarget;
   button.disabled=true;
@@ -55,9 +57,67 @@ async function showEtsDashboard(project, status){
   try{
    const result=await api('dashboard/publish',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({mode:'ets_draft',project,title:draft.title,url_path:draft.url_path,
-     expected_fingerprint:draft.fingerprint,confirm:true})});
+     climate_popups:true,expected_fingerprint:draft.fingerprint,confirm:true})});
    postStatus.innerHTML=`Plancia creata. <a href="/${encodeURIComponent(result.url_path)}/panoramica" target="_top">Apri ${escapeHTML(result.title)}</a>`;
   }catch(error){postStatus.textContent=error.message;button.disabled=false;}
+ };
+}
+
+function etsClimateReview(plan){
+ const shortRoom=room=>room.split(' / ').at(-1);
+ return `<h3>Associazioni clima e popup</h3>
+ <p>${plan.associations.length} termostati Home Assistant proposti. Il file YAML resta da installare dopo il controllo dei collegamenti KNX.</p>
+ ${plan.shared_groups.map(group=>`<details><summary>${escapeHTML(group.rooms.map(shortRoom).join(' / '))}
+ · ${group.points.length} indirizzi condivisi</summary>
+ <ul>${group.points.map(p=>`<li><code>${escapeHTML(p.address)}</code> · ${escapeHTML(p.label)}</li>`).join('')}</ul></details>`).join('')}
+ <div class="bar">
+  ${plan.associations.length?'<button id="ets-climate-yaml">Scarica bozza KNX</button><button id="ets-climate-json">Scarica associazioni e configurazioni card</button>':''}
+  <button id="ets-climate-review">Anteprima aggiornamento popup</button>
+  <button id="ets-climate-apply" hidden class="primary">Applica popup alla plancia</button>
+ </div><p id="ets-climate-status" role="status"></p>`;
+}
+
+function wireEtsClimateReview(project,draft){
+ const plan=draft.climate_plan, status=$('ets-climate-status'), apply=$('ets-climate-apply');
+ const review=$('ets-climate-review');
+ const request={mode:'ets_climate',project,url_path:draft.url_path};
+ const post=(path,body)=>api(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+ function download(filename,content,type){
+  const url=URL.createObjectURL(new Blob([content],{type}));
+  const a=document.createElement('a');a.href=url;a.download=filename;a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+ }
+ if(plan.associations.length){
+  $('ets-climate-yaml').onclick=()=>download('nm-clima-'+project.slice(0,12)+'.yaml',plan.ha_yaml,'text/yaml');
+  $('ets-climate-json').onclick=()=>{
+   const {ha_yaml,...report}=plan;
+   download('nm-clima-'+project.slice(0,12)+'.json',JSON.stringify(report,null,2),'application/json');
+  };
+ }
+ review.onclick=async()=>{
+  review.disabled=true;
+  apply.hidden=true;
+  status.textContent='Verifica plancia…';
+  try{
+   const diff=await post('dashboard/update-preview',request);
+   if(!diff.changed){
+    status.textContent='La plancia è già aggiornata o le schede sono state personalizzate in Home Assistant.';
+    return;
+   }
+   status.textContent='Pronto ad aggiungere i popup in sola lettura. Verrà salvata una copia della plancia attuale.';
+   apply.hidden=false;
+   apply.onclick=async()=>{
+    apply.disabled=true;
+    review.disabled=true;
+    try{
+     const result=await post('dashboard/update',{...request,confirm:true,expected_current:diff.expected_current,
+      expected_fingerprint:diff.expected_fingerprint});
+     status.innerHTML=`Popup preparati. <a href="/${encodeURIComponent(result.url_path)}/panoramica" target="_top">Apri la plancia</a>`;
+    }catch(error){status.textContent=error.message;}
+    finally{apply.hidden=true;apply.disabled=false;review.disabled=false;}
+   };
+  }catch(error){status.textContent=error.message;}
+  finally{review.disabled=false;}
  };
 }
 

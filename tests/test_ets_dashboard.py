@@ -4,7 +4,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from nm_bridge.dashboard_publisher import PublishError, _replacement, publish_generated
+from nm_bridge.dashboard_publisher import (PublishError, _replacement, publish_generated,
+                                              preview_generated_update, update_generated)
 from nm_bridge.ets_dashboard import preview
 from nm_bridge.ets_import import preview as parse_ets
 from nm_bridge.lab_devices import candidates
@@ -72,3 +73,26 @@ class EtsDashboardTests(unittest.TestCase):
         self.assertIn(manual, result['views'])
         self.assertTrue(any(c.get('entity') == 'light.corridoio' for v in result['views']
                             for section in v.get('sections', []) for c in section['cards']))
+
+    def test_climate_upgrade_preserves_manual_views_and_does_not_provision_entities(self):
+        client = FakeClient()
+        popup = preview(self.project, self.record, climate_popups=True)
+        with patch('nm_bridge.dashboard_publisher.BACKUP_DIR', self.root), patch(
+            'nm_bridge.dashboard_publisher.install_resource'
+        ) as install:
+            publish_generated(self.request, self.draft, lambda: client, offline=True)
+            client.existing.append(popup['url_path'])
+            manual = {'title': 'Personalizzata', 'path': 'personale', 'cards': []}
+            client.saved['views'].append(manual)
+            diff = preview_generated_update(self.request, popup, lambda: client)
+            self.assertTrue(diff['changed'])
+            request = {**self.request, 'expected_fingerprint': diff['expected_fingerprint'],
+                       'expected_current': diff['expected_current']}
+            self.assertTrue(update_generated(request, popup, lambda: client, offline=True)['updated'])
+            install.assert_called_once_with(client, climate_only=True)
+        self.assertIn(manual, client.saved['views'])
+        cards = [card for view in client.saved['views'] for section in view.get('sections', [])
+                 for card in section['cards'] if card['type'] == 'custom:nm-climate-card']
+        self.assertEqual({c['commissioning']['individual_address'] for c in cards}, {'1.1.51', '1.1.52', '1.1.53'})
+        self.assertTrue(all('entity' not in card and 'schedule' not in card for card in cards))
+        self.assertTrue(all(method.startswith('lovelace/') for method, _ in client.calls))

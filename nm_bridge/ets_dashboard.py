@@ -4,8 +4,10 @@ import hashlib
 import json
 
 try:
+    from .ets_climate_plan import build as climate_plan
     from .real_dashboard import dashboard_path, render_dashboard
 except ImportError:
+    from ets_climate_plan import build as climate_plan
     from real_dashboard import dashboard_path, render_dashboard
 
 
@@ -20,7 +22,7 @@ FUNCTIONS = {
 }
 
 
-def preview(project, record):
+def preview(project, record, *, climate_popups=False):
     if record is None:
         raise ValueError('Salva il progetto ETS prima di preparare la plancia')
     imported = record['imported']
@@ -29,10 +31,13 @@ def preview(project, record):
 
     items = []
 
-    def add(name, room, category, icon, detail=''):
+    def add(name, room, category, icon, detail='', popup=None):
         label = f'{name} · {detail}' if detail else name
         card = {'type': 'heading', 'heading_style': 'subtitle', 'icon': icon,
                 'heading': f'{label} · Da associare'}
+        if popup:
+            room_name = room.rsplit(' / ', 1)[-1]
+            card = {**popup, 'name': f'Clima · {room_name}'}
         items.append({'card': card, 'room': room, 'category': category})
 
     reviews = record.get('reviews', {})
@@ -44,6 +49,7 @@ def preview(project, record):
     functions = len(items)
 
     units = imported.get('hvac_units', [])
+    plan = climate_plan(imported) if climate_popups else {}
     shared = 0
     for unit in units:
         climate = unit['kind'] == 'climate'
@@ -55,7 +61,7 @@ def preview(project, record):
         shared += bool(common)
         detail = f'{address} · {common} GA condivisi' if common else address
         for room in unit['rooms'] or ['Da assegnare']:
-            add(name, room, category, icon, detail)
+            add(name, room, category, icon, detail, plan.get('cards', {}).get(unit['device_id']))
 
     if not items:
         raise ValueError('Il progetto ETS non contiene funzioni riconosciute per la plancia')
@@ -70,10 +76,13 @@ def preview(project, record):
     title = ('NM Control · ' + record['label'])[:60].rstrip()
     dashboard['title'] = title
     fingerprint = hashlib.sha256(json.dumps(dashboard, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
-    return {
+    result = {
         'title': title, 'url_path': url_path, 'dashboard': dashboard, 'fingerprint': fingerprint,
         'summary': {'tiles': 0, 'planned': len(items), 'rooms': len({item['room'] for item in items}),
                     'functions': functions, 'climate': sum(unit['kind'] == 'climate' for unit in units),
                     'gateways': sum(unit['kind'] != 'climate' for unit in units), 'shared': shared},
         'warnings': [],
     }
+    if plan:
+        result['climate_plan'] = {key: value for key, value in plan.items() if key != 'cards'}
+    return result

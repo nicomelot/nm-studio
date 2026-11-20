@@ -9,10 +9,10 @@ import os
 import re
 
 try:
-    from .climate_cards import prepare as prepare_climate_cards
+    from .climate_cards import prepare as prepare_climate_cards, install_resource
     from .lovelace_generator import generate
 except ImportError:
-    from climate_cards import prepare as prepare_climate_cards
+    from climate_cards import prepare as prepare_climate_cards, install_resource
     from lovelace_generator import generate
 
 
@@ -128,7 +128,9 @@ def publish_generated(payload, generated, client_factory=HAWebSocket, *, offline
         # If save fails the empty dashboard may remain. Never silently delete
         # or retry by overwriting: report the exact path to the installer.
         try:
-            if not offline:
+            if offline and generated.get('climate_plan') and generated['summary']['climate']:
+                install_resource(client, climate_only=True)
+            elif not offline:
                 prepare_climate_cards(config,client)
             client.call("lovelace/config/save", url_path=url_path, config=config)
         except Exception as exc:
@@ -166,7 +168,7 @@ def _update_target(payload, generated):
     path = payload.get('url_path') if isinstance(payload, dict) else None
     if not isinstance(path, str) or not URL_PATH.fullmatch(path) or path != generated.get('url_path'):
         raise PublishError('Seleziona la dashboard reale generata per questo progetto')
-    if not generated['summary']['tiles']:
+    if not generated['summary']['tiles'] and not (generated.get('climate_plan') and generated['summary'].get('climate')):
         raise PublishError('Nessuna entità reale associata: aggiornamento annullato')
     return path
 
@@ -308,7 +310,10 @@ def _replacement(generated, current, backup_dir=None):
 
 
 def preview_update(payload, layout, entities, client_factory=HAWebSocket, backup_dir=None):
-    generated = generate(layout, entities)
+    return preview_generated_update(payload, generate(layout, entities), client_factory, backup_dir)
+
+
+def preview_generated_update(payload, generated, client_factory=HAWebSocket, backup_dir=None):
     path = _update_target(payload, generated)
     with client_factory() as client:
         current = _read_current(client, path)
@@ -323,9 +328,12 @@ def preview_update(payload, layout, entities, client_factory=HAWebSocket, backup
 
 
 def update_existing(payload, layout, entities, client_factory=HAWebSocket, backup_dir=None):
+    return update_generated(payload, generate(layout, entities), client_factory, backup_dir)
+
+
+def update_generated(payload, generated, client_factory=HAWebSocket, backup_dir=None, *, offline=False):
     if not isinstance(payload, dict) or payload.get('confirm') is not True:
         raise PublishError('Conferma esplicita obbligatoria')
-    generated = generate(layout, entities)
     path = _update_target(payload, generated)
     if payload.get('expected_fingerprint') != generated['fingerprint']:
         raise PublishError('Anteprima non aggiornata: ripeti il confronto')
@@ -351,7 +359,10 @@ def update_existing(payload, layout, entities, client_factory=HAWebSocket, backu
         if _digest(client.call('lovelace/config', url_path=path)) != _digest(current):
             raise PublishError('Dashboard cambiata durante il backup: nessuna scrittura')
         try:
-            prepare_climate_cards(config,client)
+            if offline:
+                install_resource(client, climate_only=True)
+            else:
+                prepare_climate_cards(config,client)
             client.call('lovelace/config/save', url_path=path, config=config)
             stored = client.call('lovelace/config', url_path=path)
             if stored != config:

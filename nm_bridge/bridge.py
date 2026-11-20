@@ -26,7 +26,8 @@ from backend_checks import inspect_configuration, export_backup
 from ha_generator import generate as ha_knx_preview, validate_evidence
 from nm_link import read_links, save_links, analyze as analyze_links, simulate as simulate_link
 from lovelace_generator import generate as generate_dashboard
-from dashboard_publisher import publish as publish_dashboard, publish_generated, preview_update as preview_dashboard_update, update_existing as update_dashboard_existing
+from dashboard_publisher import (publish as publish_dashboard, publish_generated, preview_update as preview_dashboard_update,
+                                 update_existing as update_dashboard_existing, preview_generated_update, update_generated)
 from entity_matcher import suggest as suggest_entities
 from missing_ha_generator import preview as preview_missing_ha, review as review_missing_ha
 from deployment_preflight import preflight as deployment_preflight
@@ -228,8 +229,10 @@ class Handler(BaseHTTPRequestHandler):
             self.respond(200, "text/html; charset=utf-8", HTML)
         elif path == "/projects/dashboard":
             try:
-                project = parse_qs(urlsplit(self.path).query).get("project", [""])[0]
-                data = ets_dashboard_preview(project, PROJECTS.read(project))
+                query = parse_qs(urlsplit(self.path).query)
+                project = query.get("project", [""])[0]
+                data = ets_dashboard_preview(project, PROJECTS.read(project),
+                                             climate_popups=query.get("climate") == ["1"])
                 self.respond(200, "application/json; charset=utf-8", json.dumps(data, ensure_ascii=False).encode())
             except (ValueError, OSError, KeyError) as exc:
                 error = str(exc) if isinstance(exc, ValueError) else 'Progetto non disponibile'
@@ -522,16 +525,29 @@ class Handler(BaseHTTPRequestHandler):
                 data = restore_migration(request.get("bundle"), CONFIG_PATH, validate_layout,
                                          confirm=request.get("confirm") is True,
                                          overwrite=request.get("overwrite") is True)
-            elif path == "/dashboard/update-preview":
-                data = preview_dashboard_update(json.loads(body), read_widget_layout(), get_entities())
-            elif path == "/dashboard/update":
-                data = update_dashboard_existing(json.loads(body), read_widget_layout(), get_entities())
+            elif path in ("/dashboard/update-preview", "/dashboard/update"):
+                request = json.loads(body)
+                if isinstance(request, dict) and request.get("mode") == "ets_climate":
+                    self.require_admin('Per preparare i popup occorre un amministratore Home Assistant')
+                    project = request.get('project')
+                    draft = ets_dashboard_preview(project, PROJECTS.read(project), climate_popups=True)
+                    if not draft['summary']['climate']:
+                        raise ValueError('Il progetto ETS non contiene termostati')
+                    if path == "/dashboard/update-preview":
+                        data = preview_generated_update(request, draft, CONTROL.connection_factory)
+                    else:
+                        data = update_generated(request, draft, CONTROL.connection_factory, offline=True)
+                elif path == "/dashboard/update-preview":
+                    data = preview_dashboard_update(request, read_widget_layout(), get_entities())
+                else:
+                    data = update_dashboard_existing(request, read_widget_layout(), get_entities())
             elif path == "/dashboard/publish":
                 request = json.loads(body)
                 if isinstance(request, dict) and request.get('mode') == 'ets_draft':
                     self.require_admin('Per pubblicare la bozza occorre un amministratore Home Assistant')
                     project = request.get('project')
-                    draft = ets_dashboard_preview(project, PROJECTS.read(project))
+                    draft = ets_dashboard_preview(project, PROJECTS.read(project),
+                                                  climate_popups=request.get('climate_popups') is True)
                     if request.get('url_path') != draft['url_path']:
                         raise ValueError('Seleziona il percorso della plancia di questo progetto')
                     data = publish_generated(request, draft, CONTROL.connection_factory, offline=True)

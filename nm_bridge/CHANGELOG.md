@@ -1,3 +1,8 @@
+## 5.45.2
+
+- Anteprima dei collegamenti clima ETS con indirizzi condivisi, bozza KNX e configurazioni dei popup da scaricare.
+- Popup termostato offline nelle plance Home Assistant, con aggiornamento delle plance esistenti su conferma e backup.
+
 ## 5.45.1
 
 - La sezione Avvio guidato prepara una plancia Home Assistant dal progetto ETS salvato, con ambienti, funzioni e interfacce clima da associare anche se il bus è scollegato.

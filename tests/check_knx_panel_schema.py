@@ -42,3 +42,12 @@ row = compare(layout, 0, Stored())
 assert row['status'] == 'update', row
 validate_entity_data(row['call'])
 print('Official HA schema accepted: additive update preserving entity_id')
+
+# This uses the YAML schema only. No HA instance, entity creation or bus traffic.
+from homeassistant.components.knx import CONFIG_SCHEMA
+from yaml import safe_load
+from nm_bridge.ets_climate_plan import build as build_climate_plan
+from test_ets_climate_plan import mapped_project
+
+CONFIG_SCHEMA(safe_load(build_climate_plan(mapped_project())['ha_yaml']))
+print('Official HA KNX schema accepted the climate package draft')
